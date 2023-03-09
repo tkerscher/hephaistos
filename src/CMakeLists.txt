@@ -11,6 +11,8 @@ set(PUBLIC_HEADERS
 #Source
 set(SRC
     ${SRCROOT}/version.cpp
+#vulkan
+    ${SRCROOT}/vk/result.hpp
 )
 
 #create library
@@ -22,6 +24,9 @@ target_include_directories(hephaistos
 )
 set_target_properties(hephaistos PROPERTIES PUBLIC_HEADER "${PUBLIC_HEADERS}")
 target_compile_features(hephaistos PUBLIC cxx_std_20)
+
+#link libraries
+target_link_libraries(hephaistos PRIVATE volk)
 
 #tell the compiler to hide all symbols by default
 set_target_properties(hephaistos PROPERTIES CXX_VISIBILITY hidden)

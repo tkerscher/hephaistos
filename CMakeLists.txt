@@ -29,6 +29,16 @@ project("hephaistos"
 )
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
 
+# fetch volk (vulkan loader)
+set(CMAKE_DISABLE_FIND_PACKAGE_Vulkan TRUE)
+FetchContent_Declare(
+    volk
+    GIT_REPOSITORY https://github.com/zeux/volk.git
+    GIT_TAG sdk-1.3.239.0
+)
+FetchContent_MakeAvailable(volk)
+set_target_properties(volk PROPERTIES FOLDER "dependencies")
+
 #source code
 add_subdirectory(src)
 
