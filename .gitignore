@@ -1,0 +1,22 @@
+CMakeCache.txt
+
+#Visual Studio
+CMakeSettings.json
+.vs/
+.vscode/
+*.sln
+*.vcxproj
+
+#Build dirs
+[Dd]ebug/
+[Rr]elease/
+build/
+[Bb]in/
+[Oo]bj/
+out/
+x64/
+x86/
+
+#Python stuff
+*.egg-info
+_skbuild
