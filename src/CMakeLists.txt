@@ -5,14 +5,18 @@ set(SRCROOT ${PROJECT_SOURCE_DIR}/src)
 #Public API
 set(PUBLIC_HEADERS
     ${INCROOT}/config.hpp
+    ${INCROOT}/context.hpp
+    ${INCROOT}/handles.hpp
     ${INCROOT}/hephaistos.hpp
     ${INCROOT}/version.hpp
 )
 #Source
 set(SRC
+    ${SRCROOT}/context.cpp
     ${SRCROOT}/version.cpp
 #vulkan
     ${SRCROOT}/vk/result.hpp
+    ${SRCROOT}/vk/types.hpp
 )
 
 #create library
