@@ -3,6 +3,7 @@
 #Collect source files
 set(PYROOT ${PROJECT_SOURCE_DIR}/python)
 set(SRC
+    ${PYROOT}/buffer.cpp
     ${PYROOT}/context.cpp
     ${PYROOT}/pyhephaistos.cpp
 )
