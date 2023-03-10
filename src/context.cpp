@@ -438,4 +438,19 @@ ContextHandle createContext(const DeviceHandle& device) {
 	return createContext(getInstance(), device->device);
 }
 
+/*********************************** RESOURCE ********************************/
+
+const ContextHandle& Resource::getContext() const noexcept {
+	return context;
+}
+
+Resource::Resource(Resource&& other) noexcept = default;
+Resource& Resource::operator=(Resource&& other) noexcept = default;
+
+Resource::Resource(ContextHandle context)
+	: context(std::move(context))
+{}
+
+Resource::~Resource() = default;
+
 }

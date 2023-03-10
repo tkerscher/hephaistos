@@ -3,8 +3,17 @@
 #include "volk.h"
 #include "vk_mem_alloc.h"
 #include "hephaistos/config.hpp"
+#include "hephaistos/handles.hpp"
 
 namespace hephaistos::vulkan {
+
+struct Buffer {
+	VkBuffer buffer;
+	VmaAllocation allocation;
+	VmaAllocationInfo allocInfo;
+
+	const Context& context;
+};
 
 struct Context {
     VkPhysicalDevice physicalDevice;
@@ -29,5 +38,12 @@ struct Instance {
     VkDebugUtilsMessengerEXT messenger;
 #endif
 };
+
+[[nodiscard]] BufferHandle createBuffer(
+	const ContextHandle& handle,
+	uint64_t size,
+	VkBufferUsageFlags usage,
+	VmaAllocationCreateFlags flags);
+void destroyBuffer(Buffer* buffer);
 
 }

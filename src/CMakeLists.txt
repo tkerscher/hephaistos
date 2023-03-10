@@ -4,6 +4,7 @@ set(SRCROOT ${PROJECT_SOURCE_DIR}/src)
 
 #Public API
 set(PUBLIC_HEADERS
+    ${INCROOT}/buffer.hpp
     ${INCROOT}/config.hpp
     ${INCROOT}/context.hpp
     ${INCROOT}/handles.hpp
@@ -12,10 +13,12 @@ set(PUBLIC_HEADERS
 )
 #Source
 set(SRC
+    ${SRCROOT}/buffer.cpp
     ${SRCROOT}/context.cpp
     ${SRCROOT}/version.cpp
 #vulkan
     ${SRCROOT}/vk/result.hpp
+    ${SRCROOT}/vk/types.cpp
     ${SRCROOT}/vk/types.hpp
     ${SRCROOT}/vk/vma.cpp
 )

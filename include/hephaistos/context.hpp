@@ -13,6 +13,25 @@ struct DeviceInfo {
     bool isDiscrete;
 };
 
+class HEPHAISTOS_API Resource {
+public:
+    const ContextHandle& getContext() const noexcept;
+
+    Resource(const Resource&) = delete;
+    Resource& operator=(const Resource&) = delete;
+
+    virtual ~Resource();
+
+protected:
+    Resource(Resource&& other) noexcept;
+    Resource& operator=(Resource&& other) noexcept;
+
+    Resource(ContextHandle context);
+
+private:
+    ContextHandle context;
+};
+
 [[nodiscard]] HEPHAISTOS_API bool isVulkanAvailable();
 
 [[nodiscard]] HEPHAISTOS_API std::vector<DeviceHandle> enumerateDevices();
