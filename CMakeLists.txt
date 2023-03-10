@@ -55,8 +55,14 @@ endif()
 #source code
 add_subdirectory(src)
 
-#examples
-option(BUILD_EXAMPLES "Build examples" ON)
-if(BUILD_EXAMPLES)
-    add_subdirectory(examples)
+#python switch
+if(SKBUILD)
+    #Python library
+    add_subdirectory(python)
+else()
+    #add stuff we dont want in the python release
+    option(BUILD_EXAMPLES "Build examples" ON)
+    if(BUILD_EXAMPLES)
+        add_subdirectory(examples)
+    endif()
 endif()
