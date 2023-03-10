@@ -283,13 +283,15 @@ DeviceInfo getDeviceInfo(const ContextHandle& context) {
 namespace {
 
 void destroyContext(vulkan::Context* context) {
+	if (context->allocator)
+		vmaDestroyAllocator(context->allocator);
 	context->fnTable.vkDestroyPipelineCache(context->device, context->cache, nullptr);
 	context->fnTable.vkDestroyCommandPool(context->device, context->cmdPool, nullptr);
 	context->fnTable.vkDestroyDevice(context->device, nullptr);
 	returnInstance();
 }
 
-ContextHandle createContext(VkPhysicalDevice device) {
+ContextHandle createContext(VkInstance instance, VkPhysicalDevice device) {
 	//Allocate memory
 	ContextHandle context{ new vulkan::Context, destroyContext };
 	context->physicalDevice = device;
@@ -352,6 +354,46 @@ ContextHandle createContext(VkPhysicalDevice device) {
 			context->device, &cacheInfo, nullptr, &context->cache));
 	}
 
+	//Create allocator
+	{
+		VmaVulkanFunctions functions{
+			.vkGetPhysicalDeviceProperties           = vkGetPhysicalDeviceProperties,
+			.vkGetPhysicalDeviceMemoryProperties     = vkGetPhysicalDeviceMemoryProperties,
+			.vkAllocateMemory                        = context->fnTable.vkAllocateMemory,
+			.vkFreeMemory                            = context->fnTable.vkFreeMemory,
+			.vkMapMemory                             = context->fnTable.vkMapMemory,
+			.vkUnmapMemory                           = context->fnTable.vkUnmapMemory,
+			.vkFlushMappedMemoryRanges               = context->fnTable.vkFlushMappedMemoryRanges,
+			.vkInvalidateMappedMemoryRanges          = context->fnTable.vkInvalidateMappedMemoryRanges,
+			.vkBindBufferMemory                      = context->fnTable.vkBindBufferMemory,
+			.vkBindImageMemory                       = context->fnTable.vkBindImageMemory,
+			.vkGetBufferMemoryRequirements           = context->fnTable.vkGetBufferMemoryRequirements,
+			.vkGetImageMemoryRequirements            = context->fnTable.vkGetImageMemoryRequirements,
+			.vkCreateBuffer                          = context->fnTable.vkCreateBuffer,
+			.vkDestroyBuffer                         = context->fnTable.vkDestroyBuffer,
+			.vkCreateImage                           = context->fnTable.vkCreateImage,
+			.vkDestroyImage                          = context->fnTable.vkDestroyImage,
+			.vkCmdCopyBuffer                         = context->fnTable.vkCmdCopyBuffer,
+			.vkGetBufferMemoryRequirements2KHR       = context->fnTable.vkGetBufferMemoryRequirements2,
+			.vkGetImageMemoryRequirements2KHR        = context->fnTable.vkGetImageMemoryRequirements2,
+			.vkBindBufferMemory2KHR                  = context->fnTable.vkBindBufferMemory2,
+			.vkBindImageMemory2KHR                   = context->fnTable.vkBindImageMemory2,
+			.vkGetPhysicalDeviceMemoryProperties2KHR = vkGetPhysicalDeviceMemoryProperties2,
+			.vkGetDeviceBufferMemoryRequirements     = context->fnTable.vkGetDeviceBufferMemoryRequirementsKHR,
+			.vkGetDeviceImageMemoryRequirements      = context->fnTable.vkGetDeviceImageMemoryRequirementsKHR
+		};
+
+		VmaAllocatorCreateInfo info{
+			.physicalDevice   = device,
+			.device           = context->device,
+			.pVulkanFunctions = &functions,
+			.instance         = instance,
+			.vulkanApiVersion = VK_API_VERSION_1_2
+		};
+
+		vulkan::checkResult(vmaCreateAllocator(&info, &context->allocator));
+	}
+
 	//Done
 	return context;
 }
@@ -377,13 +419,13 @@ ContextHandle createContext() {
 			fallback = device;
 			vkGetPhysicalDeviceProperties(device, &props);
 			if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
-				return createContext(device);
+				return createContext(instance, device);
 		}
 	}
 
 	//no discrete gpu
 	if (fallback)
-		return createContext(fallback);
+		return createContext(instance, fallback);
 	else
 		throw std::runtime_error("No suitable device available!");
 }
@@ -393,8 +435,7 @@ ContextHandle createContext(const DeviceHandle& device) {
 		throw std::runtime_error("Device is empty!");
 
 	//new ref
-	getInstance();
-	return createContext(device->device);
+	return createContext(getInstance(), device->device);
 }
 
 }

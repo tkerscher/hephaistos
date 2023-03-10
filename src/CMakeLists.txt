@@ -17,6 +17,7 @@ set(SRC
 #vulkan
     ${SRCROOT}/vk/result.hpp
     ${SRCROOT}/vk/types.hpp
+    ${SRCROOT}/vk/vma.cpp
 )
 
 #create library
@@ -31,6 +32,7 @@ target_compile_features(hephaistos PUBLIC cxx_std_20)
 
 #link libraries
 target_link_libraries(hephaistos PRIVATE volk)
+target_link_libraries(hephaistos PRIVATE VulkanMemoryAllocator)
 
 #tell the compiler to hide all symbols by default
 set_target_properties(hephaistos PROPERTIES CXX_VISIBILITY hidden)

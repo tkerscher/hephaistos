@@ -38,6 +38,19 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(volk)
 set_target_properties(volk PROPERTIES FOLDER "dependencies")
+#Fetch vulkan memory allocator
+set(VMA_STATIC_VULKAN_FUNCTIONS OFF)
+FetchContent_Declare(
+    vma
+    GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+    GIT_TAG 66afe099f1cf1f79c270471e9c0f02139072057d
+)
+FetchContent_GetProperties(vma)
+if(NOT vma_POPULATED)
+    FetchContent_Populate(vma)
+    add_library(VulkanMemoryAllocator INTERFACE)
+    target_include_directories(VulkanMemoryAllocator INTERFACE ${vma_SOURCE_DIR}/include)
+endif()
 
 #source code
 add_subdirectory(src)

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "volk.h"
+#include "vk_mem_alloc.h"
 #include "hephaistos/config.hpp"
 
 namespace hephaistos::vulkan {
@@ -12,6 +13,8 @@ struct Context {
 
 	VkCommandPool cmdPool;
 	VkPipelineCache cache;
+
+	VmaAllocator allocator;
 
 	VolkDeviceTable fnTable;
 };
