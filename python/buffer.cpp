@@ -40,7 +40,7 @@ public:
 };
 template<class T>
 void registerBuffer(nb::module_& m, const char* name) {
-    nb::class_<TypedBuffer<T>>(m, name)
+    nb::class_<TypedBuffer<T>, hp::Buffer<std::byte>>(m, name)
         .def(nb::init<size_t>())
         .def_prop_ro("size", [](const TypedBuffer<T>& b) { return b.size(); }, "The number of elements in this buffer.")
         .def_prop_ro("size_bytes", [](const TypedBuffer<T>& b) { return b.size_bytes(); }, "The size of the buffer in bytes.")
@@ -55,14 +55,17 @@ public:
 };
 template<class T>
 void registerTensor(nb::module_& m, const char* name) {
-    nb::class_<PyTensor<T>>(m, name)
+    nb::class_<PyTensor<T>, hp::Tensor<std::byte>>(m, name)
         .def(nb::init<size_t>())
         .def_prop_ro("size", [](const PyTensor<T>& b) { return b.size(); }, "The number of elements in this tensor.")
         .def_prop_ro("size_bytes", [](const PyTensor<T>& b) { return b.size_bytes(); }, "The size of the tensor in bytes.");
 }
 
 void registerBufferModule(nb::module_& m) {
-    nb::class_<RawBuffer>(m, "RawBuffer")
+    nb::class_<hp::Buffer<std::byte>>(m, "_Buffer");
+    nb::class_<hp::Tensor<std::byte>>(m, "_Tensor");
+
+    nb::class_<RawBuffer, hp::Buffer<std::byte>>(m, "RawBuffer")
         .def(nb::init<uint64_t>())
         .def_prop_ro("address", [](const RawBuffer& b) { return b.getAddress(); } , "The memory address of the allocated buffer.")
         .def_prop_ro("size", [](const RawBuffer& b) { return b.size(); }, "The size of the buffer in bytes.")
@@ -91,5 +94,13 @@ void registerBufferModule(nb::module_& m) {
     registerTensor<int16_t>(m, "ShortTensor");
     registerTensor<int32_t>(m, "IntTensor");
     registerTensor<int64_t>(m, "LongTensor");
+
+    //register copy commands
+    m.def("retrieveTensor", [](hp::Tensor<std::byte>& src, hp::Buffer<std::byte>& dst)
+        { return CommandHandle{ hp::retrieveTensor(src, dst) }; }, "src"_a, "dst"_a,
+        "Creates a command for copying the src tensor back to the destination buffer. They must match in size.");
+    m.def("updateTensor", [](hp::Buffer<std::byte>& src, hp::Tensor<std::byte>& dst)
+        { return CommandHandle{ hp::updateTensor(src, dst)}; }, "src"_a, "dst"_a,
+        "Creates a command for copying the src buffer into the destination tensor. They must match in size.");
 }
 

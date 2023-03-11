@@ -4,6 +4,7 @@
 set(PYROOT ${PROJECT_SOURCE_DIR}/python)
 set(SRC
     ${PYROOT}/buffer.cpp
+    ${PYROOT}/command.cpp
     ${PYROOT}/context.cpp
     ${PYROOT}/pyhephaistos.cpp
 )
