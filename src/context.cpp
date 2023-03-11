@@ -1,7 +1,9 @@
 #include "hephaistos/context.hpp"
 
 #include <array>
+#include <set>
 #include <stdexcept>
+#include <string>
 
 #include "hephaistos/handles.hpp"
 #include "hephaistos/version.hpp"
@@ -176,10 +178,15 @@ namespace {
 constexpr VkQueueFlags QueueFlags = VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT;
 constexpr float QueuePriority = 1.0f;
 
+constexpr auto DeviceExtensions = std::to_array({
+	VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME
+});
+
 bool isDeviceSuitable(VkPhysicalDevice device) {
 	//Check for the following things:
 	//	- Compute queue
 	//	- timeline semaphore support
+	//  - Extension support
 
 	//Check for timeline support
 	{
@@ -210,6 +217,20 @@ bool isDeviceSuitable(VkPhysicalDevice device) {
 		}
 		if (!found)
 			return false;
+	}
+
+	//Check for extension support
+	{
+		uint32_t count;
+		vulkan::checkResult(vkEnumerateDeviceExtensionProperties(device, nullptr, &count, nullptr));
+		std::vector<VkExtensionProperties> extensions(count);
+		vulkan::checkResult(vkEnumerateDeviceExtensionProperties(device, nullptr, &count, extensions.data()));
+		std::set<std::string> required(DeviceExtensions.begin(), DeviceExtensions.end());
+		for (auto& prop : extensions) {
+			required.erase(prop.extensionName);
+		}
+		if (!required.empty())
+			return false; //at least one extension missing
 	}
 
 	//Everything checked
@@ -312,20 +333,22 @@ ContextHandle createContext(VkInstance instance, VkPhysicalDevice device) {
 	//Create logical device
 	{
 		VkDeviceQueueCreateInfo queueInfo{
-			.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+			.sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
 			.queueFamilyIndex = family,
-			.queueCount = 1,
+			.queueCount       = 1,
 			.pQueuePriorities = &QueuePriority
 		};
 		VkPhysicalDeviceTimelineSemaphoreFeatures timeline{
-			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
+			.sType             = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
 			.timelineSemaphore = VK_TRUE
 		};
 		VkDeviceCreateInfo deviceInfo{
-			.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-			.pNext = &timeline,
-			.queueCreateInfoCount = 1,
-			.pQueueCreateInfos = &queueInfo,
+			.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+			.pNext                   = &timeline,
+			.queueCreateInfoCount    = 1,
+			.pQueueCreateInfos       = &queueInfo,
+			.enabledExtensionCount   = static_cast<uint32_t>(DeviceExtensions.size()),
+			.ppEnabledExtensionNames = DeviceExtensions.data()
 		};
 		vulkan::checkResult(vkCreateDevice(device, &deviceInfo, nullptr, &context->device));
 	}
