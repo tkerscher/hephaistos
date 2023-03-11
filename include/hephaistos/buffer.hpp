@@ -78,4 +78,54 @@ public:
 template<class Container> Buffer(ContextHandle, const Container&)
 	-> Buffer<typename Container::value_type>;
 
+template<class T = std::byte> class Tensor;
+
+template<>
+class Tensor<std::byte> : public Resource {
+public:
+    [[nodiscard]] uint64_t size_bytes() const noexcept;
+    [[nodiscard]] size_t size() const noexcept;
+
+    Tensor(const Tensor<std::byte>&) = delete;
+    Tensor<std::byte>& operator=(const Tensor<std::byte>&) = delete;
+
+    Tensor(Tensor<std::byte>&& other) noexcept;
+    Tensor<std::byte>& operator=(Tensor<std::byte>&& other) noexcept;
+
+    Tensor(ContextHandle context, uint64_t size);
+    virtual ~Tensor();
+
+public: //internal
+    [[nodiscard]] const vulkan::Buffer& getBuffer() const noexcept;
+
+private:
+    BufferHandle buffer;
+	uint64_t _size;
+};
+template class HEPHAISTOS_API Tensor<std::byte>;
+
+template<class T>
+class Tensor : public Tensor<std::byte> {
+public:
+    [[nodiscard]] uint64_t size() const noexcept {
+        return Tensor<std::byte>::size_bytes() / sizeof(T);
+    }
+
+    Tensor(const Tensor&) = delete;
+    Tensor& operator=(const Tensor&) = delete;
+
+    Tensor(Tensor&& other) noexcept
+        : Tensor<std::byte>(std::move(other))
+    {}
+    Tensor& operator=(Tensor&& other) noexcept {
+        Tensor<std::byte>::operator=(std::move(other));
+        return *this;
+    }
+
+    Tensor(ContextHandle context, size_t count)
+        : Tensor<std::byte>(std::move(context), count * sizeof(T))
+    {}
+    virtual ~Tensor() = default;
+};
+
 }
