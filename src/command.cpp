@@ -195,6 +195,9 @@ uint64_t SequenceBuilder::Submit() {
 	return _pImp->currentValue;
 }
 
+SequenceBuilder::SequenceBuilder(SequenceBuilder&& other) noexcept = default;
+SequenceBuilder& SequenceBuilder::operator=(SequenceBuilder&& other) noexcept = default;
+
 SequenceBuilder::SequenceBuilder(Timeline& timeline, uint64_t startValue)
 	: _pImp(new pImp(
 		*timeline.getContext(),

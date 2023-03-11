@@ -41,6 +41,12 @@ public:
     SequenceBuilder& WaitFor(uint64_t value);
     uint64_t Submit();
 
+    SequenceBuilder(SequenceBuilder&) = delete;
+    SequenceBuilder& operator=(SequenceBuilder&) = delete;
+
+    SequenceBuilder(SequenceBuilder&& other) noexcept;
+    SequenceBuilder& operator=(SequenceBuilder&& other) noexcept;
+
     SequenceBuilder(Timeline& timeline, uint64_t startValue = 0);
     ~SequenceBuilder();
 
