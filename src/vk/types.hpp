@@ -17,6 +17,10 @@ struct Buffer {
 
 struct Command {
 	VkCommandBuffer buffer;
+	//specifies which stage the commands used so the semaphores
+	//can be more fine grained.
+	VkPipelineStageFlags stage;
+
 	const Context& context;
 };
 
@@ -57,6 +61,7 @@ void destroyBuffer(Buffer* buffer);
 
 [[nodiscard]] CommandHandle createCommand(
 	const ContextHandle& context,
+	VkPipelineStageFlags stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
 	bool startRecording = true);
 void destroyCommand(Command* command);
 

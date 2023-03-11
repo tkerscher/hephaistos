@@ -97,6 +97,7 @@ Timeline::~Timeline() {
 
 struct SequenceBuilder::pImp {
 	std::vector<std::vector<VkCommandBuffer>> commands;
+	std::vector<VkPipelineStageFlags> stages;
 	std::vector<uint64_t> waitValues;
 	std::vector<uint64_t> signalValues;
 	//the value to wait for in the next batch. Might differ from signalValues.back()
@@ -108,6 +109,7 @@ struct SequenceBuilder::pImp {
 
 	pImp(const vulkan::Context& context, VkSemaphore timeline, uint64_t value)
 		: commands({})
+		, stages({ VK_PIPELINE_STAGE_NONE })
 		, timeline(timeline)
 		, currentValue(value + 1)
 		, context(context)
@@ -123,12 +125,14 @@ SequenceBuilder& SequenceBuilder::And(const CommandHandle& command) {
 		throw std::logic_error("Timeline and command must originate from the same context!");
 
 	_pImp->commands.back().push_back(command->buffer);
+	_pImp->stages.back() |= command->stage;
 	return *this;
 }
 
 SequenceBuilder& SequenceBuilder::Then(const CommandHandle& command) {
 	//add new level
 	_pImp->commands.emplace_back();
+	_pImp->stages.emplace_back(VK_PIPELINE_STAGE_NONE);
 	_pImp->waitValues.push_back(_pImp->currentValue);
 	_pImp->currentValue++;
 	_pImp->signalValues.push_back(_pImp->currentValue);
@@ -142,6 +146,7 @@ SequenceBuilder& SequenceBuilder::WaitFor(uint64_t value) {
 
 	//add new level
 	_pImp->commands.emplace_back();
+	_pImp->stages.emplace_back(VK_PIPELINE_STAGE_NONE);
 	_pImp->waitValues.push_back(value);
 	_pImp->currentValue = value + 1;
 	_pImp->signalValues.push_back(value + 1);
@@ -157,11 +162,9 @@ uint64_t SequenceBuilder::Submit() {
 	auto size = _pImp->commands.size();
 	std::vector<VkTimelineSemaphoreSubmitInfo> timelineInfos(size);
 	std::vector<VkSubmitInfo> submits(size);
-	std::vector<VkPipelineStageFlags> waitFlags(size,
-		VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 	auto wPtr = _pImp->waitValues.data();
 	auto sPtr = _pImp->signalValues.data();
-	auto fPtr = waitFlags.data();
+	auto fPtr = _pImp->stages.data();
 	auto tPtr = timelineInfos.data();
 	for (auto i = 0u; i < submits.size(); ++i, ++wPtr, ++sPtr, ++fPtr, ++tPtr) {
 		*tPtr = VkTimelineSemaphoreSubmitInfo{

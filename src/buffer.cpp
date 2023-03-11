@@ -114,7 +114,8 @@ CommandHandle retrieveTensor(const Tensor<std::byte>& src, const Buffer<std::byt
 	auto size = src.size_bytes();
 
 	//create new empty command buffer
-	auto command = vulkan::createCommand(context);
+	auto command = vulkan::createCommand(context, VK_PIPELINE_STAGE_TRANSFER_BIT);
+	//we're working in the transfer stage
 
 	//ensure writing to tensor is finished
 	VkBufferMemoryBarrier barrier{
@@ -174,7 +175,7 @@ CommandHandle updateTensor(const Buffer<std::byte>& src, const Tensor<std::byte>
 	auto size = src.size_bytes();
 
 	//create new empty command buffer
-	auto command = vulkan::createCommand(context);
+	auto command = vulkan::createCommand(context, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
 	//ensure tensor is safe to update
 	VkBufferMemoryBarrier barrier{

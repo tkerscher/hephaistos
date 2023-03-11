@@ -40,10 +40,11 @@ void destroyBuffer(Buffer* buffer) {
 
 CommandHandle createCommand(
 	const ContextHandle& context,
+	VkPipelineStageFlags stage,
 	bool startRecording)
 {
 	CommandHandle result{
-		new Command({nullptr, *context}),
+		new Command({nullptr, stage, *context}),
 		destroyCommand
 	};
 
@@ -58,6 +59,8 @@ CommandHandle createCommand(
 	if (startRecording) {
 		VkCommandBufferBeginInfo begin{
 			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+			//TODO: This flag might be a bit heavy
+			//		--> forbid the user to resubmit or use special flag?
 			.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT
 		};
 		checkResult(context->fnTable.vkBeginCommandBuffer(result->buffer, &begin));
