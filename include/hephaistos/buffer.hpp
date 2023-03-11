@@ -128,4 +128,9 @@ public:
     virtual ~Tensor() = default;
 };
 
+[[nodiscard]] HEPHAISTOS_API CommandHandle retrieveTensor(
+	const Tensor<std::byte>& src, const Buffer<std::byte>& dst);
+[[nodiscard]] HEPHAISTOS_API CommandHandle updateTensor(
+	const Buffer<std::byte>& src, const Tensor<std::byte>& dst);
+
 }

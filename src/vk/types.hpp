@@ -15,6 +15,11 @@ struct Buffer {
 	const Context& context;
 };
 
+struct Command {
+	VkCommandBuffer buffer;
+	const Context& context;
+};
+
 struct Context {
     VkPhysicalDevice physicalDevice;
 	VkDevice device;
@@ -39,11 +44,20 @@ struct Instance {
 #endif
 };
 
+struct Timeline {
+	VkSemaphore semaphore;
+};
+
 [[nodiscard]] BufferHandle createBuffer(
 	const ContextHandle& handle,
 	uint64_t size,
 	VkBufferUsageFlags usage,
 	VmaAllocationCreateFlags flags);
 void destroyBuffer(Buffer* buffer);
+
+[[nodiscard]] CommandHandle createCommand(
+	const ContextHandle& context,
+	bool startRecording = true);
+void destroyCommand(Command* command);
 
 }
