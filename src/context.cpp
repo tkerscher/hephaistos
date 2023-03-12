@@ -308,6 +308,11 @@ void destroyContext(vulkan::Context* context) {
 		vmaDestroyAllocator(context->allocator);
 	context->fnTable.vkDestroyPipelineCache(context->device, context->cache, nullptr);
 	context->fnTable.vkDestroyCommandPool(context->device, context->cmdPool, nullptr);
+	while (!context->sequencePool.empty()) {
+		context->fnTable.vkDestroyCommandPool(
+			context->device, context->sequencePool.front(), nullptr);
+		context->sequencePool.pop();
+	}
 	context->fnTable.vkDestroyDevice(context->device, nullptr);
 	returnInstance();
 }
@@ -329,6 +334,7 @@ ContextHandle createContext(VkInstance instance, VkPhysicalDevice device) {
 				break;
 		}
 	}
+	context->queueFamily = family;
 
 	//Create logical device
 	{
@@ -362,6 +368,7 @@ ContextHandle createContext(VkInstance instance, VkPhysicalDevice device) {
 	{
 		VkCommandPoolCreateInfo poolInfo{
 			.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+			.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
 			.queueFamilyIndex = family
 		};
 		vulkan::checkResult(context->fnTable.vkCreateCommandPool(

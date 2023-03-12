@@ -18,12 +18,10 @@ int main() {
 	Tensor<uint32_t> tensor(context, 10);
 
 	//copy data
-	auto copyTo = updateTensor(buffer1, tensor);
-	auto copyFrom = retrieveTensor(tensor, buffer2);
 	Timeline timeline(context);
-	beginSequence(timeline)
-		.And(copyTo)
-		.Then(copyFrom)
+	auto submission = beginSequence(timeline)
+		.And(updateTensor(buffer1, tensor))
+		.Then(retrieveTensor(tensor, buffer2))
 		.Submit();
 
 	//wait for roundtrip

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <queue>
+
 #include "volk.h"
 #include "vk_mem_alloc.h"
 #include "hephaistos/config.hpp"
@@ -21,16 +23,20 @@ struct Command {
 	//can be more fine grained.
 	VkPipelineStageFlags stage;
 
-	const Context& context;
+	//const Context& context;
 };
 
 struct Context {
     VkPhysicalDevice physicalDevice;
 	VkDevice device;
 	VkQueue queue;
-
-	VkCommandPool cmdPool;
 	VkPipelineCache cache;
+
+	uint32_t queueFamily;
+	VkCommandPool cmdPool;
+	//looks like a hack, but this is the only one we need to change
+	//would be a bit drastic to remove const Context because of this
+	mutable std::queue<VkCommandPool> sequencePool;
 
 	VmaAllocator allocator;
 
@@ -58,11 +64,5 @@ struct Timeline {
 	VkBufferUsageFlags usage,
 	VmaAllocationCreateFlags flags);
 void destroyBuffer(Buffer* buffer);
-
-[[nodiscard]] CommandHandle createCommand(
-	const ContextHandle& context,
-	VkPipelineStageFlags stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-	bool startRecording = true);
-void destroyCommand(Command* command);
 
 }

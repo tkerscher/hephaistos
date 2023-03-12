@@ -4,7 +4,7 @@
 #include <initializer_list>
 #include <span>
 
-#include "hephaistos/config.hpp"
+#include "hephaistos/command.hpp"
 #include "hephaistos/context.hpp"
 #include "hephaistos/handles.hpp"
 
@@ -128,9 +128,48 @@ public:
     virtual ~Tensor() = default;
 };
 
-[[nodiscard]] HEPHAISTOS_API CommandHandle retrieveTensor(
-	const Tensor<std::byte>& src, const Buffer<std::byte>& dst);
-[[nodiscard]] HEPHAISTOS_API CommandHandle updateTensor(
-	const Buffer<std::byte>& src, const Tensor<std::byte>& dst);
+class HEPHAISTOS_API RetrieveTensorCommand : public Command {
+public:
+	std::reference_wrapper<const Tensor<std::byte>> Source;
+	std::reference_wrapper<const Buffer<std::byte>> Destination;
+
+	virtual void record(vulkan::Command& cmd) const override;
+
+	RetrieveTensorCommand(const RetrieveTensorCommand& other);
+	RetrieveTensorCommand& operator=(const RetrieveTensorCommand& other);
+
+	RetrieveTensorCommand(RetrieveTensorCommand&& other) noexcept;
+	RetrieveTensorCommand& operator=(RetrieveTensorCommand&& other) noexcept;
+	
+	RetrieveTensorCommand(const Tensor<std::byte>& src, const Buffer<std::byte>& dst);
+	virtual ~RetrieveTensorCommand();
+};
+[[nodiscard]] inline RetrieveTensorCommand retrieveTensor(
+	const Tensor<std::byte>& src, const Buffer<std::byte>& dst)
+{
+	return RetrieveTensorCommand(src, dst);
+}
+
+class HEPHAISTOS_API UpdateTensorCommand : public Command {
+public:
+	std::reference_wrapper<const Buffer<std::byte>> Source;
+	std::reference_wrapper<const Tensor<std::byte>> Destination;
+
+	virtual void record(vulkan::Command& cmd) const override;
+
+	UpdateTensorCommand(const UpdateTensorCommand& other);
+	UpdateTensorCommand& operator=(const UpdateTensorCommand& other);
+
+	UpdateTensorCommand(UpdateTensorCommand&& other) noexcept;
+	UpdateTensorCommand& operator=(UpdateTensorCommand&& other) noexcept;
+
+	UpdateTensorCommand(const Buffer<std::byte>& src, const Tensor<std::byte>& dst);
+	virtual ~UpdateTensorCommand();
+};
+[[nodiscard]] inline UpdateTensorCommand updateTensor(
+	const Buffer<std::byte>& src, const Tensor<std::byte>& dst)
+{
+	return UpdateTensorCommand(src, dst);
+}
 
 }

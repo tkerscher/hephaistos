@@ -7,9 +7,19 @@ namespace hephaistos {
 
 //forward
 namespace vulkan {
+    struct Command;
     struct Timeline;
 }
+struct SubmissionResources;
 
+class HEPHAISTOS_API Command {
+public:
+    virtual void record(vulkan::Command& cmd) const = 0;
+    virtual ~Command();
+
+protected:
+    Command();
+};
 
 class HEPHAISTOS_API Timeline : public Resource {
 public:
@@ -24,7 +34,7 @@ public:
     Timeline(Timeline&& other) noexcept;
     Timeline& operator=(Timeline&& other) noexcept;
 
-    Timeline(ContextHandle context, uint64_t initialValue = 0);
+    explicit Timeline(ContextHandle context, uint64_t initialValue = 0);
     virtual ~Timeline();
 
 public: //internal
@@ -34,12 +44,36 @@ private:
     std::unique_ptr<vulkan::Timeline> timeline;
 };
 
+class HEPHAISTOS_API Submission {
+public:
+    const Timeline& getTimeline() const;
+    uint64_t getFinalStep() const;
+
+    void wait() const;
+    [[nodiscard]] bool wait(uint64_t timeout) const;
+
+    Submission(const Submission&) = delete;
+    Submission& operator=(const Submission&) = delete;
+
+    Submission(Submission&& other) noexcept;
+    Submission& operator=(Submission&& other) noexcept;
+
+    Submission(const Timeline& timeline, uint64_t finalStep,
+        std::unique_ptr<SubmissionResources> resources);
+    ~Submission();
+
+private:
+    uint64_t finalStep;
+    std::reference_wrapper<const Timeline> timeline;
+    std::unique_ptr<SubmissionResources> resources;
+};
+
 class HEPHAISTOS_API SequenceBuilder final {
 public:
-    SequenceBuilder& And(const CommandHandle& command);
-    SequenceBuilder& Then(const CommandHandle& command);
+    SequenceBuilder& And(const Command& command);
+    SequenceBuilder& Then(const Command& command);
     SequenceBuilder& WaitFor(uint64_t value);
-    uint64_t Submit();
+    Submission Submit();
 
     SequenceBuilder(SequenceBuilder&) = delete;
     SequenceBuilder& operator=(SequenceBuilder&) = delete;
@@ -47,7 +81,7 @@ public:
     SequenceBuilder(SequenceBuilder&& other) noexcept;
     SequenceBuilder& operator=(SequenceBuilder&& other) noexcept;
 
-    SequenceBuilder(Timeline& timeline, uint64_t startValue = 0);
+    explicit SequenceBuilder(Timeline& timeline, uint64_t startValue = 0);
     ~SequenceBuilder();
 
 private:

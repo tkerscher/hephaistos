@@ -9,6 +9,9 @@
 
 namespace hephaistos {
 
+Command::Command() = default;
+Command::~Command() = default;
+
 /********************************* TIMELINE ***********************************/
 
 uint64_t Timeline::getValue() const {
@@ -93,46 +96,156 @@ Timeline::~Timeline() {
 	}
 }
 
+/******************************** SUBMISSION *********************************/
+
+struct SubmissionResources {
+	VkCommandPool pool;
+	std::vector<VkCommandBuffer> commands;
+};
+
+const Timeline& Submission::getTimeline() const { return timeline.get(); }
+uint64_t Submission::getFinalStep() const { return finalStep; }
+
+void Submission::wait() const {
+	if (finalStep > 0)
+		timeline.get().waitValue(finalStep);
+}
+bool Submission::wait(uint64_t timeout) const {
+	return (finalStep == 0 || timeline.get().waitValue(finalStep, timeout));
+}
+
+Submission::Submission(Submission&& other) noexcept
+	: finalStep(other.finalStep)
+	, timeline(std::move(other.timeline))
+	, resources(std::move(other.resources))
+{
+	//make waits no-op to be safe
+	other.finalStep = 0;
+}
+Submission& Submission::operator=(Submission&& other) noexcept {
+	finalStep = other.finalStep;
+	timeline = std::move(other.timeline);
+	resources = std::move(other.resources);
+	//make waits no-op to be safe
+	other.finalStep = 0;
+
+	return *this;
+}
+
+Submission::Submission(const Timeline& timeline, uint64_t finalStep, std::unique_ptr<SubmissionResources> resources)
+	: finalStep(finalStep)
+	, timeline(std::cref(timeline))
+	, resources(std::move(resources))
+{}
+Submission::~Submission() {
+	//reset pool if there is one
+	if (resources) {
+		//ensure we're save to reset pool by waiting submission to finish
+		wait();
+
+		auto& context = timeline.get().getContext();
+		//free command buffers
+		context->fnTable.vkFreeCommandBuffers(
+			context->device,
+			resources->pool,
+			static_cast<uint32_t>(resources->commands.size()),
+			resources->commands.data());
+		//reset pool
+		vulkan::checkResult(context->fnTable.vkResetCommandPool(
+			context->device,
+			resources->pool,
+			VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT));
+		//return to context
+		context->sequencePool.push(resources->pool);
+	}
+}
+
 /********************************* SEQUENCE **********************************/
 
+namespace {
+
+//Some structs are always the same -> reuse them
+constexpr VkCommandBufferBeginInfo BeginInfo{
+	.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+	.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+};
+
+}
+
 struct SequenceBuilder::pImp {
-	std::vector<std::vector<VkCommandBuffer>> commands;
-	std::vector<VkPipelineStageFlags> stages;
+	std::vector<vulkan::Command> commands;
+	VkCommandPool pool;
+
 	std::vector<uint64_t> waitValues;
 	std::vector<uint64_t> signalValues;
 	//the value to wait for in the next batch. Might differ from signalValues.back()
 	uint64_t currentValue;
 
-	VkSemaphore timeline;
+	VkSemaphore semaphore;
+	Timeline& timeline;
 
 	const vulkan::Context& context;
 
-	pImp(const vulkan::Context& context, VkSemaphore timeline, uint64_t value)
+	pImp(Timeline& timeline, uint64_t value)
 		: commands({})
-		, stages({ VK_PIPELINE_STAGE_NONE })
+		, pool(nullptr)
+		, semaphore(timeline.getTimeline().semaphore)
 		, timeline(timeline)
 		, currentValue(value + 1)
-		, context(context)
+		, context(*timeline.getContext())
 	{
 		commands.push_back({});
 		waitValues.push_back(value);
 		signalValues.push_back(value + 1);
+
+		//fetch used pool or create new
+		if (context.sequencePool.empty()) {
+			//create new
+			VkCommandPoolCreateInfo info{
+				.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+				.queueFamilyIndex = context.queueFamily
+			};
+			vulkan::checkResult(context.fnTable.vkCreateCommandPool(
+				context.device, &info, nullptr, &pool));
+		}
+		else {
+			pool = context.sequencePool.front();
+			context.sequencePool.pop();
+		}
 	}
 };
 
-SequenceBuilder& SequenceBuilder::And(const CommandHandle& command) {
-	if (&command->context != &_pImp->context)
-		throw std::logic_error("Timeline and command must originate from the same context!");
+SequenceBuilder& SequenceBuilder::And(const Command& command) {
+	//Check if we already started a command buffer
+	auto& vCmd = _pImp->commands.back();
+	if (!vCmd.buffer) {
+		//allocate and start a new command buffer
+		VkCommandBufferAllocateInfo allocInfo{
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			.commandPool = _pImp->pool,
+			.commandBufferCount = 1
+		};
+		vulkan::checkResult(_pImp->context.fnTable.vkAllocateCommandBuffers(
+			_pImp->context.device, &allocInfo, &vCmd.buffer));
+		//start recording
+		vulkan::checkResult(_pImp->context.fnTable.vkBeginCommandBuffer(
+			vCmd.buffer, &BeginInfo));
+	}
 
-	_pImp->commands.back().push_back(command->buffer);
-	_pImp->stages.back() |= command->stage;
+	//Record command
+	command.record(vCmd);
+
 	return *this;
 }
 
-SequenceBuilder& SequenceBuilder::Then(const CommandHandle& command) {
+SequenceBuilder& SequenceBuilder::Then(const Command& command) {
+	//Finish previous command buffer
+	auto& prevCmd = _pImp->commands.back();
+	if (prevCmd.buffer)
+		vulkan::checkResult(_pImp->context.fnTable.vkEndCommandBuffer(prevCmd.buffer));
+
 	//add new level
 	_pImp->commands.emplace_back();
-	_pImp->stages.emplace_back(VK_PIPELINE_STAGE_NONE);
 	_pImp->waitValues.push_back(_pImp->currentValue);
 	_pImp->currentValue++;
 	_pImp->signalValues.push_back(_pImp->currentValue);
@@ -144,9 +257,13 @@ SequenceBuilder& SequenceBuilder::WaitFor(uint64_t value) {
 	if (value < _pImp->currentValue)
 		throw std::logic_error("Wait value too low! Timeline can only go forward!");
 
+	//Finish previous command buffer
+	auto& prevCmd = _pImp->commands.back();
+	if (prevCmd.buffer)
+		vulkan::checkResult(_pImp->context.fnTable.vkEndCommandBuffer(prevCmd.buffer));
+
 	//add new level
 	_pImp->commands.emplace_back();
-	_pImp->stages.emplace_back(VK_PIPELINE_STAGE_NONE);
 	_pImp->waitValues.push_back(value);
 	_pImp->currentValue = value + 1;
 	_pImp->signalValues.push_back(value + 1);
@@ -154,9 +271,14 @@ SequenceBuilder& SequenceBuilder::WaitFor(uint64_t value) {
 	return *this;
 }
 
-uint64_t SequenceBuilder::Submit() {
+Submission SequenceBuilder::Submit() {
 	if (!_pImp)
 		throw std::logic_error("A sequence can only be submitted once!");
+
+	//Finish previous command buffer
+	auto& prevCmd = _pImp->commands.back();
+	if (prevCmd.buffer)
+		vulkan::checkResult(_pImp->context.fnTable.vkEndCommandBuffer(prevCmd.buffer));
 
 	//build infos
 	auto size = _pImp->commands.size();
@@ -164,26 +286,26 @@ uint64_t SequenceBuilder::Submit() {
 	std::vector<VkSubmitInfo> submits(size);
 	auto wPtr = _pImp->waitValues.data();
 	auto sPtr = _pImp->signalValues.data();
-	auto fPtr = _pImp->stages.data();
+	auto cPtr = _pImp->commands.data();
 	auto tPtr = timelineInfos.data();
-	for (auto i = 0u; i < submits.size(); ++i, ++wPtr, ++sPtr, ++fPtr, ++tPtr) {
+	for (auto i = 0u; i < submits.size(); ++i, ++wPtr, ++sPtr, ++cPtr, ++tPtr) {
 		*tPtr = VkTimelineSemaphoreSubmitInfo{
-			.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
-			.waitSemaphoreValueCount = 1,
-			.pWaitSemaphoreValues = wPtr,
+			.sType                     = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
+			.waitSemaphoreValueCount   = 1,
+			.pWaitSemaphoreValues      = wPtr,
 			.signalSemaphoreValueCount = 1,
-			.pSignalSemaphoreValues = sPtr
+			.pSignalSemaphoreValues    = sPtr
 		};
 		submits[i] = VkSubmitInfo{
-			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-			.pNext = tPtr,
-			.waitSemaphoreCount = 1,
-			.pWaitSemaphores = &_pImp->timeline,
-			.pWaitDstStageMask = fPtr,
-			.commandBufferCount = static_cast<uint32_t>(_pImp->commands[i].size()),
-			.pCommandBuffers = _pImp->commands[i].data(),
+			.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+			.pNext                = tPtr,
+			.waitSemaphoreCount   = 1,
+			.pWaitSemaphores      = &_pImp->semaphore,
+			.pWaitDstStageMask    = &cPtr->stage,
+			.commandBufferCount   = 1,
+			.pCommandBuffers      = &cPtr->buffer,
 			.signalSemaphoreCount = 1,
-			.pSignalSemaphores = &_pImp->timeline
+			.pSignalSemaphores    = &_pImp->semaphore
 		};
 	}
 
@@ -191,18 +313,29 @@ uint64_t SequenceBuilder::Submit() {
 	vulkan::checkResult(_pImp->context.fnTable.vkQueueSubmit(
 		_pImp->context.queue, submits.size(), submits.data(), nullptr));
 
-	//return final signal value
-	return _pImp->currentValue;
+	//collect data
+	std::vector<VkCommandBuffer> cmdBuffers(_pImp->commands.size());
+	for (int i = 0u; i < cmdBuffers.size(); ++i)
+		cmdBuffers[i] = _pImp->commands[i].buffer;
+	auto resource = std::make_unique<SubmissionResources>(
+		_pImp->pool, std::move(cmdBuffers));
+	auto& timeline = _pImp->timeline;
+	auto finalStep = _pImp->currentValue;
+	//free _pImp to prevent multiple submission
+	_pImp.reset();
+	//build and return submission responsible for the resources lifetime
+	return Submission{
+		timeline,
+		finalStep,
+		std::move(resource)
+	};
 }
 
 SequenceBuilder::SequenceBuilder(SequenceBuilder&& other) noexcept = default;
 SequenceBuilder& SequenceBuilder::operator=(SequenceBuilder&& other) noexcept = default;
 
 SequenceBuilder::SequenceBuilder(Timeline& timeline, uint64_t startValue)
-	: _pImp(new pImp(
-		*timeline.getContext(),
-		timeline.getTimeline().semaphore,
-		startValue))
+	: _pImp(new pImp(timeline, startValue))
 {}
 SequenceBuilder::~SequenceBuilder() = default;
 

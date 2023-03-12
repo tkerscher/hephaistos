@@ -103,7 +103,10 @@ constexpr auto SIZE_MISMATCH_ERROR_STR =
 
 }
 
-CommandHandle retrieveTensor(const Tensor<std::byte>& src, const Buffer<std::byte>& dst) {
+void RetrieveTensorCommand::record(vulkan::Command& cmd) const {
+	//alias for shorter code
+	auto& src = Source.get();
+	auto& dst = Destination.get();
 	//Check for src and dst to be from the same context
 	if (src.getContext().get() != dst.getContext().get())
 		throw std::logic_error(DIFFERENT_CONTEXT_ERROR_STR);
@@ -113,9 +116,8 @@ CommandHandle retrieveTensor(const Tensor<std::byte>& src, const Buffer<std::byt
 		throw std::logic_error(SIZE_MISMATCH_ERROR_STR);
 	auto size = src.size_bytes();
 
-	//create new empty command buffer
-	auto command = vulkan::createCommand(context, VK_PIPELINE_STAGE_TRANSFER_BIT);
-	//we're working in the transfer stage
+	//we're acting on the transfer stage
+	cmd.stage |= VK_PIPELINE_STAGE_TRANSFER_BIT;
 
 	//ensure writing to tensor is finished
 	VkBufferMemoryBarrier barrier{
@@ -125,7 +127,7 @@ CommandHandle retrieveTensor(const Tensor<std::byte>& src, const Buffer<std::byt
 		.buffer = src.getBuffer().buffer,
 		.size = VK_WHOLE_SIZE
 	};
-	context->fnTable.vkCmdPipelineBarrier(command->buffer,
+	context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		VK_PIPELINE_STAGE_TRANSFER_BIT,
 		VK_DEPENDENCY_BY_REGION_BIT,
@@ -137,7 +139,7 @@ CommandHandle retrieveTensor(const Tensor<std::byte>& src, const Buffer<std::byt
 	VkBufferCopy copyRegion{
 		.size = size
 	};
-	context->fnTable.vkCmdCopyBuffer(command->buffer,
+	context->fnTable.vkCmdCopyBuffer(cmd.buffer,
 		src.getBuffer().buffer,
 		dst.getBuffer().buffer,
 		1, &copyRegion);
@@ -150,21 +152,32 @@ CommandHandle retrieveTensor(const Tensor<std::byte>& src, const Buffer<std::byt
 		.buffer = dst.getBuffer().buffer,
 		.size = VK_WHOLE_SIZE
 	};
-	context->fnTable.vkCmdPipelineBarrier(command->buffer,
+	context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
 		VK_PIPELINE_STAGE_TRANSFER_BIT,
 		VK_PIPELINE_STAGE_HOST_BIT,
 		VK_DEPENDENCY_BY_REGION_BIT,
 		0, nullptr,
 		1, &barrier,
 		0, nullptr);
-
-	//finish recording
-	vulkan::checkResult(context->fnTable.vkEndCommandBuffer(command->buffer));
-	//done
-	return command;
 }
 
-CommandHandle updateTensor(const Buffer<std::byte>& src, const Tensor<std::byte>& dst) {
+RetrieveTensorCommand::RetrieveTensorCommand(const RetrieveTensorCommand& other) = default;
+RetrieveTensorCommand& RetrieveTensorCommand::operator=(const RetrieveTensorCommand& other) = default;
+
+RetrieveTensorCommand::RetrieveTensorCommand(RetrieveTensorCommand&& other) noexcept = default;
+RetrieveTensorCommand& RetrieveTensorCommand::operator=(RetrieveTensorCommand&& other) noexcept = default;
+
+RetrieveTensorCommand::RetrieveTensorCommand(const Tensor<std::byte>& src, const Buffer<std::byte>& dst)
+	: Command()
+	, Source(std::cref(src))
+	, Destination(std::cref(dst))
+{}
+RetrieveTensorCommand::~RetrieveTensorCommand() = default;
+
+void UpdateTensorCommand::record(vulkan::Command& cmd) const {
+	//to shorten the code
+	auto& src = Source.get();
+	auto& dst = Destination.get();
 	//Check for src and dst to be from the same context
 	if (src.getContext().get() != dst.getContext().get())
 		throw std::logic_error(DIFFERENT_CONTEXT_ERROR_STR);
@@ -174,8 +187,8 @@ CommandHandle updateTensor(const Buffer<std::byte>& src, const Tensor<std::byte>
 		throw std::logic_error(SIZE_MISMATCH_ERROR_STR);
 	auto size = src.size_bytes();
 
-	//create new empty command buffer
-	auto command = vulkan::createCommand(context, VK_PIPELINE_STAGE_TRANSFER_BIT);
+	//we're acting on the transfer stage
+	cmd.stage |= VK_PIPELINE_STAGE_TRANSFER_BIT;
 
 	//ensure tensor is safe to update
 	VkBufferMemoryBarrier barrier{
@@ -185,7 +198,7 @@ CommandHandle updateTensor(const Buffer<std::byte>& src, const Tensor<std::byte>
 		.buffer = dst.getBuffer().buffer,
 		.size = VK_WHOLE_SIZE
 	};
-	context->fnTable.vkCmdPipelineBarrier(command->buffer,
+	context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		VK_PIPELINE_STAGE_TRANSFER_BIT,
 		VK_DEPENDENCY_BY_REGION_BIT,
@@ -197,7 +210,7 @@ CommandHandle updateTensor(const Buffer<std::byte>& src, const Tensor<std::byte>
 	VkBufferCopy copyRegion{
 		.size = size
 	};
-	context->fnTable.vkCmdCopyBuffer(command->buffer,
+	context->fnTable.vkCmdCopyBuffer(cmd.buffer,
 		src.getBuffer().buffer,
 		dst.getBuffer().buffer,
 		1, &copyRegion);
@@ -210,18 +223,26 @@ CommandHandle updateTensor(const Buffer<std::byte>& src, const Tensor<std::byte>
 		.buffer = dst.getBuffer().buffer,
 		.size = VK_WHOLE_SIZE
 	};
-	context->fnTable.vkCmdPipelineBarrier(command->buffer,
+	context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
 		VK_PIPELINE_STAGE_TRANSFER_BIT,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
 		VK_DEPENDENCY_BY_REGION_BIT,
 		0, nullptr,
 		1, &barrier,
 		0, nullptr);
-
-	//finish recording
-	vulkan::checkResult(context->fnTable.vkEndCommandBuffer(command->buffer));
-	//done
-	return command;
 }
+
+UpdateTensorCommand::UpdateTensorCommand(const UpdateTensorCommand& other) = default;
+UpdateTensorCommand& UpdateTensorCommand::operator=(const UpdateTensorCommand& other) = default;
+
+UpdateTensorCommand::UpdateTensorCommand(UpdateTensorCommand&& other) noexcept = default;
+UpdateTensorCommand& UpdateTensorCommand::operator=(UpdateTensorCommand&& other) noexcept = default;
+
+UpdateTensorCommand::UpdateTensorCommand(const Buffer<std::byte>& src, const Tensor<std::byte>& dst)
+	: Command()
+	, Source(std::cref(src))
+	, Destination(std::cref(dst))
+{}
+UpdateTensorCommand::~UpdateTensorCommand() = default;
 
 }
