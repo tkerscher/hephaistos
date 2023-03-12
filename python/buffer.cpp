@@ -9,6 +9,8 @@ namespace hp = hephaistos;
 namespace nb = nanobind;
 using namespace nb::literals;
 
+extern nb::class_<hp::Command> commandClass;
+
 class RawBuffer : public hp::Buffer<std::byte> {
 public:
     int64_t getAddress() const noexcept {
@@ -96,11 +98,13 @@ void registerBufferModule(nb::module_& m) {
     registerTensor<int64_t>(m, "LongTensor");
 
     //register copy commands
-    m.def("retrieveTensor", [](hp::Tensor<std::byte>& src, hp::Buffer<std::byte>& dst)
-        { return CommandHandle{ hp::retrieveTensor(src, dst) }; }, "src"_a, "dst"_a,
+    nb::class_<hp::RetrieveTensorCommand>(m, "RetrieveTensorCommand", commandClass)
+        .def(nb::init<const hp::Tensor<std::byte>&, const hp::Buffer<std::byte>&>());
+    m.def("retrieveTensor", &hp::retrieveTensor, "src"_a, "dst"_a,
         "Creates a command for copying the src tensor back to the destination buffer. They must match in size.");
-    m.def("updateTensor", [](hp::Buffer<std::byte>& src, hp::Tensor<std::byte>& dst)
-        { return CommandHandle{ hp::updateTensor(src, dst)}; }, "src"_a, "dst"_a,
+    nb::class_<hp::UpdateTensorCommand>(m, "UpdateTensorCommand", commandClass)
+        .def(nb::init<const hp::Buffer<std::byte>&, const hp::Tensor<std::byte>&>());
+    m.def("updateTensor", &hp::updateTensor, "src"_a, "dst"_a,
         "Creates a command for copying the src buffer into the destination tensor. They must match in size.");
 }
 
