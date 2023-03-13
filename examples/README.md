@@ -16,3 +16,4 @@ glslangvalidator -V -g0 -o add.h --target-env vulkan1.2 --vn code add.comp
 |`add` | Adds two list of integers on the GPU. |
 |`copy`| Shows how to copy to and from the GPU. |
 |`deviceinfo`| Lists all suitable devices and prints their properties. |
+|`mandelbrot`| Creates an image of the mandelbrot set. |
