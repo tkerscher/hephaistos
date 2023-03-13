@@ -25,15 +25,12 @@ uint32_t selectedDeviceId = MaxId;
 //Keep device handles alive
 //(ids are not guaranteed to be const between enumerations)
 std::vector<hp::DeviceHandle> handles{};
-std::vector<hp::DeviceInfo> devices{};
-const std::vector<hp::DeviceInfo>& getDevices() {
-    if (devices.empty()) {
-        handles = hp::enumerateDevices();
-        for (auto& h : handles)
-            devices.push_back(hp::getDeviceInfo(h));
-    }
-
-    return devices;
+std::vector<hp::DeviceInfo> enumerateDevices() {
+    auto& devices = getDevices();
+    std::vector<hp::DeviceInfo> result;
+    for (auto& d : devices)
+        result.push_back(hp::getDeviceInfo(d));
+    return result;
 }
 
 void selectDevice(uint32_t id, bool force) {
@@ -44,7 +41,6 @@ void selectDevice(uint32_t id, bool force) {
             //objects are now undefined
             currentContext.reset();
             handles.clear();
-            devices.clear();
             //instance should have been deleted now (doesn't really matter)
         }
         else {
@@ -78,13 +74,20 @@ const hp::ContextHandle& getCurrentContext() {
     return currentContext;
 }
 
+const std::vector<hp::DeviceHandle>& getDevices() {
+    if (handles.empty())
+        handles = hp::enumerateDevices();
+
+    return handles;
+}
+
 void registerContextModule(nb::module_& m) {
     m.def("isVulkanAvailable", &hp::isVulkanAvailable, "Returns True if Vulkan is available on this system.");
 
     nb::class_<hp::DeviceInfo>(m, "Device")
         .def_ro("name", &hp::DeviceInfo::name)
         .def_ro("isDiscrete", &hp::DeviceInfo::isDiscrete);
-    m.def("enumerateDevices", &getDevices, "Returns a list of all supported installed devices.");
+    m.def("enumerateDevices", &enumerateDevices, "Returns a list of all supported installed devices.");
     m.def("getCurrentDevice", []() { return hp::getDeviceInfo(getCurrentContext()); }, "Returns the currently active device. Note that this may initialize the context.");
     m.def("selectDevice", &selectDevice, "id"_a, "force"_a = false, "Sets the device on which the context will be initialized. Set force=True if an existing context should be destroyed.");
 }

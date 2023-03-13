@@ -41,7 +41,7 @@ void registerCommandModule(nb::module_& m) {
             "Issues the command to run parallel in the current step.", nb::rv_policy::reference_internal)
         .def("Then", [](hp::SequenceBuilder& sb, const hp::Command& h) -> hp::SequenceBuilder& { return sb.Then(h); }, "cmd"_a,
             "Issues a new step to execute after waiting for the previous one to finish.", nb::rv_policy::reference_internal)
-        .def("Wait", &hp::SequenceBuilder::WaitFor, "value"_a,
+        .def("WaitFor", &hp::SequenceBuilder::WaitFor, "value"_a,
             "Issues a new step to execute after the timeline reaches the given value.", nb::rv_policy::reference_internal)
         .def("Submit", &hp::SequenceBuilder::Submit, "Submits the recorded steps as a single batch to the GPU.");
     

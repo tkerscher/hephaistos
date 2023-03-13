@@ -1,6 +1,9 @@
 import ctypes
+import subprocess
+import tempfile
+import os.path
 from typing import Any
-from .pyhephaistos import RawBuffer, ByteTensor
+from .pyhephaistos import RawBuffer, ByteTensor, Program
 
 class StructureBuffer(RawBuffer):
     """
@@ -36,3 +39,38 @@ class StructureTensor(ByteTensor):
         Creates a tensor with the exact size to hold the given structure.
         """
         super().__init__(ctypes.sizeof(type))
+
+def bindParams(program: Program, params) -> None:
+    """
+    Helper function to bind a list of params in a program.
+    """
+    for i, p in enumerate(params):
+        p.bindParameter(program, i)
+
+def isCompilerAvailable() -> bool:
+    """
+    Tests wether the glsl compiler is available.
+    """
+    return subprocess.run(
+        "glslangvalidator --version",
+        shell=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    ).returncode == 0
+
+def compileShader(code: str) -> bytes:
+    """
+    Calls the glsl compiler to process the given code and returns the created bytecode.
+    """
+    with tempfile.TemporaryDirectory() as tmpDir:
+        path = os.path.join(tmpDir, "shader")
+        result = subprocess.run(
+            f"glslangvalidator --target-env vulkan1.2 --stdin --quiet -g0 -V -S comp -o {path}",
+            shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+            input=code, text=True)
+        
+        if result.returncode != 0:
+            raise RuntimeError("Error while compiling code: " + result)
+        
+        with open(path, mode="rb") as file:
+            return file.read()
