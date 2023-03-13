@@ -70,7 +70,7 @@ public:
 	DispatchCommand dispatch(uint32_t x = 1, uint32_t y = 1, uint32_t z = 1) const;
 	template<class T, typename = typename std::enable_if_t<std::is_standard_layout_v<T> && !std::is_integral_v<T>>>
 	DispatchCommand dispatch(const T& push, uint32_t x = 1, uint32_t y = 1, uint32_t z = 1) const {
-		return dispatch({ reinterpret_cast<const std::byte*>(&push, sizeof(T))}, x, y, z);
+		return dispatch({ reinterpret_cast<const std::byte*>(&push), sizeof(T)}, x, y, z);
 	}
 
 	Program(const Program&) = delete;

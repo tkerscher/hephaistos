@@ -307,7 +307,8 @@ void destroyContext(vulkan::Context* context) {
 	if (context->allocator)
 		vmaDestroyAllocator(context->allocator);
 	context->fnTable.vkDestroyPipelineCache(context->device, context->cache, nullptr);
-	context->fnTable.vkDestroyCommandPool(context->device, context->cmdPool, nullptr);
+	context->fnTable.vkDestroyFence(context->device, context->oneTimeSubmitFence, nullptr);
+	context->fnTable.vkDestroyCommandPool(context->device, context->oneTimeSubmitPool, nullptr);
 	while (!context->sequencePool.empty()) {
 		context->fnTable.vkDestroyCommandPool(
 			context->device, context->sequencePool.front(), nullptr);
@@ -364,7 +365,7 @@ ContextHandle createContext(VkInstance instance, VkPhysicalDevice device) {
 	//get queue
 	context->fnTable.vkGetDeviceQueue(context->device, family, 0, &context->queue);
 
-	//create command pool
+	//create command pool for internal one time submits
 	{
 		VkCommandPoolCreateInfo poolInfo{
 			.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -372,7 +373,15 @@ ContextHandle createContext(VkInstance instance, VkPhysicalDevice device) {
 			.queueFamilyIndex = family
 		};
 		vulkan::checkResult(context->fnTable.vkCreateCommandPool(
-			context->device, &poolInfo, nullptr, &context->cmdPool));
+			context->device, &poolInfo, nullptr, &context->oneTimeSubmitPool));
+	}
+	//create fence for synchronizing internal one time submits
+	{
+		VkFenceCreateInfo fenceInfo{
+			.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO
+		};
+		vulkan::checkResult(context->fnTable.vkCreateFence(
+			context->device, &fenceInfo, nullptr, &context->oneTimeSubmitFence));
 	}
 
 	//Create pipeline cache

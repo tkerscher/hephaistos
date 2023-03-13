@@ -33,7 +33,9 @@ struct Context {
 	VkPipelineCache cache;
 
 	uint32_t queueFamily;
-	VkCommandPool cmdPool;
+	VkCommandPool oneTimeSubmitPool;
+	VkFence oneTimeSubmitFence;
+
 	//looks like a hack, but this is the only one we need to change
 	//would be a bit drastic to remove const Context because of this
 	mutable std::queue<VkCommandPool> sequencePool;
@@ -45,6 +47,14 @@ struct Context {
 
 struct Device {
     VkPhysicalDevice device;
+};
+
+struct Image {
+	VkImage image;
+	VkImageView view;
+	VmaAllocation allocation;
+
+	const Context& context;
 };
 
 struct Instance {
@@ -64,5 +74,11 @@ struct Timeline {
 	VkBufferUsageFlags usage,
 	VmaAllocationCreateFlags flags);
 void destroyBuffer(Buffer* buffer);
+
+[[nodiscard]] ImageHandle createImage(
+	const ContextHandle& context,
+	VkFormat format,
+	uint32_t width, uint32_t height, uint32_t depth);
+void destroyImage(Image* image);
 
 }

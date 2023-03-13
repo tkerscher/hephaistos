@@ -9,7 +9,8 @@ set(PUBLIC_HEADERS
     ${INCROOT}/config.hpp
     ${INCROOT}/context.hpp
     ${INCROOT}/handles.hpp
-    ${INCROOT}/hephaistos.hpp    
+    ${INCROOT}/hephaistos.hpp
+    ${INCROOT}/image.hpp
     ${INCROOT}/program.hpp
     ${INCROOT}/version.hpp
 )
@@ -17,13 +18,15 @@ set(PUBLIC_HEADERS
 set(SRC
     ${SRCROOT}/buffer.cpp
     ${SRCROOT}/command.cpp
-    ${SRCROOT}/context.cpp
+    ${SRCROOT}/context.cpp    
+    ${SRCROOT}/image.cpp
     ${SRCROOT}/program.cpp
     ${SRCROOT}/version.cpp
 #vulkan
     ${SRCROOT}/vk/result.hpp
     ${SRCROOT}/vk/types.cpp
     ${SRCROOT}/vk/types.hpp
+    ${SRCROOT}/vk/util.hpp
     ${SRCROOT}/vk/vma.cpp
 )
 
@@ -41,6 +44,7 @@ target_compile_features(hephaistos PUBLIC cxx_std_20)
 target_link_libraries(hephaistos PRIVATE volk)
 target_link_libraries(hephaistos PRIVATE VulkanMemoryAllocator)
 target_link_libraries(hephaistos PRIVATE spirv-reflect)
+target_link_libraries(hephaistos PRIVATE stb)
 
 #tell the compiler to hide all symbols by default
 set_target_properties(hephaistos PROPERTIES CXX_VISIBILITY hidden)
