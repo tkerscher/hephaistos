@@ -56,6 +56,10 @@ Buffer<std::byte>::~Buffer() = default;
 
 /********************************** TENSOR ************************************/
 
+struct Tensor<std::byte>::Parameter {
+	VkDescriptorBufferInfo buffer;
+};
+
 uint64_t Tensor<std::byte>::size_bytes() const noexcept {
 	return _size;
 }
@@ -66,15 +70,24 @@ const vulkan::Buffer& Tensor<std::byte>::getBuffer() const noexcept {
 	return *buffer;
 }
 
+void Tensor<std::byte>::bindParameter(VkWriteDescriptorSet& binding) const {
+	binding.pNext            = nullptr;
+	binding.pImageInfo       = nullptr;
+	binding.pTexelBufferView = nullptr;
+	binding.pBufferInfo      = &parameter->buffer;
+}
+
 Tensor<std::byte>::Tensor(Tensor<std::byte>&& other) noexcept
 	: Resource(std::move(other))
 	, buffer(std::move(other.buffer))
 	, _size(other._size)
+	, parameter(std::move(other.parameter))
 {}
 Tensor<std::byte>& Tensor<std::byte>::operator=(Tensor<std::byte>&& other) noexcept {
 	Resource::operator=(std::move(other));
 	buffer = std::move(other.buffer);
 	_size = other._size;
+	parameter = std::move(other.parameter);
 	return *this;
 }
 
@@ -87,9 +100,15 @@ Tensor<std::byte>::Tensor(ContextHandle context, uint64_t size)
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT |
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-		0
-	))
-{}
+		0))
+	, parameter(std::make_unique<Parameter>())
+{
+	parameter->buffer = VkDescriptorBufferInfo{
+		.buffer = buffer->buffer,
+		.offset = 0,
+		.range = VK_WHOLE_SIZE
+	};
+}
 Tensor<std::byte>::~Tensor() = default;
 
 /*********************************** COPY *************************************/

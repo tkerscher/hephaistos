@@ -8,6 +8,9 @@
 #include "hephaistos/context.hpp"
 #include "hephaistos/handles.hpp"
 
+//fwd
+struct VkWriteDescriptorSet;
+
 namespace hephaistos {
 
 template<class T = std::byte> class Buffer;
@@ -86,6 +89,8 @@ public:
     [[nodiscard]] uint64_t size_bytes() const noexcept;
     [[nodiscard]] size_t size() const noexcept;
 
+	void bindParameter(VkWriteDescriptorSet& binding) const;
+
     Tensor(const Tensor<std::byte>&) = delete;
     Tensor<std::byte>& operator=(const Tensor<std::byte>&) = delete;
 
@@ -99,8 +104,11 @@ public: //internal
     [[nodiscard]] const vulkan::Buffer& getBuffer() const noexcept;
 
 private:
-    BufferHandle buffer;
 	uint64_t _size;
+    BufferHandle buffer;
+
+	struct Parameter;
+	std::unique_ptr<Parameter> parameter;
 };
 template class HEPHAISTOS_API Tensor<std::byte>;
 

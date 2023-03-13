@@ -10,6 +10,7 @@ namespace vulkan {
     struct Context;
     struct Device;
     struct Timeline;
+    struct Param;
 }
 
 using ContextHandle = std::shared_ptr<vulkan::Context>;

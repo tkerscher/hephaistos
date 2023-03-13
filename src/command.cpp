@@ -337,6 +337,23 @@ SequenceBuilder& SequenceBuilder::operator=(SequenceBuilder&& other) noexcept = 
 SequenceBuilder::SequenceBuilder(Timeline& timeline, uint64_t startValue)
 	: _pImp(new pImp(timeline, startValue))
 {}
-SequenceBuilder::~SequenceBuilder() = default;
+SequenceBuilder::~SequenceBuilder() {
+	if (_pImp) {
+		auto& context = _pImp->context;
+		//free command buffers
+		for (auto& c : _pImp->commands) {
+			context.fnTable.vkFreeCommandBuffers(
+				context.device, _pImp->pool,
+				1, &c.buffer);
+		}
+		//reset pool
+		vulkan::checkResult(context.fnTable.vkResetCommandPool(
+			context.device,
+			_pImp->pool,
+			VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT));
+		//return to context
+		context.sequencePool.push(_pImp->pool);
+	}
+}
 
 }

@@ -1,0 +1,276 @@
+diff --git a/spirv_reflect.c b/spirv_reflect.c
+index 5fc190e..dcfebf6 100644
+--- a/spirv_reflect.c
++++ b/spirv_reflect.c
+@@ -126,6 +126,7 @@ typedef struct SpvReflectPrvDecorations {
+   SpvReflectPrvNumberDecoration   location;
+   SpvReflectPrvNumberDecoration   offset;
+   SpvReflectPrvNumberDecoration   uav_counter_buffer;
++  SpvReflectPrvNumberDecoration   specialization_constant;
+   SpvReflectPrvStringDecoration   semantic;
+   uint32_t                        array_stride;
+   uint32_t                        matrix_stride;
+@@ -641,6 +642,7 @@ static SpvReflectResult ParseNodes(SpvReflectPrvParser* p_parser)
+     p_parser->nodes[i].decorations.offset.value = (uint32_t)INVALID_VALUE;
+     p_parser->nodes[i].decorations.uav_counter_buffer.value = (uint32_t)INVALID_VALUE;
+     p_parser->nodes[i].decorations.built_in = (SpvBuiltIn)INVALID_VALUE;
++    p_parser->nodes[i].decorations.specialization_constant.value = (SpvBuiltIn)INVALID_VALUE;
+   }
+   // Mark source file id node
+   p_parser->source_file_id = (uint32_t)INVALID_VALUE;
+@@ -840,7 +842,12 @@ static SpvReflectResult ParseNodes(SpvReflectPrvParser* p_parser)
+ 
+       case SpvOpSpecConstantTrue:
+       case SpvOpSpecConstantFalse:
+-      case SpvOpSpecConstant:
++      case SpvOpSpecConstant: {
++        CHECKED_READU32(p_parser, p_node->word_offset + 1, p_node->result_type_id);
++        CHECKED_READU32(p_parser, p_node->word_offset + 2, p_node->result_id);
++      }
++      break;
++
+       case SpvOpSpecConstantComposite:
+       case SpvOpSpecConstantOp: {
+         CHECKED_READU32(p_parser, p_node->word_offset + 1, p_node->result_type_id);
+@@ -872,7 +879,7 @@ static SpvReflectResult ParseNodes(SpvReflectPrvParser* p_parser)
+         CHECKED_READU32(p_parser, p_node->word_offset + 3, p_access_chain->base_id);
+         //
+         // SPIRV_ACCESS_CHAIN_INDEX_OFFSET (4) is the number of words up until the first index:
+-        //   [Node, Result Type Id, Result Id, Base Id, <Indexes>]
++        //   [SpvReflectPrvNode, Result Type Id, Result Id, Base Id, <Indexes>]
+         //
+         p_access_chain->index_count = (node_word_count - SPIRV_ACCESS_CHAIN_INDEX_OFFSET);
+         if (p_access_chain->index_count > 0) {
+@@ -1354,6 +1361,7 @@ static SpvReflectResult ParseDecorations(SpvReflectPrvParser* p_parser)
+         skip = true;
+       }
+       break;
++      case SpvDecorationSpecId:
+       case SpvDecorationRelaxedPrecision:
+       case SpvDecorationBlock:
+       case SpvDecorationBufferBlock:
+@@ -1504,6 +1512,13 @@ static SpvReflectResult ParseDecorations(SpvReflectPrvParser* p_parser)
+       }
+       break;
+ 
++      case SpvDecorationSpecId: {
++        uint32_t word_offset = p_node->word_offset + member_offset+ 3;
++        CHECKED_READU32(p_parser, word_offset, p_target_decorations->specialization_constant.value);
++        p_target_decorations->specialization_constant.word_offset = word_offset;
++      }
++      break;
++
+       case SpvReflectDecorationHlslCounterBufferGOOGLE: {
+         uint32_t word_offset = p_node->word_offset + member_offset+ 3;
+         CHECKED_READU32(p_parser, word_offset, p_target_decorations->uav_counter_buffer.value);
+@@ -1811,6 +1826,12 @@ static SpvReflectResult ParseType(
+         p_type->type_flags |= SPV_REFLECT_TYPE_FLAG_EXTERNAL_ACCELERATION_STRUCTURE;
+       }
+       break;
++
++      case SpvOpSpecConstantTrue:
++      case SpvOpSpecConstantFalse:
++      case SpvOpSpecConstant: {
++      }
++      break;
+     }
+ 
+     if (result == SPV_REFLECT_RESULT_SUCCESS) {
+@@ -3380,6 +3401,69 @@ static SpvReflectResult ParseExecutionModes(
+   return SPV_REFLECT_RESULT_SUCCESS;
+ }
+ 
++static SpvReflectResult ParseSpecializationConstants(
++  SpvReflectPrvParser*    p_parser,
++  SpvReflectShaderModule* p_module)
++{
++  p_module->specialization_constant_count = 0;
++  p_module->specialization_constants = NULL;
++  for (size_t i = 0; i < p_parser->node_count; ++i) {
++    SpvReflectPrvNode* p_node = &(p_parser->nodes[i]);
++    if (p_node->op == SpvOpSpecConstantTrue || p_node->op == SpvOpSpecConstantFalse || p_node->op == SpvOpSpecConstant) {
++      p_module->specialization_constant_count++;
++    }
++  }
++
++  if (p_module->specialization_constant_count == 0) {
++    return SPV_REFLECT_RESULT_SUCCESS;
++  }
++
++  p_module->specialization_constants = (SpvReflectSpecializationConstant*)calloc(p_module->specialization_constant_count, sizeof(SpvReflectSpecializationConstant));
++
++  uint32_t index = 0;
++
++  for (size_t i = 0; i < p_parser->node_count; ++i) {
++    SpvReflectPrvNode* p_node = &(p_parser->nodes[i]);
++    switch(p_node->op) {
++      default: continue;
++      case SpvOpSpecConstantTrue: {
++        p_module->specialization_constants[index].constant_type = SPV_REFLECT_SPECIALIZATION_CONSTANT_BOOL;
++        p_module->specialization_constants[index].default_value.int_bool_value = 1;
++      } break;
++      case SpvOpSpecConstantFalse: {
++        p_module->specialization_constants[index].constant_type = SPV_REFLECT_SPECIALIZATION_CONSTANT_BOOL;
++        p_module->specialization_constants[index].default_value.int_bool_value = 0;
++      } break;
++      case SpvOpSpecConstant: {
++        SpvReflectResult result = SPV_REFLECT_RESULT_SUCCESS;
++        uint32_t element_type_id = (uint32_t)INVALID_VALUE;
++        uint32_t default_value = 0;
++        IF_READU32(result, p_parser, p_node->word_offset + 1, element_type_id);
++        IF_READU32(result, p_parser, p_node->word_offset + 3, default_value);
++
++        SpvReflectPrvNode* p_next_node = FindNode(p_parser, element_type_id);
++
++        if (p_next_node->op == SpvOpTypeInt) {
++          p_module->specialization_constants[index].constant_type = SPV_REFLECT_SPECIALIZATION_CONSTANT_INT;
++        } else if (p_next_node->op == SpvOpTypeFloat) {
++          p_module->specialization_constants[index].constant_type = SPV_REFLECT_SPECIALIZATION_CONSTANT_FLOAT;
++        } else {
++          return SPV_REFLECT_RESULT_ERROR_PARSE_FAILED;
++        }
++
++        p_module->specialization_constants[index].default_value.int_bool_value = default_value; //bits are the same for int and float
++      } break;
++    }
++
++    p_module->specialization_constants[index].name = p_node->name;
++    p_module->specialization_constants[index].constant_id = p_node->decorations.specialization_constant.value;
++    p_module->specialization_constants[index].spirv_id = p_node->result_id;
++    index++;
++  }
++
++  return SPV_REFLECT_RESULT_SUCCESS;
++}
++
+ static SpvReflectResult ParsePushConstantBlocks(
+   SpvReflectPrvParser*    p_parser,
+   SpvReflectShaderModule* p_module)
+@@ -3765,6 +3849,10 @@ static SpvReflectResult CreateShaderModule(
+     result = ParsePushConstantBlocks(&parser, p_module);
+     SPV_REFLECT_ASSERT(result == SPV_REFLECT_RESULT_SUCCESS);
+   }
++  if (result == SPV_REFLECT_RESULT_SUCCESS) {
++    result = ParseSpecializationConstants(&parser, p_module);
++    SPV_REFLECT_ASSERT(result == SPV_REFLECT_RESULT_SUCCESS);
++  }
+   if (result == SPV_REFLECT_RESULT_SUCCESS) {
+     result = ParseEntryPoints(&parser, p_module);
+     SPV_REFLECT_ASSERT(result == SPV_REFLECT_RESULT_SUCCESS);
+@@ -3928,6 +4016,7 @@ void spvReflectDestroyShaderModule(SpvReflectShaderModule* p_module)
+   }
+   SafeFree(p_module->capabilities);
+   SafeFree(p_module->entry_points);
++  SafeFree(p_module->specialization_constants);
+ 
+   // Push constants
+   for (size_t i = 0; i < p_module->push_constant_block_count; ++i) {
+@@ -4198,6 +4287,36 @@ SpvReflectResult spvReflectEnumerateEntryPointInterfaceVariables(
+   return SPV_REFLECT_RESULT_SUCCESS;
+ }
+ 
++SpvReflectResult spvReflectEnumerateSpecializationConstants(
++  const SpvReflectShaderModule*      p_module,
++  uint32_t*                          p_count,
++  SpvReflectSpecializationConstant** pp_constants
++)
++{
++  if (IsNull(p_module)) {
++    return SPV_REFLECT_RESULT_ERROR_NULL_POINTER;
++  }
++  if (IsNull(p_count)) {
++    return SPV_REFLECT_RESULT_ERROR_NULL_POINTER;
++  }
++
++  if (IsNotNull(pp_constants)) {
++    if (*p_count != p_module->specialization_constant_count) {
++      return SPV_REFLECT_RESULT_ERROR_COUNT_MISMATCH;
++    }
++
++    for (uint32_t index = 0; index < *p_count; ++index) {
++      SpvReflectSpecializationConstant *p_const = &p_module->specialization_constants[index];
++      pp_constants[index] = p_const;
++    }
++  }
++  else {
++    *p_count = p_module->specialization_constant_count;
++  }
++
++  return SPV_REFLECT_RESULT_SUCCESS;
++}
++
+ SpvReflectResult spvReflectEnumerateInputVariables(
+   const SpvReflectShaderModule* p_module,
+   uint32_t*                     p_count,
+diff --git a/spirv_reflect.h b/spirv_reflect.h
+index 690ae6c..2900c97 100644
+--- a/spirv_reflect.h
++++ b/spirv_reflect.h
+@@ -329,6 +329,26 @@ typedef struct SpvReflectTypeDescription {
+   struct SpvReflectTypeDescription* members;
+ } SpvReflectTypeDescription;
+ 
++/*! @struct SpvReflectSpecializationConstant
++
++*/
++
++typedef enum SpvReflectSpecializationConstantType {
++  SPV_REFLECT_SPECIALIZATION_CONSTANT_BOOL = 0,
++  SPV_REFLECT_SPECIALIZATION_CONSTANT_INT = 1,
++  SPV_REFLECT_SPECIALIZATION_CONSTANT_FLOAT = 2,
++} SpvReflectSpecializationConstantType;
++
++typedef struct SpvReflectSpecializationConstant {
++  const char* name;
++  uint32_t spirv_id;
++  uint32_t constant_id;
++  SpvReflectSpecializationConstantType constant_type;
++  union {
++    float float_value;
++    uint32_t int_bool_value;
++  } default_value;
++} SpvReflectSpecializationConstant;
+ 
+ /*! @struct SpvReflectInterfaceVariable
+ 
+@@ -493,6 +513,8 @@ typedef struct SpvReflectShaderModule {
+   SpvReflectInterfaceVariable*      interface_variables;                              // Uses value(s) from first entry point
+   uint32_t                          push_constant_block_count;                        // Uses value(s) from first entry point
+   SpvReflectBlockVariable*          push_constant_blocks;                             // Uses value(s) from first entry point
++  uint32_t                          specialization_constant_count;
++  SpvReflectSpecializationConstant* specialization_constants;
+ 
+   struct Internal {
+     SpvReflectModuleFlags           module_flags;
+@@ -765,6 +787,31 @@ SpvReflectResult spvReflectEnumerateInputVariables(
+   SpvReflectInterfaceVariable** pp_variables
+ );
+ 
++/*! @fn spvReflectEnumerateSpecializationConstants
++ @brief  If the module contains multiple entry points, this will only get
++         the specialization constants for the first one.
++ @param  p_module      Pointer to an instance of SpvReflectShaderModule.
++ @param  p_count       If pp_constants is NULL, the module's specialization constant
++                       count will be stored here.
++                       If pp_variables is not NULL, *p_count must contain
++                       the module's specialization constant count.
++ @param  pp_variables  If NULL, the module's specialization constant count will be
++                       written to *p_count.
++                       If non-NULL, pp_constants must point to an array with
++                       *p_count entries, where pointers to the module's
++                       specialization constants will be written. The caller must not
++                       free the specialization constants written to this array.
++ @return               If successful, returns SPV_REFLECT_RESULT_SUCCESS.
++                       Otherwise, the error code indicates the cause of the
++                       failure.
++
++*/
++SpvReflectResult spvReflectEnumerateSpecializationConstants(
++  const SpvReflectShaderModule*      p_module,
++  uint32_t*                          p_count,
++  SpvReflectSpecializationConstant** pp_constants
++);
++
+ /*! @fn spvReflectEnumerateEntryPointInputVariables
+  @brief  Enumerate the input variables for a given entry point.
+  @param  entry_point The name of the entry point to get the input variables for.
