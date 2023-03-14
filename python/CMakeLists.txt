@@ -6,6 +6,7 @@ set(SRC
     ${PYROOT}/buffer.cpp
     ${PYROOT}/command.cpp
     ${PYROOT}/context.cpp
+    ${PYROOT}/image.cpp
     ${PYROOT}/program.cpp
     ${PYROOT}/pyhephaistos.cpp
 )
