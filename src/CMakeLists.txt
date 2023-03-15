@@ -12,6 +12,7 @@ set(PUBLIC_HEADERS
     ${INCROOT}/hephaistos.hpp
     ${INCROOT}/image.hpp
     ${INCROOT}/program.hpp
+    ${INCROOT}/raytracing.hpp
     ${INCROOT}/version.hpp
 )
 #Source
@@ -21,6 +22,7 @@ set(SRC
     ${SRCROOT}/context.cpp    
     ${SRCROOT}/image.cpp
     ${SRCROOT}/program.cpp
+    ${SRCROOT}/raytracing.cpp
     ${SRCROOT}/version.cpp
 #vulkan
     ${SRCROOT}/vk/result.hpp
