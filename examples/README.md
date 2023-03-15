@@ -17,3 +17,4 @@ glslangvalidator -V -g0 -o add.h --target-env vulkan1.2 --vn code add.comp
 |`copy`| Shows how to copy to and from the GPU. |
 |`deviceinfo`| Lists all suitable devices and prints their properties. |
 |`mandelbrot`| Creates an image of the mandelbrot set. |
+|`raytracing`| Shows how to use modern ray tracing hardware. |
