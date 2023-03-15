@@ -21,4 +21,8 @@ using DeviceHandle   = std::unique_ptr<vulkan::Device,   void(*)(vulkan::Device*
 using ImageHandle    = std::unique_ptr<vulkan::Image, void(*)(vulkan::Image*)>;
 using TimelineHandle = std::unique_ptr<vulkan::Timeline, void(*)(vulkan::Timeline*)>;
 
+struct Extension;
+
+using ExtensionHandle = std::unique_ptr<Extension>;
+
 }

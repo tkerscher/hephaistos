@@ -1,6 +1,9 @@
 #pragma once
 
 #include <queue>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #include "volk.h"
 #include "vk_mem_alloc.h"
@@ -32,6 +35,10 @@ struct Context {
 	VkQueue queue;
 	VkPipelineCache cache;
 
+	//List of enabled hephaistos extensions (not vulkan!)
+	//TODO: Is this one of the rare cases where I want a set instead?
+	std::vector<std::string_view> extensions;
+
 	uint32_t queueFamily;
 	VkCommandPool oneTimeSubmitPool;
 	VkFence oneTimeSubmitFence;
@@ -47,6 +54,7 @@ struct Context {
 
 struct Device {
     VkPhysicalDevice device;
+	std::vector<std::string> supportedExtensions;
 };
 
 struct Image {

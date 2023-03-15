@@ -1,7 +1,7 @@
 #include "hephaistos/context.hpp"
 
+#include <algorithm>
 #include <array>
-#include <set>
 #include <stdexcept>
 #include <string>
 
@@ -182,61 +182,6 @@ constexpr auto DeviceExtensions = std::to_array({
 	VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME
 });
 
-bool isDeviceSuitable(VkPhysicalDevice device) {
-	//Check for the following things:
-	//	- Compute queue
-	//	- timeline semaphore support
-	//  - Extension support
-
-	//Check for timeline support
-	{
-		VkPhysicalDeviceTimelineSemaphoreFeatures timeline{
-			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES
-		};
-		VkPhysicalDeviceFeatures2 features{
-			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-			.pNext = &timeline
-		};
-		vkGetPhysicalDeviceFeatures2(device, &features);
-		if (!timeline.timelineSemaphore)
-			return false;
-	}
-
-	//check for compute queue
-	{
-		uint32_t count;
-		vkGetPhysicalDeviceQueueFamilyProperties(device, &count, nullptr);
-		std::vector<VkQueueFamilyProperties> props(count);
-		vkGetPhysicalDeviceQueueFamilyProperties(device, &count, props.data());
-		bool found = false;
-		for (auto& queue : props) {
-			if ((queue.queueFlags & QueueFlags) == QueueFlags) {
-				found = true;
-				break;
-			}
-		}
-		if (!found)
-			return false;
-	}
-
-	//Check for extension support
-	{
-		uint32_t count;
-		vulkan::checkResult(vkEnumerateDeviceExtensionProperties(device, nullptr, &count, nullptr));
-		std::vector<VkExtensionProperties> extensions(count);
-		vulkan::checkResult(vkEnumerateDeviceExtensionProperties(device, nullptr, &count, extensions.data()));
-		std::set<std::string> required(DeviceExtensions.begin(), DeviceExtensions.end());
-		for (auto& prop : extensions) {
-			required.erase(prop.extensionName);
-		}
-		if (!required.empty())
-			return false; //at least one extension missing
-	}
-
-	//Everything checked
-	return true;
-}
-
 void destroyDevice(vulkan::Device* device) {
 	delete device;
 	returnInstance();
@@ -245,7 +190,27 @@ void destroyDevice(vulkan::Device* device) {
 DeviceHandle createDevice(VkPhysicalDevice device) {
 	//increment instance ref count
 	getInstance();
-	return DeviceHandle{ new vulkan::Device{ device }, destroyDevice };
+
+	//query extensions
+	uint32_t count;
+	vulkan::checkResult(vkEnumerateDeviceExtensionProperties(device, nullptr, &count, nullptr));
+	std::vector<VkExtensionProperties> extensions(count);
+	vulkan::checkResult(vkEnumerateDeviceExtensionProperties(device, nullptr, &count, extensions.data()));
+
+	//allocate handle
+	DeviceHandle result{
+		new vulkan::Device{ device, std::vector<std::string>(count) },
+		destroyDevice
+	};
+
+	//copy extensions
+	std::transform(extensions.begin(), extensions.end(), result->supportedExtensions.begin(),
+		[](VkExtensionProperties prop) -> std::string { return std::string(prop.extensionName); });
+	//sort extensions for std::includes
+	std::sort(result->supportedExtensions.begin(), result->supportedExtensions.end());
+
+	//done
+	return result;
 };
 
 DeviceInfo createInfo(VkPhysicalDevice device) {
@@ -262,6 +227,63 @@ DeviceInfo createInfo(VkPhysicalDevice device) {
 
 }
 
+bool isDeviceSuitable(const DeviceHandle& device, std::span<const ExtensionHandle> extensions) {
+	//Check for the following things:
+	//	- Compute queue
+	//	- timeline semaphore support
+	//  - Extension support
+
+	//Check for timeline support
+	{
+		VkPhysicalDeviceTimelineSemaphoreFeatures timeline{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES
+		};
+		VkPhysicalDeviceFeatures2 features{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+			.pNext = &timeline
+		};
+		vkGetPhysicalDeviceFeatures2(device->device, &features);
+		if (!timeline.timelineSemaphore)
+			return false;
+	}
+
+	//check for compute queue
+	{
+		uint32_t count;
+		vkGetPhysicalDeviceQueueFamilyProperties(device->device, &count, nullptr);
+		std::vector<VkQueueFamilyProperties> props(count);
+		vkGetPhysicalDeviceQueueFamilyProperties(device->device, &count, props.data());
+		bool found = false;
+		for (auto& queue : props) {
+			if ((queue.queueFlags & QueueFlags) == QueueFlags) {
+				found = true;
+				break;
+			}
+		}
+		if (!found)
+			return false;
+	}
+
+	//Check for internal extension support
+	if (!DeviceExtensions.empty() && !std::includes(
+		device->supportedExtensions.begin(),
+		device->supportedExtensions.end(),
+		DeviceExtensions.begin(),
+		DeviceExtensions.end()))
+	{
+		return false;
+	}
+
+	//check for external extension support
+	for (auto& ext : extensions) {
+		if (!ext->isDeviceSupported(device))
+			return false;
+	}
+
+	//Everything checked
+	return true;
+}
+
 std::vector<DeviceHandle> enumerateDevices() {
 	//get instance
 	auto instance = getInstance();
@@ -275,8 +297,7 @@ std::vector<DeviceHandle> enumerateDevices() {
     //transform supported devices
     std::vector<DeviceHandle> result;
     for (auto device : devices) {
-        if (isDeviceSuitable(device))
-            result.push_back(createDevice(device));
+        result.push_back(createDevice(device));
     }
 
 	//we only needed the instance for the enumerate command
@@ -318,7 +339,11 @@ void destroyContext(vulkan::Context* context) {
 	returnInstance();
 }
 
-ContextHandle createContext(VkInstance instance, VkPhysicalDevice device) {
+ContextHandle createContext(
+	VkInstance instance,
+	VkPhysicalDevice device,
+	std::span<ExtensionHandle> extensions)
+{
 	//Allocate memory
 	ContextHandle context{ new vulkan::Context, destroyContext };
 	context->physicalDevice = device;
@@ -339,6 +364,34 @@ ContextHandle createContext(VkInstance instance, VkPhysicalDevice device) {
 
 	//Create logical device
 	{
+		//extensions are allowed to add device extensions, but
+		//vulkan wants their names in contiguous memory
+		// -> collect them in a vector
+		//TODO: Right now it's not possible, but we should
+		//		check to not name an extension multiple times
+		//Note: Passing the same extension multiple times is
+		//		the users fault
+		std::vector<const char*> allDeviceExtensions{};
+		//copy the base one
+		allDeviceExtensions.insert(
+			allDeviceExtensions.end(),
+			DeviceExtensions.begin(),
+			DeviceExtensions.end());
+
+		//process extensions
+		void* pNext = nullptr;
+		for (auto& ext : extensions) {
+			//chain features
+			pNext = ext->chain(pNext);
+			//save name
+			context->extensions.push_back(ext->getExtensionName());
+			//add extensions
+			auto extNames = ext->getDeviceExtensions();
+			allDeviceExtensions.insert(
+				allDeviceExtensions.end(),
+				extNames.begin(), extNames.end());
+		}
+
 		VkDeviceQueueCreateInfo queueInfo{
 			.sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
 			.queueFamilyIndex = family,
@@ -347,6 +400,7 @@ ContextHandle createContext(VkInstance instance, VkPhysicalDevice device) {
 		};
 		VkPhysicalDeviceTimelineSemaphoreFeatures timeline{
 			.sType             = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
+			.pNext			   = pNext, //chain external extensions
 			.timelineSemaphore = VK_TRUE
 		};
 		VkDeviceCreateInfo deviceInfo{
@@ -354,8 +408,8 @@ ContextHandle createContext(VkInstance instance, VkPhysicalDevice device) {
 			.pNext                   = &timeline,
 			.queueCreateInfoCount    = 1,
 			.pQueueCreateInfos       = &queueInfo,
-			.enabledExtensionCount   = static_cast<uint32_t>(DeviceExtensions.size()),
-			.ppEnabledExtensionNames = DeviceExtensions.data()
+			.enabledExtensionCount   = static_cast<uint32_t>(allDeviceExtensions.size()),
+			.ppEnabledExtensionNames = allDeviceExtensions.data()
 		};
 		vulkan::checkResult(vkCreateDevice(device, &deviceInfo, nullptr, &context->device));
 	}
@@ -439,7 +493,7 @@ ContextHandle createContext(VkInstance instance, VkPhysicalDevice device) {
 
 }
 
-ContextHandle createContext() {
+ContextHandle createContext(std::span<ExtensionHandle> extensions) {
 	//new handle -> refs to instance
 	auto instance = getInstance();
 
@@ -453,28 +507,33 @@ ContextHandle createContext() {
 	VkPhysicalDevice fallback = nullptr;
 	VkPhysicalDeviceProperties props;
 	for (auto device : devices) {
-		if (isDeviceSuitable(device)) {
+		if (isDeviceSuitable(createDevice(device), extensions)) {
 			//Remember last suitable device if no discrete present
 			fallback = device;
 			vkGetPhysicalDeviceProperties(device, &props);
 			if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
-				return createContext(instance, device);
+				return createContext(instance, device, extensions);
 		}
 	}
 
 	//no discrete gpu
 	if (fallback)
-		return createContext(instance, fallback);
+		return createContext(instance, fallback, extensions);
 	else
 		throw std::runtime_error("No suitable device available!");
 }
 
-ContextHandle createContext(const DeviceHandle& device) {
+ContextHandle createContext(
+	const DeviceHandle& device,
+	std::span<ExtensionHandle> extensions)
+{
 	if (!device)
 		throw std::runtime_error("Device is empty!");
+	if (!isDeviceSuitable(device, extensions))
+		throw std::runtime_error("Device is not suitable!");
 
 	//new ref
-	return createContext(getInstance(), device->device);
+	return createContext(getInstance(), device->device, extensions);
 }
 
 /*********************************** RESOURCE ********************************/
