@@ -14,6 +14,7 @@ int main() {
 			createRaytracingExtension()
 		});
 		context = createContext(extensions);
+		return 1;
 	}
 	catch (const std::exception& e) {
 		std::cerr << "Failed to create context!\n"

@@ -46,12 +46,8 @@ bool isRaytracingSupported(const DeviceHandle& device) {
 	}
 
 	//Query features
-	VkPhysicalDeviceBufferDeviceAddressFeatures addressFeatures{
-		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES
-	};
 	VkPhysicalDeviceRayQueryFeaturesKHR queryFeatures{
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR,
-		.pNext = &addressFeatures
 	};
 	VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures{
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
@@ -64,8 +60,6 @@ bool isRaytracingSupported(const DeviceHandle& device) {
 	vkGetPhysicalDeviceFeatures2(device->device, &features);
 
 	//check features
-	if (!addressFeatures.bufferDeviceAddress)
-		return false;
 	if (!queryFeatures.rayQuery)
 		return false;
 	if (!accelerationStructureFeatures.accelerationStructure)

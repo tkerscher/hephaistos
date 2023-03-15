@@ -99,7 +99,8 @@ Tensor<std::byte>::Tensor(ContextHandle context, uint64_t size)
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT |
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, //needed for ray tracing
 		0))
 	, parameter(std::make_unique<Parameter>())
 {

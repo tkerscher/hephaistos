@@ -233,17 +233,19 @@ bool isDeviceSuitable(const DeviceHandle& device, std::span<const ExtensionHandl
 	//	- timeline semaphore support
 	//  - Extension support
 
-	//Check for timeline support
+	//Check for timeline & device adresss support
 	{
-		VkPhysicalDeviceTimelineSemaphoreFeatures timeline{
-			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES
+		VkPhysicalDeviceVulkan12Features features12{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
 		};
 		VkPhysicalDeviceFeatures2 features{
 			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-			.pNext = &timeline
+			.pNext = &features12
 		};
 		vkGetPhysicalDeviceFeatures2(device->device, &features);
-		if (!timeline.timelineSemaphore)
+		if (!features12.timelineSemaphore)
+			return false;
+		if (!features12.bufferDeviceAddress)
 			return false;
 	}
 
@@ -403,9 +405,14 @@ ContextHandle createContext(
 			.pNext			   = pNext, //chain external extensions
 			.timelineSemaphore = VK_TRUE
 		};
+		VkPhysicalDeviceBufferDeviceAddressFeatures addressFeatures{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
+			.pNext = &timeline,
+			.bufferDeviceAddress = VK_TRUE
+		};
 		VkDeviceCreateInfo deviceInfo{
 			.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-			.pNext                   = &timeline,
+			.pNext                   = &addressFeatures,
 			.queueCreateInfoCount    = 1,
 			.pQueueCreateInfos       = &queueInfo,
 			.enabledExtensionCount   = static_cast<uint32_t>(allDeviceExtensions.size()),
@@ -477,6 +484,7 @@ ContextHandle createContext(
 		};
 
 		VmaAllocatorCreateInfo info{
+			.flags            = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
 			.physicalDevice   = device,
 			.device           = context->device,
 			.pVulkanFunctions = &functions,
