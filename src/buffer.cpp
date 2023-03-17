@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "vk/util.hpp"
 #include "vk/types.hpp"
 #include "vk/result.hpp"
 
@@ -110,6 +111,19 @@ Tensor<std::byte>::Tensor(ContextHandle context, uint64_t size)
 		.range = VK_WHOLE_SIZE
 	};
 }
+Tensor<std::byte>::Tensor(const Buffer<std::byte>& source)
+	: Tensor<std::byte>(source.getContext(), source.size_bytes())
+{
+	//one time submit copy buffer to source
+	UpdateTensorCommand command(source, *this);
+	vulkan::oneTimeSubmit(*getContext(), [&command](VkCommandBuffer cmd) {
+		vulkan::Command wrapper{ cmd, 0 };
+		command.record(wrapper);
+	});
+}
+Tensor<std::byte>::Tensor(ContextHandle context, std::span<const std::byte> data)
+	: Tensor<std::byte>(Buffer<std::byte>(std::move(context), data))
+{}
 Tensor<std::byte>::~Tensor() = default;
 
 /*********************************** COPY *************************************/

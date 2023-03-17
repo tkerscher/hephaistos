@@ -98,6 +98,8 @@ public:
     Tensor<std::byte>& operator=(Tensor<std::byte>&& other) noexcept;
 
     Tensor(ContextHandle context, uint64_t size);
+	Tensor(const Buffer<std::byte>& source);
+	Tensor(ContextHandle context, std::span<const std::byte> data);
     virtual ~Tensor();
 
 public: //internal
@@ -133,6 +135,12 @@ public:
     Tensor(ContextHandle context, size_t count)
         : Tensor<std::byte>(std::move(context), count * sizeof(T))
     {}
+	Tensor(const Buffer<std::byte>& buffer)
+		: Tensor<std::byte>(buffer)
+	{}
+	Tensor(ContextHandle context, std::span<const T> data)
+		: Tensor<std::byte>(std::move(context), std::as_bytes(data))
+	{}
     virtual ~Tensor() = default;
 };
 
