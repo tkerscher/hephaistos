@@ -1,6 +1,7 @@
 #include "context.hpp"
 
 #include <stdexcept>
+#include <string_view>
 
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/string.h>
@@ -20,7 +21,11 @@ hp::ContextHandle currentContext{ nullptr, _emptyDtor };
 
 //we select device via id, MaxId means let hephaistos decide
 constexpr uint32_t MaxId = 0xFFFFFFFF;
-uint32_t selectedDeviceId = MaxId; 
+uint32_t selectedDeviceId = MaxId;
+
+//extension list
+std::vector<hp::ExtensionHandle> extensions{};
+std::vector<std::string_view> extension_names{};
 
 //Keep device handles alive
 //(ids are not guaranteed to be const between enumerations)
@@ -61,10 +66,10 @@ void selectDevice(uint32_t id, bool force) {
 const hp::ContextHandle& getCurrentContext() {
     if (!currentContext) {
         if (selectedDeviceId == MaxId) {
-            currentContext = hp::createContext();
+            currentContext = hp::createContext(extensions);
         }
         else if(selectedDeviceId < handles.size()) {
-            currentContext = hp::createContext(handles[selectedDeviceId]);
+            currentContext = hp::createContext(handles[selectedDeviceId], extensions);
         }
         else {
             throw std::runtime_error("There is no device with the selected id!");
@@ -79,6 +84,32 @@ const std::vector<hp::DeviceHandle>& getDevices() {
         handles = hp::enumerateDevices();
 
     return handles;
+}
+
+void addExtension(hp::ExtensionHandle extension, bool force) {
+    //check if the extension was already added
+    auto name = extension->getExtensionName();
+    auto& reg = extension_names;
+    if (std::find(reg.begin(), reg.end(), name) != reg.end())
+        return;
+
+    //check if we have to recreate context
+    if (currentContext) {
+        if (force) {
+            //delete old context
+            //objects are now undefined
+            currentContext.reset();
+            handles.clear();
+            //instance should have been deleted now (doesn't really matter)
+        }
+        else {
+            throw std::runtime_error("Cannot change device: There is already an active context! Specify force=True if you want to invalidate and replace active one.");
+        }
+    }
+
+    //add extension
+    extension_names.push_back(name);
+    extensions.push_back(std::move(extension));
 }
 
 void registerContextModule(nb::module_& m) {

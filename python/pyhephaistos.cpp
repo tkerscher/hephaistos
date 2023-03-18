@@ -8,6 +8,7 @@ void registerCommandModule(nb::module_&);
 void registerContextModule(nb::module_&);
 void registerImageModule(nb::module_&);
 void registerProgramModule(nb::module_&);
+void registerRaytracing(nb::module_&);
 
 NB_MODULE(pyhephaistos, m) {
     registerContextModule(m);
@@ -15,4 +16,5 @@ NB_MODULE(pyhephaistos, m) {
     registerProgramModule(m);
     registerBufferModule(m);
     registerImageModule(m);
+    registerRaytracing(m);
 }
