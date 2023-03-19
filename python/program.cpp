@@ -60,4 +60,9 @@ void registerProgramModule(nb::module_& m) {
                         std::span<const std::byte>{ reinterpret_cast<const std::byte*>(push.c_str()), push.size() }, x, y, z); },
                 "push"_a, "x"_a = 1, "y"_a = 1, "z"_a = 1,
                 "Dispatches a program execution with the given push data and workgroup size.");
+    
+    nb::class_<hp::FlushMemoryCommand>(m, "FlushMemoryCommand", commandClass)
+        .def("__init__", [](hp::FlushMemoryCommand* cmd) { new (cmd) hp::FlushMemoryCommand(getCurrentContext()); });
+    m.def("flushMemory", []() -> hp::FlushMemoryCommand { return hp::flushMemory(getCurrentContext()); },
+        "Returns a command for flushing memory writes.");
 }
