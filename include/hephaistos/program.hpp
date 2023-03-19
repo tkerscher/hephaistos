@@ -91,4 +91,22 @@ private:
 	std::unique_ptr<vulkan::Program> program;
 };
 
+class HEPHAISTOS_API FlushMemoryCommand : public Command{
+public:
+	//The command on its own cant do anything so we're save to
+	//just store the reference instead
+	std::reference_wrapper<const vulkan::Context> context;
+
+	virtual void record(vulkan::Command& cmd) const override;
+
+	FlushMemoryCommand(const FlushMemoryCommand&);
+	FlushMemoryCommand& operator=(const FlushMemoryCommand&);
+
+	FlushMemoryCommand(const ContextHandle& context);
+	virtual ~FlushMemoryCommand();
+};
+[[nodiscard]] inline FlushMemoryCommand flushMemory(const ContextHandle& context) {
+	return FlushMemoryCommand(context);
+}
+
 }

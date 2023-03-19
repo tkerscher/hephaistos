@@ -301,4 +301,35 @@ Program::~Program() {
 	}
 }
 
+/********************************* FLUSH MEMORY *******************************/
+
+namespace {
+
+const VkMemoryBarrier memoryBarrier {
+	.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+	.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT,
+	.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT
+};
+
+}
+
+void FlushMemoryCommand::record(vulkan::Command& cmd) const {
+	cmd.stage |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+	context.get().fnTable.vkCmdPipelineBarrier(cmd.buffer,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_DEPENDENCY_BY_REGION_BIT,
+		1, &memoryBarrier,
+		0, nullptr,
+		0, nullptr);
+}
+
+FlushMemoryCommand::FlushMemoryCommand(const FlushMemoryCommand&) = default;
+FlushMemoryCommand& FlushMemoryCommand::operator=(const FlushMemoryCommand&) = default;
+
+FlushMemoryCommand::FlushMemoryCommand(const ContextHandle& context)
+	: context(*context)
+{}
+FlushMemoryCommand::~FlushMemoryCommand() = default;
+
 }
