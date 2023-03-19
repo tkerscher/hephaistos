@@ -1,0 +1,18 @@
+#version 460
+
+layout(local_size_x = 1) in;
+
+layout(binding = 0) uniform UniformObject {
+    int const0;
+    int const1;
+    int const2;
+} ubo;
+
+layout(binding = 1) buffer tensor { int arr[]; };
+
+void main() {
+    int data[3] = int[](ubo.const0, ubo.const1, ubo.const2);
+    uint idx = gl_GlobalInvocationID.x;
+    arr[idx] = data[idx];
+}
+

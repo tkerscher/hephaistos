@@ -1,0 +1,15 @@
+#version 460
+
+layout(local_size_x = 1) in;
+
+layout(constant_id = 0) const int value0 = 5;
+layout(constant_id = 5) const int value1 = 3;
+layout(constant_id = 8) const int value2 = 9;
+
+layout(binding = 0) buffer tensor { int arr[]; };
+
+void main() {
+    int data[3] = int[](value0, value1, value2);
+    uint idx = gl_GlobalInvocationID.x;
+    arr[idx] = data[idx];
+}

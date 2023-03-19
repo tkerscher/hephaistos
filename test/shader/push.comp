@@ -1,0 +1,17 @@
+#version 460
+
+layout(local_size_x = 1) in;
+
+layout(binding = 0) buffer tensor { int arr[]; };
+
+layout(push_constant) uniform constants {
+    int const0;
+    int const1;
+    int const2;
+} push;
+
+void main() {
+    int data[3] = int[](push.const0, push.const1, push.const2);
+    uint idx = gl_GlobalInvocationID.x;
+    arr[idx] = data[idx];
+}

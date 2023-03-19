@@ -1,0 +1,10 @@
+#version 460
+
+layout(local_size_x = 1) in;
+
+layout(binding = 0) buffer tensor { int arr[]; };
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    arr[idx] = int(idx);
+}
