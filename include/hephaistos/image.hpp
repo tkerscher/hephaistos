@@ -180,6 +180,4 @@ public:
     return UpdateImageCommand(src, dst);
 }
 
-//class HEPHAISTOS_API FlushImageCommand : public Command
-
 }
