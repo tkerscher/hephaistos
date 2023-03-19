@@ -141,6 +141,10 @@ public:
 	Tensor(ContextHandle context, std::span<const T> data)
 		: Tensor<std::byte>(std::move(context), std::as_bytes(data))
 	{}
+	template<typename = std::enable_if_t<!std::is_integral_v<T>>>
+	Tensor(ContextHandle context, const T& data)
+		: Tensor<std::byte>(std::move(context), { reinterpret_cast<const std::byte*>(&data), sizeof(T) })
+	{}
     virtual ~Tensor() = default;
 };
 
