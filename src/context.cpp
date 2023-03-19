@@ -18,6 +18,8 @@
 
 namespace {
 
+bool validationError = false;
+
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 	VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -39,6 +41,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 	//Output
 	if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
 		std::cerr << message.str() << std::endl;
+		validationError = true;
 	}
 	else {
 		std::cout << message.str() << std::endl;
@@ -72,6 +75,14 @@ constexpr auto InstanceExtensions = std::to_array({
 	VK_EXT_DEBUG_UTILS_EXTENSION_NAME
 });
 
+}
+
+bool hephaistos::hasValidationErrorOccurred(bool reset) {
+	if (validationError && reset) {
+		validationError = false;
+		return true;
+	}
+	return validationError;
 }
 #else
 namespace {
