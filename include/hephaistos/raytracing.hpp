@@ -26,7 +26,7 @@ constexpr TransformMatrix IdentityTransform = {
 
 struct Geometry {
 	std::span<const std::byte> vertices = {};
-	uint64_t vertexStride = 0;
+	uint64_t vertexStride = 3 * sizeof(float);
 	uint32_t vertexCount = 0;
 	std::span<const uint32_t> indices = {};
 };

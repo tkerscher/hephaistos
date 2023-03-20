@@ -383,11 +383,12 @@ void AccelerationStructure::Parameter::createTlas(
 	//get size info
 	VkAccelerationStructureBuildGeometryInfoKHR tlasGeometryInfo{
 		.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
+		.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,
 		.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
 		.geometryCount = 1,
 		.pGeometries = &tlasGeometry
 	};
-	uint32_t primitiveCount = 1;
+	uint32_t primitiveCount = static_cast<uint32_t>(instances.size());
 	VkAccelerationStructureBuildSizesInfoKHR tlasSizeInfo{
 		.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR,
 	};
