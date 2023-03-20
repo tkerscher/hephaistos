@@ -7,6 +7,7 @@ set(TEST_FILES
     ${TESTROOT}/command.cpp
     ${TESTROOT}/image.cpp
     ${TESTROOT}/program.cpp
+    ${TESTROOT}/raytracing.cpp
 )
 
 #fetch catch2 test framework
