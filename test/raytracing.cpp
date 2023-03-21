@@ -177,4 +177,7 @@ TEST_CASE("ray queries are available in shaders", "[raytracing]") {
         REQUIRE_THAT(result[i].hitY, Catch::Matchers::WithinAbs(expectedY[i], eps));
         REQUIRE_THAT(result[i].hitZ, Catch::Matchers::WithinAbs(expectedZ[i], eps));
     }
+
+    //check validation errors
+    REQUIRE(!hasValidationErrorOccurred());
 }
