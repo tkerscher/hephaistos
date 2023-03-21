@@ -9,7 +9,6 @@
 
 namespace hephaistos {
 
-Command::Command() = default;
 Command::~Command() = default;
 
 /********************************* TIMELINE ***********************************/

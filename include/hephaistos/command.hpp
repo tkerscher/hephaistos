@@ -16,9 +16,6 @@ class HEPHAISTOS_API Command {
 public:
     virtual void record(vulkan::Command& cmd) const = 0;
     virtual ~Command();
-
-protected:
-    Command();
 };
 
 class HEPHAISTOS_API Timeline : public Resource {
