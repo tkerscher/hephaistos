@@ -42,17 +42,16 @@ TEST_CASE("timeline can start at an arbitrary value", "[command]") {
 //sequences are plenty tested in other places
 //here we just test wether we can implement waitings
 
-//TODO: Fix this
-//TEST_CASE("sequences can wait for the cpu", "[command]") {
-//    Timeline timeline(getContext());
-//
-//    auto submission = beginSequence(timeline).WaitFor(5).Submit();
-//
-//    REQUIRE(!submission.wait(100));
-//    timeline.setValue(2);
-//    REQUIRE(!submission.wait(100));
-//    timeline.setValue(6);
-//    REQUIRE(submission.wait(100));
-//
-//    REQUIRE(!hasValidationErrorOccurred());
-//}
+TEST_CASE("sequences can wait for the cpu", "[command]") {
+    Timeline timeline(getContext());
+
+    auto submission = beginSequence(timeline).WaitFor(5).Submit();
+
+    REQUIRE(!submission.wait(100));
+    timeline.setValue(2);
+    REQUIRE(!submission.wait(100));
+    timeline.setValue(5);
+    REQUIRE(submission.wait(100));
+
+    REQUIRE(!hasValidationErrorOccurred());
+}
