@@ -169,6 +169,9 @@ constexpr VkCommandBufferBeginInfo BeginInfo{
 	.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
 };
 
+constexpr VkPipelineStageFlags EmptyStage =
+	VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
 }
 
 struct SequenceBuilder::pImp {
@@ -258,14 +261,21 @@ SequenceBuilder& SequenceBuilder::WaitFor(uint64_t value) {
 
 	//Finish previous command buffer
 	auto& prevCmd = _pImp->commands.back();
-	if (prevCmd.buffer)
+	if (prevCmd.buffer) {
 		vulkan::checkResult(_pImp->context.fnTable.vkEndCommandBuffer(prevCmd.buffer));
 
-	//add new level
-	_pImp->commands.emplace_back();
-	_pImp->waitValues.push_back(value);
-	_pImp->currentValue = value + 1;
-	_pImp->signalValues.push_back(value + 1);
+		//add new level
+		_pImp->commands.emplace_back();
+		_pImp->waitValues.push_back(value);
+		_pImp->currentValue = value + 1;
+		_pImp->signalValues.push_back(value + 1);
+	}
+	else {
+		//if the current is empty, just update current values
+		_pImp->waitValues.back() = value;
+		_pImp->currentValue = value + 1;
+		_pImp->signalValues.back() = value + 1;
+	}
 
 	return *this;
 }
@@ -295,14 +305,15 @@ Submission SequenceBuilder::Submit() {
 			.signalSemaphoreValueCount = 1,
 			.pSignalSemaphoreValues    = sPtr
 		};
+		auto empty = cPtr->buffer == nullptr;
 		submits[i] = VkSubmitInfo{
 			.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 			.pNext                = tPtr,
 			.waitSemaphoreCount   = 1,
 			.pWaitSemaphores      = &_pImp->semaphore,
-			.pWaitDstStageMask    = &cPtr->stage,
-			.commandBufferCount   = 1,
-			.pCommandBuffers      = &cPtr->buffer,
+			.pWaitDstStageMask    = empty ? &EmptyStage : &cPtr->stage,
+			.commandBufferCount   = empty ? 0u : 1u,
+			.pCommandBuffers      = empty ? nullptr : &cPtr->buffer,
 			.signalSemaphoreCount = 1,
 			.pSignalSemaphores    = &_pImp->semaphore
 		};
