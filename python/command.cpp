@@ -47,4 +47,6 @@ void registerCommandModule(nb::module_& m) {
     
     m.def("beginSequence", [](hp::Timeline& t, uint64_t v) { return hp::beginSequence(t, v); },
         "timeline"_a, "startValue"_a = 0, "Starts a new sequence.", nb::rv_policy::move);
+    m.def("beginSequence", []() { return hp::beginSequence(getCurrentContext()); },
+        "Starts a new sequence.", nb::rv_policy::move);
 }
