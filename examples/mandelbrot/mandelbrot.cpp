@@ -44,8 +44,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Rendering...\n";
 
     //create sequence
-    Timeline timeline(context);
-    beginSequence(timeline)
+    beginSequence(context)
         .And(program.dispatch(push, width / 4, height / 4))
         .And(retrieveImage(image, buffer)) //has implicit barrier
         .Submit();

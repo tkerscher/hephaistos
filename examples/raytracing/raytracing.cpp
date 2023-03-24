@@ -62,8 +62,7 @@ int main() {
 	program.bindParameterList(accStruct, vertexTensor, indexTensor, image);
 
 	//Create sequence
-	Timeline timeline(context);
-	beginSequence(timeline)
+	beginSequence(context)
 		.And(program.dispatch(256, 256))
 		.Then(retrieveImage(image, imgBuffer))
 		.Submit();

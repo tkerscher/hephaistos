@@ -29,8 +29,7 @@ int main() {
     program.bindParameterList(tensor1, tensor2, tensor3);
 
     //create sequence
-    Timeline timeline(context);
-    beginSequence(timeline)
+    beginSequence(context)
         .And(updateTensor(buffer1, tensor1))
         .And(updateTensor(buffer2, tensor2))
         .Then(program.dispatch(10))
