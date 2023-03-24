@@ -47,7 +47,7 @@ FetchContent_Declare(
     vma
     GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
     GIT_TAG 66afe099f1cf1f79c270471e9c0f02139072057d
-    GIT_SHALLOW 1
+    #GIT_SHALLOW 1 #Cant use shallow with hashes
 )
 FetchContent_GetProperties(vma)
 if(NOT vma_POPULATED)
@@ -91,7 +91,7 @@ FetchContent_Declare(
     stb_s
     GIT_REPOSITORY https://github.com/nothings/stb.git
     GIT_TAG 5736b15f7ea0ffb08dd38af21067c314d6a3aae9
-    GIT_SHALLOW 1
+    #GIT_SHALLOW 1 #cant use shallow with hashes
 )
 FetchContent_GetProperties(stb_s)
 if (NOT stb_s_POPULATED)
