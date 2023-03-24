@@ -78,6 +78,7 @@ public:
     SequenceBuilder(SequenceBuilder&& other) noexcept;
     SequenceBuilder& operator=(SequenceBuilder&& other) noexcept;
 
+    explicit SequenceBuilder(ContextHandle context);
     explicit SequenceBuilder(Timeline& timeline, uint64_t startValue = 0);
     ~SequenceBuilder();
 
@@ -89,6 +90,10 @@ private:
 [[nodiscard]]
 inline SequenceBuilder beginSequence(Timeline& timeline, uint64_t startValue = 0) {
     return SequenceBuilder(timeline, startValue);
+}
+[[nodiscard]]
+inline SequenceBuilder beginSequence(const ContextHandle& context) {
+    return SequenceBuilder(context);
 }
 
 }

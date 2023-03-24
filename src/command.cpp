@@ -100,6 +100,8 @@ Timeline::~Timeline() {
 struct SubmissionResources {
 	VkCommandPool pool;
 	std::vector<VkCommandBuffer> commands;
+	//Handle used to manage lifetime of implicit timeline
+	std::unique_ptr<Timeline> exclusiveTimeline = nullptr;
 };
 
 const Timeline& Submission::getTimeline() const { return timeline.get(); }
@@ -172,6 +174,25 @@ constexpr VkCommandBufferBeginInfo BeginInfo{
 constexpr VkPipelineStageFlags EmptyStage =
 	VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 
+VkCommandPool fetchCommandPool(const vulkan::Context& context) {
+	//fetch used pool or create new
+	VkCommandPool pool;
+	if (context.sequencePool.empty()) {
+		//create new
+		VkCommandPoolCreateInfo info{
+			.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+			.queueFamilyIndex = context.queueFamily
+		};
+		vulkan::checkResult(context.fnTable.vkCreateCommandPool(
+			context.device, &info, nullptr, &pool));
+	}
+	else {
+		pool = context.sequencePool.front();
+		context.sequencePool.pop();
+	}
+	return pool;
+}
+
 }
 
 struct SequenceBuilder::pImp {
@@ -183,6 +204,8 @@ struct SequenceBuilder::pImp {
 	//the value to wait for in the next batch. Might differ from signalValues.back()
 	uint64_t currentValue;
 
+	//Handle used to manage lifetime of implicit timeline
+	std::unique_ptr<Timeline> exclusiveTimeline;
 	VkSemaphore semaphore;
 	Timeline& timeline;
 
@@ -190,7 +213,8 @@ struct SequenceBuilder::pImp {
 
 	pImp(Timeline& timeline, uint64_t value)
 		: commands({})
-		, pool(nullptr)
+		, pool(fetchCommandPool(*timeline.getContext()))
+		, exclusiveTimeline(nullptr)
 		, semaphore(timeline.getTimeline().semaphore)
 		, timeline(timeline)
 		, currentValue(value + 1)
@@ -199,21 +223,19 @@ struct SequenceBuilder::pImp {
 		commands.push_back({});
 		waitValues.push_back(value);
 		signalValues.push_back(value + 1);
-
-		//fetch used pool or create new
-		if (context.sequencePool.empty()) {
-			//create new
-			VkCommandPoolCreateInfo info{
-				.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-				.queueFamilyIndex = context.queueFamily
-			};
-			vulkan::checkResult(context.fnTable.vkCreateCommandPool(
-				context.device, &info, nullptr, &pool));
-		}
-		else {
-			pool = context.sequencePool.front();
-			context.sequencePool.pop();
-		}
+	}
+	pImp(ContextHandle context)
+		: commands({})
+		, pool(fetchCommandPool(*context))
+		, exclusiveTimeline(std::make_unique<Timeline>(std::move(context)))
+		, semaphore(exclusiveTimeline->getTimeline().semaphore)
+		, timeline(*exclusiveTimeline)
+		, currentValue(1)
+		, context(*timeline.getContext())
+	{
+		commands.push_back({});
+		waitValues.push_back(0);
+		signalValues.push_back(1);
 	}
 };
 
@@ -258,6 +280,10 @@ SequenceBuilder& SequenceBuilder::Then(const Command& command) {
 SequenceBuilder& SequenceBuilder::WaitFor(uint64_t value) {
 	if (value < _pImp->currentValue)
 		throw std::logic_error("Wait value too low! Timeline can only go forward!");
+
+	//wait for will dead lock if we use an implicit timeline
+	if (_pImp->exclusiveTimeline)
+		throw std::logic_error("WaitFor will dead lock with an implicit timeline!");
 
 	//Finish previous command buffer
 	auto& prevCmd = _pImp->commands.back();
@@ -328,7 +354,9 @@ Submission SequenceBuilder::Submit() {
 	for (int i = 0u; i < cmdBuffers.size(); ++i)
 		cmdBuffers[i] = _pImp->commands[i].buffer;
 	auto resource = std::make_unique<SubmissionResources>(
-		_pImp->pool, std::move(cmdBuffers));
+		_pImp->pool,
+		std::move(cmdBuffers),
+		std::move(_pImp->exclusiveTimeline));
 	auto& timeline = _pImp->timeline;
 	auto finalStep = _pImp->currentValue;
 	//free _pImp to prevent multiple submission
@@ -346,6 +374,9 @@ SequenceBuilder& SequenceBuilder::operator=(SequenceBuilder&& other) noexcept = 
 
 SequenceBuilder::SequenceBuilder(Timeline& timeline, uint64_t startValue)
 	: _pImp(new pImp(timeline, startValue))
+{}
+SequenceBuilder::SequenceBuilder(ContextHandle context)
+	: _pImp(new pImp(context))
 {}
 SequenceBuilder::~SequenceBuilder() {
 	if (_pImp) {
