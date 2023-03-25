@@ -13,12 +13,21 @@ namespace {
 
 class TimeStampCommand : public Command {
 public:
+	const vulkan::Context& context;
+	VkPipelineStageFlagBits stage;
+	VkQueryPool queryPool;
+	mutable uint32_t query; //TODO: looks nasty
+	bool incrementing = false;
+
 	void record(vulkan::Command& cmd) const override {
 		//TODO: really necessary?
 		cmd.stage |= stage;
 
 		context.fnTable.vkCmdWriteTimestamp(cmd.buffer,
 			stage, queryPool, query);
+
+		if (incrementing)
+			query++;
 	}
 
 	TimeStampCommand(
@@ -32,12 +41,6 @@ public:
 		, query(query)
 	{}
 	virtual ~TimeStampCommand() = default;
-
-private:
-	const vulkan::Context& context;
-	VkPipelineStageFlagBits stage;
-	VkQueryPool queryPool;
-	uint32_t query;
 };
 
 }
@@ -50,12 +53,15 @@ struct StopWatch::pImp {
 	float period;
 
 	uint32_t count;
-	std::vector<TimeStampCommand> commands;
+	TimeStampCommand startCommand;
+	TimeStampCommand endCommand;
 
 	pImp(const vulkan::Context& context, uint32_t count)
 		: context(context)
 		, queryPool(nullptr)
 		, count(count)
+		, startCommand(context, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, nullptr, 0)
+		, endCommand(context, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, nullptr, 1)
 	{
 		//query timestamp period
 		VkPhysicalDeviceProperties devProps;
@@ -81,10 +87,9 @@ struct StopWatch::pImp {
 		//before use we have to reset it once
 		context.fnTable.vkResetQueryPool(context.device, queryPool, 0, count);
 
-		//create commands
-		commands.emplace_back(context, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, queryPool, 0);
-		for (auto i = 1u; i < count; ++i)
-			commands.emplace_back(context, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, queryPool, i);
+		//register query pool in commands
+		startCommand.queryPool = queryPool;
+		endCommand.queryPool = queryPool;
 	}
 	~pImp() {
 		context.fnTable.vkDestroyQueryPool(
@@ -92,11 +97,15 @@ struct StopWatch::pImp {
 	}
 };
 
-const Command& StopWatch::start() {
-	return _pImp->commands.at(0);
+uint32_t StopWatch::getStopCount() const {
+	return _pImp->count;
 }
-const Command& StopWatch::stop(uint32_t id) {
-	return _pImp->commands.at(id + 1);
+
+const Command& StopWatch::start() {
+	return _pImp->startCommand;
+}
+const Command& StopWatch::stop() {
+	return _pImp->endCommand;
 }
 
 void StopWatch::reset() {
@@ -105,6 +114,9 @@ void StopWatch::reset() {
 		_pImp->queryPool,
 		0,
 		_pImp->count);
+
+	//reset counter
+	_pImp->endCommand.query = 1;
 }
 std::vector<double> StopWatch::getTimeStamps(bool wait) const {
 	VkQueryResultFlags flags =

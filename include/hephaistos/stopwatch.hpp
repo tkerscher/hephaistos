@@ -8,8 +8,10 @@ namespace hephaistos {
 
 class HEPHAISTOS_API StopWatch : public Resource {
 public:
+    [[nodiscard]] uint32_t getStopCount() const;
+
     [[nodiscard]] const Command& start();
-    [[nodiscard]] const Command& stop(uint32_t id = 0);
+    [[nodiscard]] const Command& stop();
     void reset();
 
     //stops not reached yet are identified via NaN
