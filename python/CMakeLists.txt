@@ -10,6 +10,7 @@ set(SRC
     ${PYROOT}/program.cpp
     ${PYROOT}/pyhephaistos.cpp
     ${PYROOT}/raytracing.cpp
+    ${PYROOT}/stopwatch.cpp
 )
 
 # Fix missing shared library name for cibuildwheel+windows+pypy3.9
