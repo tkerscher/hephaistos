@@ -70,8 +70,10 @@ else()
 endif()
 
 #install lib
-install(
-    TARGETS hephaistos
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hephaistos
-)
+if(NOT SKBUILD)
+    install(
+        TARGETS hephaistos
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/hephaistos
+    )
+endif()
