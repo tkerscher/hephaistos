@@ -6,4 +6,5 @@
 #include "hephaistos/handles.hpp"
 #include "hephaistos/image.hpp"
 #include "hephaistos/program.hpp"
+#include "hephaistos/stopwatch.hpp"
 #include "hephaistos/version.hpp"

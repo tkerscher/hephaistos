@@ -258,6 +258,8 @@ bool isDeviceSuitable(const DeviceHandle& device, std::span<const ExtensionHandl
 			return false;
 		if (!features12.bufferDeviceAddress)
 			return false;
+		if (!features12.hostQueryReset)
+			return false;
 	}
 
 	//check for compute queue
@@ -416,9 +418,14 @@ ContextHandle createContext(
 			.pNext			   = pNext, //chain external extensions
 			.timelineSemaphore = VK_TRUE
 		};
+		VkPhysicalDeviceHostQueryResetFeatures hostQueryReset{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES,
+			.pNext = &timeline,
+			.hostQueryReset = VK_TRUE
+		};
 		VkPhysicalDeviceBufferDeviceAddressFeatures addressFeatures{
 			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
-			.pNext = &timeline,
+			.pNext = &hostQueryReset,
 			.bufferDeviceAddress = VK_TRUE
 		};
 		VkDeviceCreateInfo deviceInfo{
