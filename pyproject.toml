@@ -8,4 +8,4 @@ requires = [
     "ninja; platform_system!='Windows'"
 ]
 
-build_backend = "setuptools.build_meta"
+build-backend = "setuptools.build_meta"
