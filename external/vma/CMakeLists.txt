@@ -1,0 +1,3 @@
+add_library(VulkanMemoryAllocator INTERFACE)
+target_include_directories(VulkanMemoryAllocator INTERFACE ${CMAKE_CURRENT_LIST_DIR})
+set_target_properties(VulkanMemoryAllocator PROPERTIES FOLDER "dependencies")

@@ -31,74 +31,8 @@ project("hephaistos"
 )
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
 
-# fetch volk (vulkan loader)
-set(CMAKE_DISABLE_FIND_PACKAGE_Vulkan TRUE)
-FetchContent_Declare(
-    volk
-    GIT_REPOSITORY https://github.com/zeux/volk.git
-    GIT_TAG sdk-1.3.239.0
-    GIT_SHALLOW 1
-)
-FetchContent_MakeAvailable(volk)
-set_target_properties(volk PROPERTIES FOLDER "dependencies")
-#Fetch vulkan memory allocator
-set(VMA_STATIC_VULKAN_FUNCTIONS OFF)
-FetchContent_Declare(
-    vma
-    GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
-    GIT_TAG 66afe099f1cf1f79c270471e9c0f02139072057d
-    #GIT_SHALLOW 1 #Cant use shallow with hashes
-)
-FetchContent_GetProperties(vma)
-if(NOT vma_POPULATED)
-    FetchContent_Populate(vma)
-    add_library(VulkanMemoryAllocator INTERFACE)
-    target_include_directories(VulkanMemoryAllocator INTERFACE ${vma_SOURCE_DIR}/include)
-endif()
-#fetch spirv-reflect
-#Let's create the target ourselves to skip some things
-FetchContent_Declare(
-    reflect
-    GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Reflect.git
-    GIT_TAG sdk-1.3.236.0
-    GIT_SHALLOW 1
-    GIT_SUBMODULES "common" #empty is not valid, but we want to skip googletest
-)
-FetchContent_GetProperties(reflect)
-if(NOT reflect_POPULATED)
-    FetchContent_Populate(reflect)
-    #apply patch
-    #we do this ourselves since this is always run and would fail the config on cached data
-    execute_process(
-        COMMAND ${GIT_EXECUTABLE} apply ${PROJECT_SOURCE_DIR}/patches/spirv-reflect.patch
-        WORKING_DIRECTORY ${reflect_SOURCE_DIR}
-        RESULT_VARIABLE reflect_PATCH_RESULT
-    )
-    
-    #Since the patch is always run
-    #if(NOT reflect_PATCH_RESULT EQUAL "0")
-    #    message(FATAL_ERROR "Failed to apply patch to spirv-reflect!")
-    #endif()
-    
-    #for whatever reason google decided to put the important files at the root
-    #with all the other files...
-    add_library(spirv-reflect STATIC ${reflect_SOURCE_DIR}/spirv_reflect.cpp)
-    target_include_directories(spirv-reflect PUBLIC ${reflect_SOURCE_DIR})
-    set_target_properties(spirv-reflect PROPERTIES FOLDER "dependencies")
-endif()
-#stb image - it has no CMakeLists.txt so we make the target ourselves
-FetchContent_Declare(
-    stb_s
-    GIT_REPOSITORY https://github.com/nothings/stb.git
-    GIT_TAG 5736b15f7ea0ffb08dd38af21067c314d6a3aae9
-    #GIT_SHALLOW 1 #cant use shallow with hashes
-)
-FetchContent_GetProperties(stb_s)
-if (NOT stb_s_POPULATED)
-    FetchContent_Populate(stb_s)
-    add_library(stb INTERFACE)
-    target_include_directories(stb INTERFACE ${stb_s_SOURCE_DIR})
-endif()
+#add dependencies
+add_subdirectory(external)
 
 #source code
 add_subdirectory(src)
