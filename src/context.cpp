@@ -241,10 +241,10 @@ DeviceInfo createInfo(VkPhysicalDevice device) {
 bool isDeviceSuitable(const DeviceHandle& device, std::span<const ExtensionHandle> extensions) {
 	//Check for the following things:
 	//	- Compute queue
-	//	- timeline semaphore support
+	//	- feature support
 	//  - Extension support
 
-	//Check for timeline & device adresss support
+	//Check for features support
 	{
 		VkPhysicalDeviceVulkan12Features features12{
 			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
@@ -254,11 +254,25 @@ bool isDeviceSuitable(const DeviceHandle& device, std::span<const ExtensionHandl
 			.pNext = &features12
 		};
 		vkGetPhysicalDeviceFeatures2(device->device, &features);
+		//timeline sempahore feature
 		if (!features12.timelineSemaphore)
 			return false;
+		//buffer device address
 		if (!features12.bufferDeviceAddress)
 			return false;
+		//host query reset (stopwatch)
 		if (!features12.hostQueryReset)
+			return false;
+		//extended arithmetic types
+		if (!features.features.shaderFloat64)
+			return false;
+		if (!features.features.shaderInt64)
+			return false;
+		if (!features.features.shaderInt16)
+			return false;
+		if (!features12.shaderFloat16)
+			return false;
+		if (!features12.shaderInt8)
 			return false;
 	}
 
@@ -423,10 +437,21 @@ ContextHandle createContext(
 			.pNext = &timeline,
 			.hostQueryReset = VK_TRUE
 		};
+		VkPhysicalDeviceShaderFloat16Int8Features float16Int8Features{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES,
+			.pNext = &hostQueryReset,
+			.shaderFloat16 = VK_TRUE,
+			.shaderInt8    = VK_TRUE
+		};
 		VkPhysicalDeviceBufferDeviceAddressFeatures addressFeatures{
 			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
-			.pNext = &hostQueryReset,
+			.pNext = &float16Int8Features,
 			.bufferDeviceAddress = VK_TRUE
+		};
+		VkPhysicalDeviceFeatures features{
+			.shaderFloat64 = VK_TRUE,
+			.shaderInt64   = VK_TRUE,
+			.shaderInt16   = VK_TRUE
 		};
 		VkDeviceCreateInfo deviceInfo{
 			.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -434,7 +459,8 @@ ContextHandle createContext(
 			.queueCreateInfoCount    = 1,
 			.pQueueCreateInfos       = &queueInfo,
 			.enabledExtensionCount   = static_cast<uint32_t>(allDeviceExtensions.size()),
-			.ppEnabledExtensionNames = allDeviceExtensions.data()
+			.ppEnabledExtensionNames = allDeviceExtensions.data(),
+			.pEnabledFeatures        = &features
 		};
 		vulkan::checkResult(vkCreateDevice(device, &deviceInfo, nullptr, &context->device));
 	}
