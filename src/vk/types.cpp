@@ -42,7 +42,8 @@ void destroyBuffer(Buffer* buffer) {
 ImageHandle createImage(
 	const ContextHandle& context,
 	VkFormat format,
-	uint32_t width, uint32_t height, uint32_t depth)
+	uint32_t width, uint32_t height, uint32_t depth,
+	VkImageUsageFlags usage)
 {
 	ImageHandle result{ new Image({ 0, 0, {}, *context}), destroyImage };
 
@@ -68,9 +69,7 @@ ImageHandle createImage(
 		.arrayLayers = 1,
 		.samples = VK_SAMPLE_COUNT_1_BIT,
 		.tiling = VK_IMAGE_TILING_OPTIMAL,
-		.usage = VK_IMAGE_USAGE_STORAGE_BIT |
-			VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-			VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+		.usage = usage
 	};
 	VmaAllocationCreateInfo allocInfo{
 		.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
@@ -92,28 +91,6 @@ ImageHandle createImage(
 	};
 	checkResult(context->fnTable.vkCreateImageView(
 		context->device, &viewInfo, nullptr, &result->view));
-
-	//transition image from undefined to general
-	VkImage image = result->image;
-	oneTimeSubmit(*context, [image, &context](VkCommandBuffer cmdBuffer) {
-		VkImageMemoryBarrier barrier{
-			.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-			.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-			.newLayout = VK_IMAGE_LAYOUT_GENERAL,
-			.image = image,
-			.subresourceRange = VkImageSubresourceRange{
-				VK_IMAGE_ASPECT_COLOR_BIT,
-				0, 1, 0, 1
-			}
-		};
-		context->fnTable.vkCmdPipelineBarrier(cmdBuffer,
-			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			VK_DEPENDENCY_BY_REGION_BIT,
-			0, nullptr,
-			0, nullptr,
-			1, &barrier);
-	});
 
 	//done
 	return result;
