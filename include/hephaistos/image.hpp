@@ -72,6 +72,34 @@ template<> struct ImageElementType<ImageFormat::R32G32B32A32_SFLOAT> { using Ele
 template<ImageFormat IF>
 using ImageElementTypeValue = typename ImageElementType<IF>::ElementType;
 
+enum class AddressMode {
+    REPEAT = 0,
+    MIRRORED_REPEAT = 1,
+    CLAMP_TO_EDGE = 2,
+    //CLAMP_TO_BORDER = 3,
+    MIRROR_CLAMP_TO_EDGE = 4
+};
+
+enum class Filter {
+    NEAREST,
+    LINEAR
+};
+
+[[nodiscard]] bool isFilterSupported(const DeviceHandle& device,
+    ImageFormat format, Filter filter);
+[[nodiscard]] bool isFilterSupported(const ContextHandle& context,
+    ImageFormat format, Filter filter);
+
+struct Sampler {
+    AddressMode addressModeU = AddressMode::REPEAT;
+    AddressMode addressModeV = AddressMode::REPEAT;
+    AddressMode addressModeW = AddressMode::REPEAT;
+
+    Filter filter = Filter::LINEAR;
+
+    bool unnormalizedCoordinates = false;
+};
+
 class HEPHAISTOS_API Image : public Resource {
 public:
     [[nodiscard]] uint32_t getWidth() const noexcept;
@@ -107,6 +135,51 @@ private:
     std::unique_ptr<Parameter> parameter;
 };
 
+class HEPHAISTOS_API Texture : public Resource {
+public:
+    [[nodiscard]] uint32_t getWidth() const noexcept;
+    [[nodiscard]] uint32_t getHeight() const noexcept;
+    [[nodiscard]] uint32_t getDepth() const noexcept;
+    [[nodiscard]] ImageFormat getFormat() const noexcept;
+    [[nodiscard]] uint64_t size_bytes() const noexcept;
+
+    void bindParameter(VkWriteDescriptorSet& binding) const;
+
+    Texture(const Texture&) = delete;
+    Texture& operator=(const Texture&) = delete;
+
+    Texture(Texture&& other) noexcept;
+    Texture& operator=(Texture&& other) noexcept;
+
+    Texture(ContextHandle context,
+        ImageFormat format,
+        uint32_t width,
+        const Sampler& sampler = {});
+    Texture(ContextHandle context,
+        ImageFormat format,
+        uint32_t width,
+        uint32_t height,
+        const Sampler& sampler = {});
+    Texture(ContextHandle context,
+        ImageFormat format,
+        uint32_t width,
+        uint32_t height,
+        uint32_t depth,
+        const Sampler& sampler = {});
+    virtual ~Texture();
+
+public: //internal
+    const vulkan::Image& getImage() const noexcept;
+
+private:
+    ImageHandle image;
+    ImageFormat format;
+    uint32_t width, height, depth;
+
+    struct Parameter;
+    std::unique_ptr<Parameter> parameter;
+};
+
 class HEPHAISTOS_API ImageBuffer : public Buffer<Vec4<uint8_t>> {
 public:
     using ElementType = Vec4<uint8_t>;
@@ -117,6 +190,7 @@ public:
     [[nodiscard]] uint32_t getHeight() const;
 
     [[nodiscard]] Image createImage(bool copy = true) const;
+    [[nodiscard]] Texture createTexture(const Sampler& sampler = {}, bool copy = true) const;
 
     [[nodiscard]] static ImageBuffer load(ContextHandle context, const char* filename);
     [[nodiscard]] static ImageBuffer load(ContextHandle context, std::span<const std::byte> memory);
@@ -178,6 +252,28 @@ public:
     const Buffer<std::byte>& src, const Image& dst)
 {
     return UpdateImageCommand(src, dst);
+}
+
+class HEPHAISTOS_API UpdateTextureCommand : public Command {
+public:
+    std::reference_wrapper<const Buffer<std::byte>> Source;
+    std::reference_wrapper<const Texture> Destination;
+
+    virtual void record(vulkan::Command& cmd) const override;
+
+    UpdateTextureCommand(const UpdateTextureCommand& other);
+    UpdateTextureCommand& operator=(const UpdateTextureCommand& other);
+
+    UpdateTextureCommand(UpdateTextureCommand&& other) noexcept;
+    UpdateTextureCommand& operator=(UpdateTextureCommand&& other) noexcept;
+
+    UpdateTextureCommand(const Buffer<std::byte>& src, const Texture& dst);
+    virtual ~UpdateTextureCommand();
+};
+[[nodiscard]] inline UpdateTextureCommand updateTexture(
+    const Buffer<std::byte>& src, const Texture& dst)
+{
+    return UpdateTextureCommand(src, dst);
 }
 
 }
