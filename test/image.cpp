@@ -7,6 +7,10 @@
 
 #include <hephaistos/command.hpp>
 #include <hephaistos/image.hpp>
+#include <hephaistos/program.hpp>
+
+//shader code
+#include "shader/sampler.h"
 
 using namespace hephaistos;
 
@@ -142,6 +146,57 @@ TEST_CASE("images can be copied to and from gpu", "[image]") {
     //check data
     auto mem = bufferOut.getMemory();
     REQUIRE(std::equal(data2.begin(), data2.end(), mem.begin(), mem.end()));
+
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
+TEST_CASE("image buffer can create texture", "[image]") {
+    auto width = GENERATE(1, 24, 60);
+    auto height = GENERATE(1, 12, 32);
+    ImageBuffer buffer(getContext(), width, height);
+
+    SECTION("texture has same dimension") {
+        auto texture = buffer.createTexture({}, false);
+        REQUIRE(texture.getWidth() == buffer.getWidth());
+        REQUIRE(texture.getHeight() == buffer.getHeight());
+    }
+
+    SECTION("texture has correct format") {
+        auto texture = buffer.createTexture({}, false);
+        auto size = getElementSize(ImageBuffer::Format) * width * height;
+
+        REQUIRE(texture.getFormat() == ImageBuffer::Format);
+        REQUIRE(texture.size_bytes() == size);
+    }
+
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
+TEST_CASE("image buffer can populate created texture", "[image]") {
+    ImageBuffer buffer(getContext(), 3, 3);
+    ImageBuffer bufferOut(getContext(), 3, 3);
+
+    //fill data
+    std::memcpy(buffer.getMemory().data(), data.data(), 36);
+    //create texture with nearest sampling
+    auto texture = buffer.createTexture({ .filter = Filter::NEAREST });
+    auto image = buffer.createImage(false);
+
+    //we can't copy the data back ourselves, so we need a shader
+    //for sampling from the texture and copying it into an image
+    Program program(getContext(), sampler_code);
+    program.bindParameterList(texture, image);
+
+    beginSequence(getContext())
+        .And(program.dispatch(3, 3))
+        .Then(retrieveImage(image, bufferOut))
+        .Submit();
+
+    //compare data
+    auto outMemory = std::span<uint8_t>{
+        reinterpret_cast<uint8_t*>(bufferOut.getMemory().data()), 36
+    };
+    REQUIRE(std::equal(data.begin(), data.end(), outMemory.begin(), outMemory.end()));
 
     REQUIRE(!hasValidationErrorOccurred());
 }
