@@ -5,6 +5,42 @@ import os.path
 from typing import Any
 from .pyhephaistos import RawBuffer, ByteTensor, Program
 
+class ArrayBuffer(RawBuffer):
+    """
+    Helper class for creating buffer holding an array of a given type.
+    """
+    
+    def __init__(self, type: ctypes.Structure, size: int):
+        """
+        Creates a typed array buffer of the given type and size.
+        """
+        super().__init__(ctypes.sizeof(type) * size)
+        self._arr = (type * size).from_address(super().address)
+    
+    def __len__(self):
+        return self._arr.__len__()
+
+    def __getitem__(self, key):
+        return self._arr.__getitem__(key)
+
+    def __setitem__(self, key, item):
+        return self._arr.__setitem__(key, item)
+    
+    def __iter__(self):
+        return iter(self._arr)
+
+class ArrayTensor(ByteTensor):
+    """
+    Helper class for creating a tensor big enough to hold an array of given type
+    and size.
+    """
+
+    def __init__(self, type: ctypes.Structure, size: int):
+        """
+        Create a typed array tensor of given type and size.
+        """
+        super().__init__(ctypes.sizeof(type) * size)
+
 class StructureBuffer(RawBuffer):
     """
     Helper class for creating typed buffers.
