@@ -1,9 +1,32 @@
 import ctypes
-import subprocess
-import tempfile
-import os.path
+from numpy.ctypeslib import as_array
+from pandas import DataFrame
 from typing import Any
 from .pyhephaistos import RawBuffer, ByteTensor, Program
+
+def collectFields(struct: ctypes.Structure) -> list[tuple[str,ctypes._SimpleCData]]:
+    """
+    Returns a flat list of fields and their types for a given ctype structure.
+    """
+    fields = []
+    for name, T in struct._fields_:
+        if type(T) == type(ctypes.Structure):
+            fields.extend([
+                (f"{name}.{subname}", subT) for subname, subT in collectFields(T)
+            ])
+        else:
+            fields.append((name, T))
+    return fields
+
+def createFlatType(struct: ctypes.Structure) -> ctypes.Structure:
+    """
+    Creates a equivalent ctype structure from the given one where all nested
+    types are flattened.
+    """
+    fields = collectFields(struct)
+    class Flat(ctypes.Structure):
+        _fields_ = fields
+    return Flat
 
 class ArrayBuffer(RawBuffer):
     """
@@ -16,6 +39,19 @@ class ArrayBuffer(RawBuffer):
         """
         super().__init__(ctypes.sizeof(type) * size)
         self._arr = (type * size).from_address(super().address)
+        self._flat = (createFlatType(type) * size).from_address(super().address)
+    
+    @property
+    def array(self):
+        return self._arr
+    
+    @property
+    def flatarray(self):
+        return self._flat
+    
+    def pandas(self) -> DataFrame:
+        """Returns a pandas DataFrame holding the information"""
+        return DataFrame(as_array(self.flatarray))
     
     def __len__(self):
         return self._arr.__len__()
