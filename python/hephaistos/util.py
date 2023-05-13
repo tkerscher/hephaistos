@@ -1,7 +1,6 @@
 import ctypes
-from numpy.ctypeslib import as_array
-from pandas import DataFrame
 from typing import Any
+from numpy.ctypeslib import as_array
 from .pyhephaistos import RawBuffer, ByteTensor, Program
 
 def collectFields(struct: ctypes.Structure) -> list[tuple[str,ctypes._SimpleCData]]:
@@ -49,9 +48,12 @@ class ArrayBuffer(RawBuffer):
     def flatarray(self):
         return self._flat
     
-    def pandas(self) -> DataFrame:
-        """Returns a pandas DataFrame holding the information"""
-        return DataFrame(as_array(self.flatarray))
+    def numpy(self):
+        """
+        Returns a structured numpy array sharing the same memory as the buffer.
+        The field names correspond the the flattened ones.
+        """
+        return as_array(self.flatarray)
     
     def __len__(self):
         return self._arr.__len__()
