@@ -1,10 +1,12 @@
 #pragma once
 
+#include <optional>
 #include <span>
 #include <type_traits>
 #include <vector>
 
 #include "hephaistos/command.hpp"
+#include "hephaistos/imageformat.hpp"
 
 //fwd
 struct VkWriteDescriptorSet;
@@ -30,6 +32,32 @@ struct SubgroupProperties {
 HEPHAISTOS_API SubgroupProperties getSubgroupProperties(const DeviceHandle& device);
 HEPHAISTOS_API SubgroupProperties getSubgroupProperties(const ContextHandle& context);
 
+enum class DescriptorType {
+	/*SAMPLER = 0,*/
+	COMBINED_IMAGE_SAMPLER = 1,
+	//SAMPLED_IMAGE = 2,
+	STORAGE_IMAGE = 3,
+	//UNIFORM_TEXEL_BUFFER = 4,
+	//STORAGE_TEXEL_BUFFER = 5,
+	UNIFORM_BUFFER = 6,
+	STORAGE_BUFFER = 7,
+	//UNIFORM_BUFFER_DYNAMIC = 8,
+	//STORAGE_BUFFER_DYNAMIC = 9,
+	ACCELERATION_STRUCTURE = 1000150000
+};
+
+struct ImageBindingTraits {
+	ImageFormat format;
+	uint8_t dims;
+};
+
+struct BindingTraits {
+	std::string name;
+	DescriptorType type;
+	std::optional<ImageBindingTraits> imageTraits;
+	uint32_t count; //0 for runtime array
+};
+
 class HEPHAISTOS_API DispatchCommand : public Command {
 public:
 	uint32_t groupCountX;
@@ -54,10 +82,19 @@ private:
 
 class HEPHAISTOS_API Program : public Resource {
 public:
-	VkWriteDescriptorSet& getBinding(uint32_t i);
+	[[nodiscard]] const BindingTraits& getBindingTraits(uint32_t i) const;
+	[[nodiscard]] const BindingTraits& getBindingTraits(std::string_view name) const;
+	[[nodiscard]] const std::vector<BindingTraits>& listBindings() const noexcept;
+
+	[[nodiscard]] VkWriteDescriptorSet& getBinding(uint32_t i);
+	[[nodiscard]] VkWriteDescriptorSet& getBinding(std::string_view name);
 
 	template<class T>
 	void bindParameter(const T& param, uint32_t binding) {
+		param.bindParameter(getBinding(binding));
+	}
+	template<class T>
+	void bindParameter(const T& param, std::string_view binding) {
 		param.bindParameter(getBinding(binding));
 	}
 	template<class ...T>
@@ -89,6 +126,7 @@ public:
 
 private:
 	std::unique_ptr<vulkan::Program> program;
+	std::vector<BindingTraits> bindingTraits;
 };
 
 class HEPHAISTOS_API FlushMemoryCommand : public Command{

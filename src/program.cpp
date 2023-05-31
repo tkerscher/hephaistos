@@ -1,5 +1,6 @@
 #include "hephaistos/program.hpp"
 
+#include <array>
 #include <cstdlib>
 #include <stdexcept>
 
@@ -134,12 +135,96 @@ void spvCheckResult(SpvReflectResult result) {
 		throw std::runtime_error("Failed to retrieve reflection information from the shader!");
 }
 
+ImageFormat castImageFormat(SpvImageFormat format) {
+	switch (format) {
+	case SpvImageFormatRgba32f:
+		return ImageFormat::R32G32B32A32_SFLOAT;
+	case SpvImageFormatRgba32i:
+		return ImageFormat::R32G32B32A32_SINT;
+	case SpvImageFormatRgba32ui:
+		return ImageFormat::R32G32B32A32_UINT;
+	case SpvImageFormatRg32f:
+		return ImageFormat::R32G32_SFLOAT;
+	case SpvImageFormatRg32i:
+		return ImageFormat::R32G32_SINT;
+	case SpvImageFormatRg32ui:
+		return ImageFormat::R32G32_UINT;
+	case SpvImageFormatR32f:
+		return ImageFormat::R32G32_SFLOAT;
+	case SpvImageFormatR32i:
+		return ImageFormat::R32G32_SINT;
+	case SpvImageFormatR32ui:
+		return ImageFormat::R32G32B32A32_UINT;
+	case SpvImageFormatRgba16i:
+		return ImageFormat::R16G16B16A16_SINT;
+	case SpvImageFormatRgba16ui:
+		return ImageFormat::R16G16B16A16_UINT;
+	case SpvImageFormatRgba8:
+		return ImageFormat::R8G8B8A8_UNORM;
+	case SpvImageFormatRgba8Snorm:
+		return ImageFormat::R8G8B8A8_SNORM;
+	case SpvImageFormatRgba8i:
+		return ImageFormat::R8G8B8A8_SINT;
+	case SpvImageFormatRgba8ui:
+		return ImageFormat::R8G8B8A8_UINT;
+	default:
+		return ImageFormat::UNKNOWN;
+	}
+}
+
+uint8_t castDimension(SpvDim dim) {
+	switch (dim) {
+	case SpvDim1D:
+		return 1;
+	case SpvDim2D:
+		return 2;
+	case SpvDim3D:
+		return 3;
+	default:
+		return 0; //Unknown
+	}
+}
+
+}
+
+const BindingTraits& Program::getBindingTraits(uint32_t i) const {
+	if (i >= bindingTraits.size())
+		throw std::runtime_error("There is no binding point at specified number!");
+
+	return bindingTraits[i];
+}
+const BindingTraits& Program::getBindingTraits(std::string_view name) const {
+	const auto& b = bindingTraits;
+	auto it = std::find_if(b.begin(), b.end(), [name](const BindingTraits& t) -> bool {
+		return t.name == name;
+	});
+
+	if (it == b.end())
+		throw std::runtime_error("There is no binding point at specified location!");
+
+	return *it;
+}
+
+const std::vector<BindingTraits>& Program::listBindings() const noexcept {
+	return bindingTraits;
 }
 
 VkWriteDescriptorSet& Program::getBinding(uint32_t i) {
 	if (i >= program->boundParams.size())
-		throw std::runtime_error("There is no binding point at specified number!");
+		throw std::runtime_error("There is no binding point at specified number! Binding: " + std::to_string(i));
 
+	return program->boundParams[i];
+}
+VkWriteDescriptorSet& Program::getBinding(std::string_view name) {
+	const auto& b = bindingTraits;
+	auto it = std::find_if(b.begin(), b.end(), [name](const BindingTraits& t) -> bool {
+		return t.name == name;
+	});
+
+	if (it == b.end())
+		throw std::runtime_error("There is no binding point at specified location! Binding name: " + std::string(name));
+
+	auto i = std::distance(b.begin(), it);
 	return program->boundParams[i];
 }
 
@@ -181,11 +266,15 @@ Program::Program(ContextHandle context, std::span<const uint32_t> code, std::spa
 
 		//reserve binding slots
 		program->boundParams = std::vector<VkWriteDescriptorSet>(set.binding_count);
+		bindingTraits.resize(set.binding_count);
 
 		//Create bindings
 		auto pBinding = *set.bindings;
 		std::vector<VkDescriptorSetLayoutBinding> bindings(set.binding_count);
 		for (auto i = 0u; i < set.binding_count; ++i, ++pBinding) {
+			if (pBinding->count == 0)
+				throw std::runtime_error("Unbound arrays are not supported!");
+
 			bindings[i] = VkDescriptorSetLayoutBinding{
 				.binding         = pBinding->binding,
 				.descriptorType  = static_cast<VkDescriptorType>(pBinding->descriptor_type),
@@ -195,9 +284,28 @@ Program::Program(ContextHandle context, std::span<const uint32_t> code, std::spa
 			program->boundParams[i] = VkWriteDescriptorSet{
 				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 				.dstBinding = pBinding->binding,
-				.descriptorCount = 1,
+				.descriptorCount = pBinding->count,
 				.descriptorType = static_cast<VkDescriptorType>(pBinding->descriptor_type)
 			};
+
+			bindingTraits[i] = {
+				.name = pBinding->name,
+				.type = static_cast<DescriptorType>(pBinding->descriptor_type),
+				.count = pBinding->count
+			};
+
+			switch (pBinding->descriptor_type) {
+			case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+				bindingTraits[i].imageTraits = ImageBindingTraits{
+					.format = castImageFormat(pBinding->image.image_format),
+					.dims = castDimension(pBinding->image.dim)
+				};
+				break;
+			case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+			case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+				bindingTraits[i].name = pBinding->type_description->type_name;
+				break;
+			}
 		}
 
 		//Create set layout

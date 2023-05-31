@@ -11,6 +11,7 @@ set(PUBLIC_HEADERS
     ${INCROOT}/handles.hpp
     ${INCROOT}/hephaistos.hpp
     ${INCROOT}/image.hpp
+    ${INCROOT}/imageformat.hpp
     ${INCROOT}/program.hpp
     ${INCROOT}/raytracing.hpp
     ${INCROOT}/stopwatch.hpp
