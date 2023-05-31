@@ -40,7 +40,7 @@ int main(int argc, char* argv[]) {
 
     //create program
     Program program(context, code);
-    program.bindParameterList(image);
+    program.bindParameter(image, "outImage");
 
     std::cout << "Rendering...\n";
 

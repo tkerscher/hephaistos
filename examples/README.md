@@ -6,7 +6,7 @@ The shaders have already been compiled with [glslang](https://github.com/Khronos
 using the following command:
 
 ```bash
-glslangvalidator -V -g0 -o add.h --target-env vulkan1.2 --vn code add.comp
+glslangvalidator -V -o add.h --target-env vulkan1.2 --vn code add.comp
 ```
 
 ## List of Examples
