@@ -2,6 +2,7 @@
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/bind_vector.h>
 #include <nanobind/stl/optional.h>
+#include <nanobind/stl/string_view.h>
 
 #include <hephaistos/program.hpp>
 #include <hephaistos/raytracing.hpp>
@@ -107,5 +108,6 @@ void registerRaytracing(nb::module_& m) {
         .def("__init__", [](hp::AccelerationStructure* as, std::vector<hp::GeometryInstance> instances) {
             new (as) hp::AccelerationStructure(getCurrentContext(), instances);
         }, "instances"_a, "Creates an acceleration structure for consumption in shaders from the given geometry instances.")
-        .def("bindParameter", [](const hp::AccelerationStructure& as, hp::Program& p, uint32_t b) { as.bindParameter(p.getBinding(b)); });
+        .def("bindParameter", [](const hp::AccelerationStructure& as, hp::Program& p, uint32_t b) { as.bindParameter(p.getBinding(b)); })
+        .def("bindParameter", [](const hp::AccelerationStructure& as, hp::Program& p, std::string_view b) { as.bindParameter(p.getBinding(b)); });
 }

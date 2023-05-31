@@ -52,7 +52,7 @@ class GLSLangCompiler(ShaderCompiler):
         with tempfile.TemporaryDirectory() as tmpDir:
             path = os.path.join(tmpDir, "shader")
             result = subprocess.run(
-                f"{self.exec} --target-env vulkan1.2 --stdin --quiet -g0 -V -S comp -o {path}",
+                f"{self.exec} --target-env vulkan1.2 --stdin --quiet -V -S comp -o {path}",
                 shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
                 input=code, text=True)
             
@@ -66,7 +66,7 @@ class GLSLangCompiler(ShaderCompiler):
         with tempfile.TemporaryDirectory() as tmpDir:
             path = os.path.join(tmpDir, "shader")
             result = subprocess.run(
-                f"glslangvalidator --target-env vulkan1.2 --quiet -g0 -V -S comp -o {path} {filepath}",
+                f"glslangvalidator --target-env vulkan1.2 --quiet -V -S comp -o {path} {filepath}",
                 shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
             
             if result.returncode != 0:
@@ -96,7 +96,7 @@ class GLSLCCompiler(ShaderCompiler):
         return self._available
 
     def compileSource(self, code: str) -> bytes:
-        result = subprocess.run(f"{self.exec} --target-env=vulkan1.2 -fshader-stage=comp -O -o - -",
+        result = subprocess.run(f"{self.exec} --target-env=vulkan1.2 -fshader-stage=comp -o - -",
             shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             input=code.encode("ascii"))
         
@@ -106,7 +106,7 @@ class GLSLCCompiler(ShaderCompiler):
         return result.stdout
     
     def compileFile(self, filepath: str) -> bytes:
-        result = subprocess.run(f"{self.exec} --target-env=vulkan1.2 -fshader-stage=comp -O -o - {filepath}",
+        result = subprocess.run(f"{self.exec} --target-env=vulkan1.2 -fshader-stage=comp -o - {filepath}",
             shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
         if result.returncode != 0:

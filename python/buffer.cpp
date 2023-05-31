@@ -1,5 +1,6 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
+#include <nanobind/stl/string_view.h>
 
 #include <hephaistos/buffer.hpp>
 #include <hephaistos/program.hpp>
@@ -62,7 +63,8 @@ void registerTensor(nb::module_& m, const char* name) {
         .def(nb::init<size_t>())
         .def_prop_ro("size", [](const PyTensor<T>& t) { return t.size(); }, "The number of elements in this tensor.")
         .def_prop_ro("size_bytes", [](const PyTensor<T>& t) { return t.size_bytes(); }, "The size of the tensor in bytes.")
-        .def("bindParameter", [](const PyTensor<T>& t, hp::Program& p, uint32_t b) { t.bindParameter(p.getBinding(b)); } );
+        .def("bindParameter", [](const PyTensor<T>& t, hp::Program& p, uint32_t b) { t.bindParameter(p.getBinding(b)); } )
+        .def("bindParameter", [](const PyTensor<T>& t, hp::Program& p, std::string_view b) { t.bindParameter(p.getBinding(b)); } );
 }
 
 void registerBufferModule(nb::module_& m) {

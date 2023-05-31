@@ -1,5 +1,6 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
+#include <nanobind/stl/string_view.h>
 
 #include <string_view>
 #include <unordered_map>
@@ -149,7 +150,8 @@ void registerImageModule(nb::module_& m) {
         .def_prop_ro("depth", [](const hp::Image& img) -> uint32_t { return img.getDepth(); })
         .def_prop_ro("format", [](const hp::Image& img) -> hp::ImageFormat { return img.getFormat(); })
         .def_prop_ro("size_bytes", [](const hp::Image& img) -> uint64_t { return img.size_bytes(); })
-        .def("bindParameter", [](const hp::Image& img, hp::Program& p, uint32_t b) { img.bindParameter(p.getBinding(b)); });
+        .def("bindParameter", [](const hp::Image& img, hp::Program& p, uint32_t b) { img.bindParameter(p.getBinding(b)); })
+        .def("bindParameter", [](const hp::Image& img, hp::Program& p, std::string_view b) { img.bindParameter(p.getBinding(b)); });
     
     nb::class_<hp::Texture>(m, "Texture")
         .def("__init__",
@@ -164,7 +166,8 @@ void registerImageModule(nb::module_& m) {
         .def_prop_ro("depth", [](const hp::Texture& tex) -> uint32_t { return tex.getDepth(); })
         .def_prop_ro("format", [](const hp::Texture& tex) -> hp::ImageFormat { return tex.getFormat(); })
         .def_prop_ro("size_bytes", [](const hp::Texture& tex) -> uint64_t { return tex.size_bytes(); })
-        .def("bindParameter", [](const hp::Texture& tex, hp::Program& p, uint32_t b) { tex.bindParameter(p.getBinding(b)); });
+        .def("bindParameter", [](const hp::Texture& tex, hp::Program& p, uint32_t b) { tex.bindParameter(p.getBinding(b)); })
+        .def("bindParameter", [](const hp::Texture& tex, hp::Program& p, std::string_view b) { tex.bindParameter(p.getBinding(b)); });
 
     nb::class_<hp::ImageBuffer, hp::Buffer<std::byte>>(m, "ImageBuffer")
         .def("__init__",

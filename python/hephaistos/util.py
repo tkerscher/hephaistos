@@ -114,9 +114,13 @@ class StructureTensor(ByteTensor):
         """
         super().__init__(ctypes.sizeof(type))
 
-def bindParams(program: Program, params) -> None:
+def _bindParams(program: Program, *params, **namedparams) -> None:
     """
     Helper function to bind a list of params in a program.
     """
     for i, p in enumerate(params):
         p.bindParameter(program, i)
+    for name, p in namedparams.items():
+        p.bindParameter(program, name)
+#register function in class
+Program.bindParams = _bindParams
