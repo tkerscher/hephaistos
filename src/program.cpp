@@ -289,7 +289,7 @@ Program::Program(ContextHandle context, std::span<const uint32_t> code, std::spa
 			};
 
 			bindingTraits[i] = {
-				.name = pBinding->name,
+				.name = pBinding->name ? pBinding->name : "",
 				.type = static_cast<DescriptorType>(pBinding->descriptor_type),
 				.count = pBinding->count
 			};
@@ -303,7 +303,8 @@ Program::Program(ContextHandle context, std::span<const uint32_t> code, std::spa
 				break;
 			case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER:
 			case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
-				bindingTraits[i].name = pBinding->type_description->type_name;
+				auto name = pBinding->type_description->type_name;
+				bindingTraits[i].name = name ? name : "";
 				break;
 			}
 		}
