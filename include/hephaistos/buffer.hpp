@@ -84,6 +84,8 @@ template<class T = std::byte> class Tensor;
 template<>
 class Tensor<std::byte> : public Argument, public Resource {
 public:
+	[[nodiscard]] uint64_t address() const noexcept;
+
     [[nodiscard]] uint64_t size_bytes() const noexcept;
     [[nodiscard]] size_t size() const noexcept;
 

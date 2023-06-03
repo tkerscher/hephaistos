@@ -102,3 +102,13 @@ TEST_CASE("tensors can be initialized with data", "[buffer]") {
 
     REQUIRE(!hasValidationErrorOccurred());
 }
+
+TEST_CASE("tensors have a device address", "[buffer]") {
+    Tensor<int> tensor(getContext(), 16);
+
+    REQUIRE(tensor.address() != 0);
+
+    //TODO: Should we test the address via a short shader?
+
+    REQUIRE(!hasValidationErrorOccurred());
+}

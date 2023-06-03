@@ -58,8 +58,13 @@ Buffer<std::byte>::~Buffer() = default;
 /********************************** TENSOR ************************************/
 
 struct Tensor<std::byte>::Parameter {
+	uint64_t address;
 	VkDescriptorBufferInfo buffer;
 };
+
+uint64_t Tensor<std::byte>::address() const noexcept {
+	return parameter->address;
+}
 
 uint64_t Tensor<std::byte>::size_bytes() const noexcept {
 	return _size;
@@ -101,7 +106,7 @@ Tensor<std::byte>::Tensor(ContextHandle context, uint64_t size)
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT |
 		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, //needed for ray tracing
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		0))
 	, parameter(std::make_unique<Parameter>())
 {
@@ -110,6 +115,13 @@ Tensor<std::byte>::Tensor(ContextHandle context, uint64_t size)
 		.offset = 0,
 		.range = VK_WHOLE_SIZE
 	};
+
+	VkBufferDeviceAddressInfo addressInfo{
+		.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+		.buffer = buffer->buffer
+	};
+	parameter->address = getContext()->fnTable.vkGetBufferDeviceAddress(
+		getContext()->device, &addressInfo);
 }
 Tensor<std::byte>::Tensor(const Buffer<std::byte>& source)
 	: Tensor<std::byte>(source.getContext(), source.size_bytes())
