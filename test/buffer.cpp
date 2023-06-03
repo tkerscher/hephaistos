@@ -5,6 +5,10 @@
 
 #include <hephaistos/buffer.hpp>
 #include <hephaistos/command.hpp>
+#include <hephaistos/program.hpp>
+
+// shader code
+#include "shader/buffer_array.h"
 
 using namespace hephaistos;
 
@@ -99,6 +103,59 @@ TEST_CASE("tensors can be initialized with data", "[buffer]") {
     
     //compare data
     REQUIRE(std::equal(data.begin(), data.end(), buffer.getMemory().begin()));
+
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
+TEST_CASE("tensors can be bundled into arrays", "[buffer]") {
+    Tensor<int> t1(getContext(), std::to_array({ 1, 2, 3, 4 }));  //10
+    Tensor<int> t2(getContext(), std::to_array({ 17, 5, 8, 4 })); //34
+    Tensor<int> t3(getContext(), std::to_array({ 1, 12, 0, 9 })); //22
+
+    SECTION("arrays can be created with an initializer list") {
+        ArgumentArray<Tensor<std::byte>> arr{ t1, t2, t3 };
+
+        REQUIRE(arr.size() == 3);
+    }
+
+    SECTION("arrays can be pushed into") {
+        ArgumentArray<Tensor<std::byte>> arr;
+
+        REQUIRE(arr.size() == 0);
+        REQUIRE(arr.empty());
+
+        arr.push_back(t1);
+
+        REQUIRE(arr.size() == 1);
+        REQUIRE(!arr.empty());
+
+        arr.push_back(t1);
+        arr.push_back(t2);
+        arr.push_back(t1);
+
+        REQUIRE(arr.size() == 4);
+    }
+
+    SECTION("arrays are correctly bound to shaders") {
+        ArgumentArray<Tensor<std::byte>> arr{ t1, t2, t1, t3 };
+        Tensor<int> res(getContext(), 4);
+        Buffer<int> buf(getContext(), 4);
+
+        Program program(getContext(), buffer_array_code);
+        program.bindParameterList(res, arr);
+
+        beginSequence(getContext())
+            .And(program.dispatch(4))
+            .Then(retrieveTensor(res, buf))
+            .Submit();
+
+        auto p = buf.getMemory();
+
+        REQUIRE(p[0] == 10);
+        REQUIRE(p[1] == 34);
+        REQUIRE(p[2] == 10);
+        REQUIRE(p[3] == 22);
+    }
 
     REQUIRE(!hasValidationErrorOccurred());
 }

@@ -1,0 +1,21 @@
+#version 460
+
+#extension GL_EXT_nonuniform_qualifier : require
+
+layout(local_size_x = 1) in;
+
+layout(binding = 0) writeonly buffer Result { int s[]; };
+// layout(binding = 1) uniform Data {
+//     int x[4];
+// } data[];
+layout(binding = 1) readonly buffer Data {
+    int x[4];
+} data[];
+
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+    int a = 0;
+    for (int j = 0; j < 4; ++j)
+        a += data[i].x[j];
+    s[i] = a;
+}

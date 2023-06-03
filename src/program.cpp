@@ -272,6 +272,7 @@ Program::Program(ContextHandle context, std::span<const uint32_t> code, std::spa
 		auto pBinding = *set.bindings;
 		std::vector<VkDescriptorSetLayoutBinding> bindings(set.binding_count);
 		for (auto i = 0u; i < set.binding_count; ++i, ++pBinding) {
+			//Can't mix push descriptors and runtime arrays...
 			if (pBinding->count == 0)
 				throw std::runtime_error("Unbound arrays are not supported!");
 
@@ -282,10 +283,10 @@ Program::Program(ContextHandle context, std::span<const uint32_t> code, std::spa
 				.stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT
 			};
 			program->boundParams[i] = VkWriteDescriptorSet{
-				.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.dstBinding = pBinding->binding,
+				.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.dstBinding      = pBinding->binding,
 				.descriptorCount = pBinding->count,
-				.descriptorType = static_cast<VkDescriptorType>(pBinding->descriptor_type)
+				.descriptorType  = static_cast<VkDescriptorType>(pBinding->descriptor_type)
 			};
 
 			bindingTraits[i] = {

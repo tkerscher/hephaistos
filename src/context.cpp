@@ -255,25 +255,27 @@ bool isDeviceSuitable(const DeviceHandle& device, std::span<const ExtensionHandl
 		};
 		vkGetPhysicalDeviceFeatures2(device->device, &features);
 		//timeline sempahore feature
-		if (!features12.timelineSemaphore)
-			return false;
+		if (!features12.timelineSemaphore) return false;
 		//buffer device address
-		if (!features12.bufferDeviceAddress)
-			return false;
+		if (!features12.bufferDeviceAddress) return false;
 		//host query reset (stopwatch)
-		if (!features12.hostQueryReset)
-			return false;
+		if (!features12.hostQueryReset) return false;
 		//extended arithmetic types
-		if (!features.features.shaderFloat64)
-			return false;
-		if (!features.features.shaderInt64)
-			return false;
-		if (!features.features.shaderInt16)
-			return false;
-		if (!features12.shaderFloat16)
-			return false;
-		if (!features12.shaderInt8)
-			return false;
+		if (!features.features.shaderFloat64) return false;
+		if (!features.features.shaderInt64) return false;
+		if (!features.features.shaderInt16) return false;
+		if (!features12.shaderFloat16) return false;
+		if (!features12.shaderInt8) return false;
+		//run-time descriptor array
+		if (!features12.runtimeDescriptorArray) return false;
+		if (!features12.descriptorBindingVariableDescriptorCount) return false;
+		//partially-bound
+		if (!features12.descriptorBindingPartiallyBound) return false;
+		//non uniform indexing
+		if (!features12.shaderSampledImageArrayNonUniformIndexing) return false;
+		if (!features12.shaderStorageBufferArrayNonUniformIndexing) return false;
+		if (!features12.shaderStorageImageArrayNonUniformIndexing) return false;
+		if (!features12.shaderUniformBufferArrayNonUniformIndexing) return false;
 	}
 
 	//check for compute queue
@@ -427,9 +429,20 @@ ContextHandle createContext(
 			.queueCount       = 1,
 			.pQueuePriorities = &QueuePriority
 		};
+		VkPhysicalDeviceDescriptorIndexingFeatures indexing{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES,
+			.pNext = pNext, //chain external extensions
+			.shaderUniformBufferArrayNonUniformIndexing = VK_TRUE,
+			.shaderSampledImageArrayNonUniformIndexing  = VK_TRUE,
+			.shaderStorageBufferArrayNonUniformIndexing = VK_TRUE,
+			.shaderStorageImageArrayNonUniformIndexing  = VK_TRUE,
+			.descriptorBindingPartiallyBound            = VK_TRUE,
+			.descriptorBindingVariableDescriptorCount   = VK_TRUE,
+			.runtimeDescriptorArray                     = VK_TRUE
+		};
 		VkPhysicalDeviceTimelineSemaphoreFeatures timeline{
 			.sType             = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
-			.pNext			   = pNext, //chain external extensions
+			.pNext			   = &indexing,
 			.timelineSemaphore = VK_TRUE
 		};
 		VkPhysicalDeviceHostQueryResetFeatures hostQueryReset{

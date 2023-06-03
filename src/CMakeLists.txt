@@ -4,6 +4,7 @@ set(SRCROOT ${PROJECT_SOURCE_DIR}/src)
 
 #Public API
 set(PUBLIC_HEADERS
+    ${INCROOT}/argument.hpp
     ${INCROOT}/buffer.hpp
     ${INCROOT}/command.hpp
     ${INCROOT}/config.hpp

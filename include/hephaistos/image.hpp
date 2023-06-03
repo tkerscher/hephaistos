@@ -1,13 +1,13 @@
 #pragma once
 
+#include <functional>
+
+#include "hephaistos/argument.hpp"
 #include "hephaistos/buffer.hpp"
 #include "hephaistos/command.hpp"
 #include "hephaistos/context.hpp"
 #include "hephaistos/handles.hpp"
 #include "hephaistos/imageformat.hpp"
-
-//fwd
-struct VkWriteDescriptorSet;
 
 namespace hephaistos {
 
@@ -39,7 +39,7 @@ struct Sampler {
     bool unnormalizedCoordinates = false;
 };
 
-class HEPHAISTOS_API Image : public Resource {
+class HEPHAISTOS_API Image : public Argument, public Resource {
 public:
     [[nodiscard]] uint32_t getWidth() const noexcept;
     [[nodiscard]] uint32_t getHeight() const noexcept;
@@ -47,7 +47,7 @@ public:
     [[nodiscard]] ImageFormat getFormat() const noexcept;
     [[nodiscard]] uint64_t size_bytes() const noexcept;
 
-    void bindParameter(VkWriteDescriptorSet& binding) const;
+    void bindParameter(VkWriteDescriptorSet& binding) const override final;
 
     Image(const Image&) = delete;
     Image& operator=(const Image&) = delete;
@@ -60,7 +60,7 @@ public:
         uint32_t width,
         uint32_t height = 1,
         uint32_t depth = 1);
-    virtual ~Image();
+    ~Image() override;
 
 public: //internal
     const vulkan::Image& getImage() const noexcept;
@@ -74,7 +74,43 @@ private:
     std::unique_ptr<Parameter> parameter;
 };
 
-class HEPHAISTOS_API Texture : public Resource {
+//template<>
+//class HEPHAISTOS_API ArgumentArray<Image> : public Argument {
+//public:
+//    using ElementType = Image;
+//
+//public:
+//    void bindParameter(VkWriteDescriptorSet& binding) const override final;
+//
+//    [[nodiscard]] size_t size() const;
+//    [[nodiscard]] bool empty() const;
+//
+//    void clear();
+//    void resize(size_t count);
+//
+//    void set(size_t pos, const ElementType& img);
+//    void push_back(const ElementType& img);
+//
+//    ArgumentArray(const ArgumentArray& other);
+//    ArgumentArray& operator=(const ArgumentArray& other);
+//    
+//
+//    ArgumentArray(ArgumentArray&& other) noexcept;
+//    ArgumentArray& operator=(ArgumentArray&& other) noexcept;
+//
+//    ArgumentArray();
+//    ArgumentArray(size_t count);
+//    ArgumentArray(size_t count, const ElementType& img);
+//    ArgumentArray(std::initializer_list<std::reference_wrapper<const ElementType>> images);
+//
+//    ~ArgumentArray() override;
+//
+//private:
+//    struct Argument;
+//    std::unique_ptr<Argument> argument;
+//};
+
+class HEPHAISTOS_API Texture : public Argument, public Resource {
 public:
     [[nodiscard]] uint32_t getWidth() const noexcept;
     [[nodiscard]] uint32_t getHeight() const noexcept;
@@ -82,7 +118,7 @@ public:
     [[nodiscard]] ImageFormat getFormat() const noexcept;
     [[nodiscard]] uint64_t size_bytes() const noexcept;
 
-    void bindParameter(VkWriteDescriptorSet& binding) const;
+    void bindParameter(VkWriteDescriptorSet& binding) const override final;
 
     Texture(const Texture&) = delete;
     Texture& operator=(const Texture&) = delete;
@@ -105,7 +141,7 @@ public:
         uint32_t height,
         uint32_t depth,
         const Sampler& sampler = {});
-    virtual ~Texture();
+    ~Texture() override;
 
 public: //internal
     const vulkan::Image& getImage() const noexcept;
@@ -118,6 +154,42 @@ private:
     struct Parameter;
     std::unique_ptr<Parameter> parameter;
 };
+
+//template<>
+//class HEPHAISTOS_API ArgumentArray<Texture> : public Argument {
+//public:
+//    using ElementType = Texture;
+//
+//public:
+//    void bindParameter(VkWriteDescriptorSet& binding) const override final;
+//
+//    [[nodiscard]] size_t size() const;
+//    [[nodiscard]] bool empty() const;
+//
+//    void clear();
+//    void resize(size_t count);
+//
+//    void set(size_t pos, const ElementType& tex);
+//    void push_back(const ElementType& tex);
+//
+//    ArgumentArray(const ArgumentArray& other);
+//    ArgumentArray& operator=(const ArgumentArray& other);
+//
+//
+//    ArgumentArray(ArgumentArray&& other) noexcept;
+//    ArgumentArray& operator=(ArgumentArray&& other) noexcept;
+//
+//    ArgumentArray();
+//    ArgumentArray(size_t count);
+//    ArgumentArray(size_t count, const ElementType& tex);
+//    ArgumentArray(std::initializer_list<std::reference_wrapper<const ElementType>> texs);
+//
+//    ~ArgumentArray() override;
+//
+//private:
+//    struct Argument;
+//    std::unique_ptr<Argument> argument;
+//};
 
 class HEPHAISTOS_API ImageBuffer : public Buffer<Vec4<uint8_t>> {
 public:
@@ -143,7 +215,7 @@ public:
     ImageBuffer& operator=(ImageBuffer&& other) noexcept;
 
     ImageBuffer(ContextHandle context, uint32_t width, uint32_t height);
-    virtual ~ImageBuffer();
+    ~ImageBuffer() override;
 
 private:
     uint32_t width, height;
@@ -154,7 +226,7 @@ public:
     std::reference_wrapper<const Image> Source;
     std::reference_wrapper<const Buffer<std::byte>> Destination;
 
-    virtual void record(vulkan::Command& cmd) const override;
+    void record(vulkan::Command& cmd) const override;
 
     RetrieveImageCommand(const RetrieveImageCommand& other);
     RetrieveImageCommand& operator=(const RetrieveImageCommand& other);
@@ -163,7 +235,7 @@ public:
     RetrieveImageCommand& operator=(RetrieveImageCommand&& other) noexcept;
 
     RetrieveImageCommand(const Image& src, const Buffer<std::byte>& dst);
-    virtual ~RetrieveImageCommand();
+    ~RetrieveImageCommand() override;
 };
 [[nodiscard]] inline RetrieveImageCommand retrieveImage(
     const Image& src, const Buffer<std::byte>& dst)
@@ -176,7 +248,7 @@ public:
     std::reference_wrapper<const Buffer<std::byte>> Source;
     std::reference_wrapper<const Image> Destination;
 
-    virtual void record(vulkan::Command& cmd) const override;
+    void record(vulkan::Command& cmd) const override;
 
     UpdateImageCommand(const UpdateImageCommand& other);
     UpdateImageCommand& operator=(const UpdateImageCommand& other);
@@ -185,7 +257,7 @@ public:
     UpdateImageCommand& operator=(UpdateImageCommand&& other) noexcept;
 
     UpdateImageCommand(const Buffer<std::byte>& src, const Image& dst);
-    virtual ~UpdateImageCommand();
+    ~UpdateImageCommand() override;
 };
 [[nodiscard]] inline UpdateImageCommand updateImage(
     const Buffer<std::byte>& src, const Image& dst)
@@ -198,7 +270,7 @@ public:
     std::reference_wrapper<const Buffer<std::byte>> Source;
     std::reference_wrapper<const Texture> Destination;
 
-    virtual void record(vulkan::Command& cmd) const override;
+    void record(vulkan::Command& cmd) const override;
 
     UpdateTextureCommand(const UpdateTextureCommand& other);
     UpdateTextureCommand& operator=(const UpdateTextureCommand& other);
@@ -207,7 +279,7 @@ public:
     UpdateTextureCommand& operator=(UpdateTextureCommand&& other) noexcept;
 
     UpdateTextureCommand(const Buffer<std::byte>& src, const Texture& dst);
-    virtual ~UpdateTextureCommand();
+    ~UpdateTextureCommand() override;
 };
 [[nodiscard]] inline UpdateTextureCommand updateTexture(
     const Buffer<std::byte>& src, const Texture& dst)

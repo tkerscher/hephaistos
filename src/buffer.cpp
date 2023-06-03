@@ -73,6 +73,7 @@ const vulkan::Buffer& Tensor<std::byte>::getBuffer() const noexcept {
 
 void Tensor<std::byte>::bindParameter(VkWriteDescriptorSet& binding) const {
 	binding.pNext            = nullptr;
+	binding.descriptorCount  = 1;
 	binding.pImageInfo       = nullptr;
 	binding.pTexelBufferView = nullptr;
 	binding.pBufferInfo      = &parameter->buffer;
@@ -125,6 +126,77 @@ Tensor<std::byte>::Tensor(ContextHandle context, std::span<const std::byte> data
 	: Tensor<std::byte>(Buffer<std::byte>(std::move(context), data))
 {}
 Tensor<std::byte>::~Tensor() = default;
+
+/*********************************** ARRAY ************************************/
+
+struct ArgumentArray<Tensor<std::byte>>::Parameter {
+	//Bit ugly to have effectively have a pointer to a vector,
+	//but I don't want to expose the Vulkan API
+	std::vector<VkDescriptorBufferInfo> infos;
+
+	Parameter() = default;
+	Parameter(size_t count, const VkDescriptorBufferInfo& i = {}) : infos(count, i) {}
+	Parameter(const Parameter& other) : infos(other.infos) {}
+};
+
+void ArgumentArray<Tensor<std::byte>>::bindParameter(VkWriteDescriptorSet& binding) const {
+	binding.pNext            = nullptr;
+	binding.descriptorCount  = parameter->infos.size();
+	binding.pImageInfo       = nullptr;
+	binding.pTexelBufferView = nullptr;
+	binding.pBufferInfo      = parameter->infos.data();
+}
+
+size_t ArgumentArray<Tensor<std::byte>>::size() const { return parameter->infos.size(); }
+bool ArgumentArray<Tensor<std::byte>>::empty() const { return parameter->infos.empty(); }
+
+void ArgumentArray<Tensor<std::byte>>::clear() { parameter->infos.clear(); }
+void ArgumentArray<Tensor<std::byte>>::resize(size_t count) { parameter->infos.resize(count); }
+
+void ArgumentArray<Tensor<std::byte>>::set(size_t pos, const Tensor<std::byte>& tensor) {
+	parameter->infos.at(pos) = tensor.parameter->buffer;
+}
+void ArgumentArray<Tensor<std::byte>>::push_back(const Tensor<std::byte>& tensor) {
+	parameter->infos.push_back(tensor.parameter->buffer);
+}
+
+ArgumentArray<Tensor<std::byte>>::ArgumentArray(const ArgumentArray& other)
+	: parameter(std::make_unique<Parameter>(*other.parameter))
+{}
+ArgumentArray<Tensor<std::byte>>& ArgumentArray<Tensor<std::byte>>::operator=(const ArgumentArray& other) {
+	parameter->infos = other.parameter->infos;
+	return *this;
+}
+
+ArgumentArray<Tensor<std::byte>>::ArgumentArray(ArgumentArray&& other) noexcept
+	: parameter(std::move(other.parameter))
+{}
+ArgumentArray<Tensor<std::byte>>& ArgumentArray<Tensor<std::byte>>::operator=(ArgumentArray&& other) noexcept {
+	parameter = std::move(other.parameter);
+	return *this;
+}
+
+ArgumentArray<Tensor<std::byte>>::ArgumentArray()
+	: parameter(std::make_unique<Parameter>())
+{}
+ArgumentArray<Tensor<std::byte>>::ArgumentArray(size_t count)
+	: parameter(std::make_unique<Parameter>(count))
+{}
+ArgumentArray<Tensor<std::byte>>::ArgumentArray(size_t count, const Tensor<std::byte>& t)
+	: parameter(std::make_unique<Parameter>(count, t.parameter->buffer))
+{}
+ArgumentArray<Tensor<std::byte>>::ArgumentArray(std::initializer_list<std::reference_wrapper<const Tensor<std::byte>>> tensors)
+	: parameter(std::make_unique<Parameter>(tensors.size()))
+{
+	auto pp = parameter->infos.begin();
+	auto pi = tensors.begin();
+	auto pe = tensors.end();
+	
+	for (; pi != pe; ++pp, ++pi)
+		*pp = pi->get().parameter->buffer;
+}
+
+ArgumentArray<Tensor<std::byte>>::~ArgumentArray() = default;
 
 /*********************************** COPY *************************************/
 

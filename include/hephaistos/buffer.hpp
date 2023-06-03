@@ -4,12 +4,10 @@
 #include <initializer_list>
 #include <span>
 
+#include "hephaistos/argument.hpp"
 #include "hephaistos/command.hpp"
 #include "hephaistos/context.hpp"
 #include "hephaistos/handles.hpp"
-
-//fwd
-struct VkWriteDescriptorSet;
 
 namespace hephaistos {
 
@@ -30,7 +28,7 @@ public:
 
 	Buffer(ContextHandle context, uint64_t size);
 	Buffer(ContextHandle context, std::span<const std::byte> data);
-	virtual ~Buffer();
+	~Buffer() override;
 
 public: //internal
 	const vulkan::Buffer& getBuffer() const noexcept;
@@ -75,7 +73,7 @@ public:
 	Buffer(ContextHandle context, std::initializer_list<T> data)
 		: Buffer(std::move(context), std::span<const T>{data})
 	{}
-	virtual ~Buffer() = default;
+	~Buffer() override = default;
 };
 
 template<class Container> Buffer(ContextHandle, const Container&)
@@ -84,12 +82,12 @@ template<class Container> Buffer(ContextHandle, const Container&)
 template<class T = std::byte> class Tensor;
 
 template<>
-class Tensor<std::byte> : public Resource {
+class Tensor<std::byte> : public Argument, public Resource {
 public:
     [[nodiscard]] uint64_t size_bytes() const noexcept;
     [[nodiscard]] size_t size() const noexcept;
 
-	void bindParameter(VkWriteDescriptorSet& binding) const;
+	void bindParameter(VkWriteDescriptorSet& binding) const override final;
 
     Tensor(const Tensor<std::byte>&) = delete;
     Tensor<std::byte>& operator=(const Tensor<std::byte>&) = delete;
@@ -100,7 +98,7 @@ public:
     Tensor(ContextHandle context, uint64_t size);
 	Tensor(const Buffer<std::byte>& source);
 	Tensor(ContextHandle context, std::span<const std::byte> data);
-    virtual ~Tensor();
+    ~Tensor() override;
 
 public: //internal
     [[nodiscard]] const vulkan::Buffer& getBuffer() const noexcept;
@@ -111,6 +109,8 @@ private:
 
 	struct Parameter;
 	std::unique_ptr<Parameter> parameter;
+
+	friend class ArgumentArray<Tensor<std::byte>>;
 };
 template class HEPHAISTOS_API Tensor<std::byte>;
 
@@ -148,12 +148,47 @@ public:
     virtual ~Tensor() = default;
 };
 
+template<>
+class HEPHAISTOS_API ArgumentArray<Tensor<std::byte>> : public Argument {
+public:
+	using ElementType = Tensor<std::byte>;
+
+public:
+	void bindParameter(VkWriteDescriptorSet& binding) const override final;
+
+	[[nodiscard]] size_t size() const;
+	[[nodiscard]] bool empty() const;
+
+	void clear();
+	void resize(size_t count);
+
+	void set(size_t pos, const ElementType& tensor);
+	void push_back(const ElementType& tensor);
+
+	ArgumentArray(const ArgumentArray& other);
+	ArgumentArray& operator=(const ArgumentArray& other);
+
+	ArgumentArray(ArgumentArray&& other) noexcept;
+	ArgumentArray& operator=(ArgumentArray&& other) noexcept;
+
+	ArgumentArray();
+	ArgumentArray(size_t count);
+	ArgumentArray(size_t count, const ElementType& tensor);
+	ArgumentArray(std::initializer_list<std::reference_wrapper<const ElementType>> tensors);
+
+	~ArgumentArray() override;
+
+private:
+	struct Parameter;
+	std::unique_ptr<Parameter> parameter;
+};
+
 class HEPHAISTOS_API RetrieveTensorCommand : public Command {
 public:
 	std::reference_wrapper<const Tensor<std::byte>> Source;
 	std::reference_wrapper<const Buffer<std::byte>> Destination;
 
-	virtual void record(vulkan::Command& cmd) const override;
+	void record(vulkan::Command& cmd) const override;
 
 	RetrieveTensorCommand(const RetrieveTensorCommand& other);
 	RetrieveTensorCommand& operator=(const RetrieveTensorCommand& other);
@@ -162,7 +197,7 @@ public:
 	RetrieveTensorCommand& operator=(RetrieveTensorCommand&& other) noexcept;
 	
 	RetrieveTensorCommand(const Tensor<std::byte>& src, const Buffer<std::byte>& dst);
-	virtual ~RetrieveTensorCommand();
+	~RetrieveTensorCommand() override;
 };
 [[nodiscard]] inline RetrieveTensorCommand retrieveTensor(
 	const Tensor<std::byte>& src, const Buffer<std::byte>& dst)
@@ -175,7 +210,7 @@ public:
 	std::reference_wrapper<const Buffer<std::byte>> Source;
 	std::reference_wrapper<const Tensor<std::byte>> Destination;
 
-	virtual void record(vulkan::Command& cmd) const override;
+	void record(vulkan::Command& cmd) const override;
 
 	UpdateTensorCommand(const UpdateTensorCommand& other);
 	UpdateTensorCommand& operator=(const UpdateTensorCommand& other);
@@ -184,7 +219,7 @@ public:
 	UpdateTensorCommand& operator=(UpdateTensorCommand&& other) noexcept;
 
 	UpdateTensorCommand(const Buffer<std::byte>& src, const Tensor<std::byte>& dst);
-	virtual ~UpdateTensorCommand();
+	~UpdateTensorCommand() override;
 };
 [[nodiscard]] inline UpdateTensorCommand updateTensor(
 	const Buffer<std::byte>& src, const Tensor<std::byte>& dst)

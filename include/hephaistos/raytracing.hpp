@@ -3,10 +3,9 @@
 #include <optional>
 #include <span>
 
+#include "hephaistos/argument.hpp"
 #include "hephaistos/context.hpp"
 #include "hephaistos/handles.hpp"
-
-struct VkWriteDescriptorSet;
 
 namespace hephaistos {
 
@@ -38,9 +37,9 @@ struct GeometryInstance {
 	uint32_t mask : 8         = 0xFF;
 };
 
-class HEPHAISTOS_API AccelerationStructure : public Resource {
+class HEPHAISTOS_API AccelerationStructure : public Argument, public Resource {
 public:
-	void bindParameter(VkWriteDescriptorSet& binding) const;
+	void bindParameter(VkWriteDescriptorSet& binding) const override final;
 
 	AccelerationStructure(const AccelerationStructure&) = delete;
 	AccelerationStructure& operator=(const AccelerationStructure&) = delete;
@@ -50,11 +49,47 @@ public:
 
 	AccelerationStructure(ContextHandle context, const GeometryInstance& instance);
 	AccelerationStructure(ContextHandle context, std::span<const GeometryInstance> instances);
-	virtual ~AccelerationStructure();
+	~AccelerationStructure() override;
 
 private:
 	struct Parameter;
 	std::unique_ptr<Parameter> param;
 };
+
+//template<>
+//class HEPHAISTOS_API ArgumentArray<AccelerationStructure> : public Argument {
+//public:
+//	using ElementType = AccelerationStructure;
+//
+//public:
+//	void bindParameter(VkWriteDescriptorSet& binding) const override final;
+//
+//	[[nodiscard]] size_t size() const;
+//	[[nodiscard]] bool empty() const;
+//
+//	void clear();
+//	void resize(size_t count);
+//
+//	void set(size_t pos, const ElementType& img);
+//	void push_back(const ElementType& img);
+//
+//	ArgumentArray(const ArgumentArray& other);
+//	ArgumentArray& operator=(const ArgumentArray& other);
+//
+//
+//	ArgumentArray(ArgumentArray&& other) noexcept;
+//	ArgumentArray& operator=(ArgumentArray&& other) noexcept;
+//
+//	ArgumentArray();
+//	ArgumentArray(size_t count);
+//	ArgumentArray(size_t count, const ElementType& img);
+//	ArgumentArray(std::initializer_list<std::reference_wrapper<const ElementType>> images);
+//
+//	~ArgumentArray() override;
+//
+//private:
+//	struct Argument;
+//	std::unique_ptr<Argument> argument;
+//};
 
 }
