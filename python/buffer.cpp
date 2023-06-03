@@ -61,6 +61,7 @@ template<class T>
 void registerTensor(nb::module_& m, const char* name) {
     nb::class_<PyTensor<T>, hp::Tensor<std::byte>>(m, name)
         .def(nb::init<size_t>())
+        .def_prop_ro("address", [](const PyTensor<T>& t) { return t.address(); }, "The device address of this tensor.")
         .def_prop_ro("size", [](const PyTensor<T>& t) { return t.size(); }, "The number of elements in this tensor.")
         .def_prop_ro("size_bytes", [](const PyTensor<T>& t) { return t.size_bytes(); }, "The size of the tensor in bytes.")
         .def("bindParameter", [](const PyTensor<T>& t, hp::Program& p, uint32_t b) { t.bindParameter(p.getBinding(b)); } )
