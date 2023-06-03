@@ -3,10 +3,9 @@
 #include <optional>
 #include <span>
 
+#include "hephaistos/argument.hpp"
 #include "hephaistos/context.hpp"
 #include "hephaistos/handles.hpp"
-
-struct VkWriteDescriptorSet;
 
 namespace hephaistos {
 
@@ -38,9 +37,9 @@ struct GeometryInstance {
 	uint32_t mask : 8         = 0xFF;
 };
 
-class HEPHAISTOS_API AccelerationStructure : public Resource {
+class HEPHAISTOS_API AccelerationStructure : public Argument, public Resource {
 public:
-	void bindParameter(VkWriteDescriptorSet& binding) const;
+	void bindParameter(VkWriteDescriptorSet& binding) const final override;
 
 	AccelerationStructure(const AccelerationStructure&) = delete;
 	AccelerationStructure& operator=(const AccelerationStructure&) = delete;
@@ -50,7 +49,7 @@ public:
 
 	AccelerationStructure(ContextHandle context, const GeometryInstance& instance);
 	AccelerationStructure(ContextHandle context, std::span<const GeometryInstance> instances);
-	virtual ~AccelerationStructure();
+	~AccelerationStructure() override;
 
 private:
 	struct Parameter;

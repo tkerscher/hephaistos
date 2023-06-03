@@ -5,16 +5,13 @@
 #include <type_traits>
 #include <vector>
 
+#include "hephaistos/argument.hpp"
 #include "hephaistos/command.hpp"
 #include "hephaistos/imageformat.hpp"
-
-//fwd
-struct VkWriteDescriptorSet;
 
 namespace hephaistos {
 
 namespace vulkan {
-	struct Param;
 	struct Program;
 }
 
@@ -65,7 +62,7 @@ public:
 	uint32_t groupCountZ;
 	std::span<const std::byte> pushData;
 
-	virtual void record(vulkan::Command& cmd) const override;
+	void record(vulkan::Command& cmd) const override;
 
 	DispatchCommand(const DispatchCommand&);
 	DispatchCommand& operator=(const DispatchCommand&);
@@ -74,7 +71,7 @@ public:
 	DispatchCommand& operator=(DispatchCommand&&) noexcept;
 
 	DispatchCommand(const vulkan::Program& program, uint32_t x, uint32_t y, uint32_t z, std::span<const std::byte> push);
-	virtual ~DispatchCommand();
+	~DispatchCommand() override;
 
 private:
 	std::reference_wrapper<const vulkan::Program> program;
@@ -122,7 +119,7 @@ public:
 	Program(ContextHandle context, std::span<const uint32_t> code, const T& specialization)
 		: Program(std::move(context), code, std::as_bytes(std::span<const T>{ &specialization, 1 }))
 	{}
-	~Program();
+	~Program() override;
 
 private:
 	std::unique_ptr<vulkan::Program> program;
@@ -135,13 +132,13 @@ public:
 	//just store the reference instead
 	std::reference_wrapper<const vulkan::Context> context;
 
-	virtual void record(vulkan::Command& cmd) const override;
+	void record(vulkan::Command& cmd) const override;
 
 	FlushMemoryCommand(const FlushMemoryCommand&);
 	FlushMemoryCommand& operator=(const FlushMemoryCommand&);
 
-	FlushMemoryCommand(const ContextHandle& context);
-	virtual ~FlushMemoryCommand();
+	explicit FlushMemoryCommand(const ContextHandle& context);
+	~FlushMemoryCommand() override;
 };
 [[nodiscard]] inline FlushMemoryCommand flushMemory(const ContextHandle& context) {
 	return FlushMemoryCommand(context);

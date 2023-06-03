@@ -32,7 +32,7 @@ public:
     Timeline& operator=(Timeline&& other) noexcept;
 
     explicit Timeline(ContextHandle context, uint64_t initialValue = 0);
-    virtual ~Timeline();
+    ~Timeline() override;
 
 public: //internal
     vulkan::Timeline& getTimeline() const;

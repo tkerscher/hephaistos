@@ -4,12 +4,10 @@
 #include <initializer_list>
 #include <span>
 
+#include "hephaistos/argument.hpp"
 #include "hephaistos/command.hpp"
 #include "hephaistos/context.hpp"
 #include "hephaistos/handles.hpp"
-
-//fwd
-struct VkWriteDescriptorSet;
 
 namespace hephaistos {
 
@@ -30,7 +28,7 @@ public:
 
 	Buffer(ContextHandle context, uint64_t size);
 	Buffer(ContextHandle context, std::span<const std::byte> data);
-	virtual ~Buffer();
+	~Buffer() override;
 
 public: //internal
 	const vulkan::Buffer& getBuffer() const noexcept;
@@ -75,7 +73,7 @@ public:
 	Buffer(ContextHandle context, std::initializer_list<T> data)
 		: Buffer(std::move(context), std::span<const T>{data})
 	{}
-	virtual ~Buffer() = default;
+	~Buffer() override = default;
 };
 
 template<class Container> Buffer(ContextHandle, const Container&)
@@ -84,12 +82,12 @@ template<class Container> Buffer(ContextHandle, const Container&)
 template<class T = std::byte> class Tensor;
 
 template<>
-class Tensor<std::byte> : public Resource {
+class Tensor<std::byte> : public Argument, public Resource {
 public:
     [[nodiscard]] uint64_t size_bytes() const noexcept;
     [[nodiscard]] size_t size() const noexcept;
 
-	void bindParameter(VkWriteDescriptorSet& binding) const;
+	void bindParameter(VkWriteDescriptorSet& binding) const final override;
 
     Tensor(const Tensor<std::byte>&) = delete;
     Tensor<std::byte>& operator=(const Tensor<std::byte>&) = delete;
@@ -98,9 +96,9 @@ public:
     Tensor<std::byte>& operator=(Tensor<std::byte>&& other) noexcept;
 
     Tensor(ContextHandle context, uint64_t size);
-	Tensor(const Buffer<std::byte>& source);
+	explicit Tensor(const Buffer<std::byte>& source);
 	Tensor(ContextHandle context, std::span<const std::byte> data);
-    virtual ~Tensor();
+    ~Tensor() override;
 
 public: //internal
     [[nodiscard]] const vulkan::Buffer& getBuffer() const noexcept;
@@ -135,7 +133,7 @@ public:
     Tensor(ContextHandle context, size_t count)
         : Tensor<std::byte>(std::move(context), count * sizeof(T))
     {}
-	Tensor(const Buffer<std::byte>& buffer)
+	explicit Tensor(const Buffer<std::byte>& buffer)
 		: Tensor<std::byte>(buffer)
 	{}
 	Tensor(ContextHandle context, std::span<const T> data)
@@ -145,7 +143,7 @@ public:
 	Tensor(ContextHandle context, const T& data)
 		: Tensor<std::byte>(std::move(context), { reinterpret_cast<const std::byte*>(&data), sizeof(T) })
 	{}
-    virtual ~Tensor() = default;
+    ~Tensor() override = default;
 };
 
 class HEPHAISTOS_API RetrieveTensorCommand : public Command {
@@ -162,7 +160,7 @@ public:
 	RetrieveTensorCommand& operator=(RetrieveTensorCommand&& other) noexcept;
 	
 	RetrieveTensorCommand(const Tensor<std::byte>& src, const Buffer<std::byte>& dst);
-	virtual ~RetrieveTensorCommand();
+	~RetrieveTensorCommand() override;
 };
 [[nodiscard]] inline RetrieveTensorCommand retrieveTensor(
 	const Tensor<std::byte>& src, const Buffer<std::byte>& dst)
@@ -184,7 +182,7 @@ public:
 	UpdateTensorCommand& operator=(UpdateTensorCommand&& other) noexcept;
 
 	UpdateTensorCommand(const Buffer<std::byte>& src, const Tensor<std::byte>& dst);
-	virtual ~UpdateTensorCommand();
+	~UpdateTensorCommand() override;
 };
 [[nodiscard]] inline UpdateTensorCommand updateTensor(
 	const Buffer<std::byte>& src, const Tensor<std::byte>& dst)

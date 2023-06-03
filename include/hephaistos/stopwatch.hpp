@@ -25,8 +25,8 @@ public:
     StopWatch(StopWatch&& other) noexcept;
     StopWatch& operator=(StopWatch&& other) noexcept;
 
-    StopWatch(ContextHandle context, uint32_t stops = 1);
-    virtual ~StopWatch();
+    explicit StopWatch(ContextHandle context, uint32_t stops = 1);
+    ~StopWatch() override;
 
 private:
     struct pImp;
