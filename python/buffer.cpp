@@ -51,21 +51,34 @@ void registerBuffer(nb::module_& m, const char* name) {
         .def("numpy", &TypedBuffer<T>::numpy, "Returns a numpy array using this buffer's memory.");
 }
 
+namespace {
+
 template<class T>
-class PyTensor : public hp::Tensor<T> {
+std::span<const T> span_cast(const nb::ndarray<T, nb::shape<nb::any>, nb::c_contig, nb::device::cpu>& array) {
+    return { array.data(), array.size() };
+}
+
+}
+
+template<class T>
+class TypedTensor : public hp::Tensor<T> {
 public:
-    PyTensor(size_t count) : hp::Tensor<T>(getCurrentContext(), count) {}
-    virtual ~PyTensor() = default;
+    using array_type = nb::ndarray<T, nb::shape<nb::any>, nb::c_contig, nb::device::cpu>;
+
+    TypedTensor(size_t count) : hp::Tensor<T>(getCurrentContext(), count) {}
+    TypedTensor(const array_type& array) : hp::Tensor<T>(getCurrentContext(), span_cast(array)) {}
+    ~TypedTensor() override = default;
 };
 template<class T>
 void registerTensor(nb::module_& m, const char* name) {
-    nb::class_<PyTensor<T>, hp::Tensor<std::byte>>(m, name)
+    nb::class_<TypedTensor<T>, hp::Tensor<std::byte>>(m, name)
         .def(nb::init<size_t>())
-        .def_prop_ro("address", [](const PyTensor<T>& t) { return t.address(); }, "The device address of this tensor.")
-        .def_prop_ro("size", [](const PyTensor<T>& t) { return t.size(); }, "The number of elements in this tensor.")
-        .def_prop_ro("size_bytes", [](const PyTensor<T>& t) { return t.size_bytes(); }, "The size of the tensor in bytes.")
-        .def("bindParameter", [](const PyTensor<T>& t, hp::Program& p, uint32_t b) { t.bindParameter(p.getBinding(b)); } )
-        .def("bindParameter", [](const PyTensor<T>& t, hp::Program& p, std::string_view b) { t.bindParameter(p.getBinding(b)); } );
+        .def(nb::init<const TypedTensor<T>::array_type&>())
+        .def_prop_ro("address", [](const TypedTensor<T>& t) { return t.address(); }, "The device address of this tensor.")
+        .def_prop_ro("size", [](const TypedTensor<T>& t) { return t.size(); }, "The number of elements in this tensor.")
+        .def_prop_ro("size_bytes", [](const TypedTensor<T>& t) { return t.size_bytes(); }, "The size of the tensor in bytes.")
+        .def("bindParameter", [](const TypedTensor<T>& t, hp::Program& p, uint32_t b) { t.bindParameter(p.getBinding(b)); } )
+        .def("bindParameter", [](const TypedTensor<T>& t, hp::Program& p, std::string_view b) { t.bindParameter(p.getBinding(b)); } );
 }
 
 void registerBufferModule(nb::module_& m) {
