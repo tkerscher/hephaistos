@@ -66,6 +66,7 @@ public:
     using array_type = nb::ndarray<T, nb::shape<nb::any>, nb::c_contig, nb::device::cpu>;
 
     TypedTensor(size_t count) : hp::Tensor<T>(getCurrentContext(), count) {}
+    TypedTensor(uint64_t addr, size_t n) : hp::Tensor<T>(getCurrentContext(), { reinterpret_cast<const T*>(addr), n }) {}
     TypedTensor(const array_type& array) : hp::Tensor<T>(getCurrentContext(), span_cast(array)) {}
     ~TypedTensor() override = default;
 };
@@ -73,6 +74,7 @@ template<class T>
 void registerTensor(nb::module_& m, const char* name) {
     nb::class_<TypedTensor<T>, hp::Tensor<std::byte>>(m, name)
         .def(nb::init<size_t>())
+        .def(nb::init<uint64_t, size_t>())
         .def(nb::init<const TypedTensor<T>::array_type&>())
         .def_prop_ro("address", [](const TypedTensor<T>& t) { return t.address(); }, "The device address of this tensor.")
         .def_prop_ro("size", [](const TypedTensor<T>& t) { return t.size(); }, "The number of elements in this tensor.")

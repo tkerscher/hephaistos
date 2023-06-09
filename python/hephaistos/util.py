@@ -1,5 +1,5 @@
 import ctypes
-from typing import Any
+from typing import Any, Union
 from numpy.ctypeslib import as_array
 from .pyhephaistos import RawBuffer, ByteTensor, Program
 
@@ -108,11 +108,14 @@ class StructureTensor(ByteTensor):
     Helper class for creating tensors matching the size of a given struct.
     """
 
-    def __init__(self, type: ctypes.Structure):
+    def __init__(self, typeOrData: Union[ctypes.Structure,Any]):
         """
         Creates a tensor with the exact size to hold the given structure.
         """
-        super().__init__(ctypes.sizeof(type))
+        if type(typeOrData) == type(ctypes.Structure):
+            super().__init__(ctypes.sizeof(typeOrData))
+        else:
+            super().__init__(ctypes.addressof(typeOrData), ctypes.sizeof(typeOrData))
 
 def _bindParams(program: Program, *params, **namedparams) -> None:
     """
