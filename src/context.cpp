@@ -274,6 +274,9 @@ bool isDeviceSuitable(const DeviceHandle& device, std::span<const ExtensionHandl
 			return false;
 		if (!features12.shaderInt8)
 			return false;
+		//scalar block layout
+		if (!features12.scalarBlockLayout)
+			return false;
 	}
 
 	//check for compute queue
@@ -443,9 +446,14 @@ ContextHandle createContext(
 			.shaderFloat16 = VK_TRUE,
 			.shaderInt8    = VK_TRUE
 		};
+		VkPhysicalDeviceScalarBlockLayoutFeatures scalarBlockFeatures{
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES,
+			.pNext = &float16Int8Features,
+			.scalarBlockLayout = VK_TRUE
+		};
 		VkPhysicalDeviceBufferDeviceAddressFeatures addressFeatures{
 			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
-			.pNext = &float16Int8Features,
+			.pNext = &scalarBlockFeatures,
 			.bufferDeviceAddress = VK_TRUE
 		};
 		VkPhysicalDeviceFeatures features{
