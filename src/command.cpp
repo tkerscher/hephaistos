@@ -6,6 +6,7 @@
 
 #include "vk/result.hpp"
 #include "vk/types.hpp"
+#include "vk/util.hpp"
 
 namespace hephaistos {
 
@@ -395,6 +396,14 @@ SequenceBuilder::~SequenceBuilder() {
 		//return to context
 		context.sequencePool.push(_pImp->pool);
 	}
+}
+
+void execute(const ContextHandle& context, const Command& command) {
+	//run a one time submit command
+	vulkan::oneTimeSubmit(*context, [&command](VkCommandBuffer cmd) {
+		vulkan::Command wrapper { cmd, 0 };
+		command.record(wrapper);
+	});
 }
 
 }

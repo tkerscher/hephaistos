@@ -96,4 +96,6 @@ inline SequenceBuilder beginSequence(const ContextHandle& context) {
     return SequenceBuilder(context);
 }
 
+HEPHAISTOS_API void execute(const ContextHandle& context, const Command& command);
+
 }
