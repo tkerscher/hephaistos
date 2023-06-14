@@ -49,4 +49,7 @@ void registerCommandModule(nb::module_& m) {
         "timeline"_a, "startValue"_a = 0, "Starts a new sequence.", nb::rv_policy::move);
     m.def("beginSequence", []() { return hp::beginSequence(getCurrentContext()); },
         "Starts a new sequence.", nb::rv_policy::move);
+    
+    m.def("execute", [](const hp::Command& cmd) { hp::execute(getCurrentContext(), cmd); },
+        "cmd"_a, "Runs the given command synchronous.");
 }
