@@ -41,6 +41,7 @@ struct Context {
 
 	uint32_t queueFamily;
 	VkCommandPool oneTimeSubmitPool;
+	VkCommandBuffer oneTimeSubmitBuffer;
 	VkFence oneTimeSubmitFence;
 
 	//looks like a hack, but this is the only one we need to change

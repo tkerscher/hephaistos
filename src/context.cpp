@@ -488,6 +488,16 @@ ContextHandle createContext(
 		vulkan::checkResult(context->fnTable.vkCreateCommandPool(
 			context->device, &poolInfo, nullptr, &context->oneTimeSubmitPool));
 	}
+	//create command buffer for one time submits
+	{
+		VkCommandBufferAllocateInfo bufInfo{
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			.commandPool = context->oneTimeSubmitPool,
+			.commandBufferCount = 1
+		};
+		vulkan::checkResult(context->fnTable.vkAllocateCommandBuffers(
+			context->device, &bufInfo, &context->oneTimeSubmitBuffer));
+	}
 	//create fence for synchronizing internal one time submits
 	{
 		VkFenceCreateInfo fenceInfo{
