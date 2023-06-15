@@ -264,14 +264,30 @@ Program::Program(ContextHandle context, std::span<const uint32_t> code, std::spa
 	if (reflectModule.descriptor_set_count == 1) {
 		auto& set = reflectModule.descriptor_sets[0];
 
+		//count actually used params
+		auto pBinding = *set.bindings;
+		auto pBindingEnd = pBinding + set.binding_count;
+		auto param_count = static_cast<uint32_t>(std::count_if(pBinding, pBindingEnd,
+			[](const SpvReflectDescriptorBinding& b) -> bool { return b.accessed != 0; }
+		));
+
 		//reserve binding slots
-		program->boundParams = std::vector<VkWriteDescriptorSet>(set.binding_count);
-		bindingTraits.resize(set.binding_count);
+		program->boundParams = std::vector<VkWriteDescriptorSet>(param_count);
+		bindingTraits.resize(param_count);
 
 		//Create bindings
-		auto pBinding = *set.bindings;
-		std::vector<VkDescriptorSetLayoutBinding> bindings(set.binding_count);
-		for (auto i = 0u; i < set.binding_count; ++i, ++pBinding) {
+		std::vector<VkDescriptorSetLayoutBinding> bindings(param_count);
+		for (auto i = -1; pBinding != pBindingEnd; ++pBinding) {
+			//if the file was compiled with auto binding mapping, unused bindings get mapped to 0
+			//since this might result in multiple bindigs pointing to the same, overwriting each
+			//other, we HAVE to skip unused ones. While this will later produce errors if the
+			//user wants to bind an unused parameter, he still can check the bindings of the
+			//program to see which bindings he can actually use
+			if (!pBinding->accessed)
+				continue;
+			else
+				++i;
+
 			if (pBinding->count == 0)
 				throw std::runtime_error("Unbound arrays are not supported!");
 
@@ -290,6 +306,7 @@ Program::Program(ContextHandle context, std::span<const uint32_t> code, std::spa
 
 			bindingTraits[i] = {
 				.name = pBinding->name ? pBinding->name : "",
+				.binding = pBinding->binding,
 				.type = static_cast<DescriptorType>(pBinding->descriptor_type),
 				.count = pBinding->count
 			};
@@ -313,7 +330,7 @@ Program::Program(ContextHandle context, std::span<const uint32_t> code, std::spa
 		VkDescriptorSetLayoutCreateInfo info{
 			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
 			.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR,
-			.bindingCount = set.binding_count,
+			.bindingCount = param_count,
 			.pBindings    = bindings.data()
 		};
 		vulkan::checkResult(con->fnTable.vkCreateDescriptorSetLayout(

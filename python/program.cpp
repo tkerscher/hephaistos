@@ -58,6 +58,7 @@ void registerProgramModule(nb::module_& m) {
     
     nb::class_<hp::BindingTraits>(m, "BindingTraits")
         .def_ro("name", &hp::BindingTraits::name)
+        .def_ro("binding", &hp::BindingTraits::binding)
         .def_ro("type", &hp::BindingTraits::type)
         .def_ro("imageTraits", &hp::BindingTraits::imageTraits)
         .def_ro("count", &hp::BindingTraits::count);

@@ -50,6 +50,7 @@ struct ImageBindingTraits {
 
 struct BindingTraits {
 	std::string name;
+	uint32_t binding;
 	DescriptorType type;
 	std::optional<ImageBindingTraits> imageTraits;
 	uint32_t count; //0 for runtime array
