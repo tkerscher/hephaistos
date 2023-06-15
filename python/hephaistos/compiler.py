@@ -66,7 +66,7 @@ class GLSLangCompiler(ShaderCompiler):
         with tempfile.TemporaryDirectory() as tmpDir:
             path = os.path.join(tmpDir, "shader")
             result = subprocess.run(
-                f"glslangvalidator --target-env vulkan1.2 --amb --quiet -V -S comp -o {path} {filepath}",
+                f"{self.exec} --target-env vulkan1.2 --amb --quiet -V -S comp -o {path} {filepath}",
                 shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
             
             if result.returncode != 0:
