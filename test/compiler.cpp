@@ -1,0 +1,118 @@
+#include <catch2/catch_test_macros.hpp>
+
+#include <algorithm>
+#include <array>
+#include <fstream>
+
+#include <hephaistos/buffer.hpp>
+#include <hephaistos/command.hpp>
+#include <hephaistos/context.hpp>
+#include <hephaistos/compiler.hpp>
+#include <hephaistos/program.hpp>
+
+using namespace hephaistos;
+
+namespace {
+
+ContextHandle getContext() {
+	static ContextHandle context = createEmptyContext();
+	if (!context)
+		context = createContext();
+	return context;
+}
+
+std::array<int32_t, 4> dataA{ { 12, 4156, 12, 56 } };
+std::array<int32_t, 4> dataB{ { 17, 12, 123, 3 } };
+std::array<int32_t, 4> dataOut{ { 29, 4168, 135, 59 } };
+std::array<int32_t, 4> dataOut2{ { 41, 8324, 147, 115 } };
+
+}
+
+TEST_CASE("compiler can compile GLSL code to SPIR-V", "[compiler]") {
+	auto source = R"(
+		#version 460
+
+		layout(local_size_x = 1) in;
+
+		readonly buffer tensorA { int in_a[]; };
+		readonly buffer tensorB { int in_b[]; };
+		writeonly buffer tensorOut { int out_c[]; };
+
+		void main() {
+			uint idx = gl_GlobalInvocationID.x;
+			out_c[idx] = in_a[idx] + in_b[idx];
+		}
+	)";
+
+	Compiler compiler;
+	std::vector<uint32_t> code;
+	REQUIRE_NOTHROW(code = compiler.compile(source));
+	REQUIRE(code.size() > 0);
+
+	std::unique_ptr<Program> program;
+	REQUIRE_NOTHROW(program = std::make_unique<Program>(getContext(), code));
+
+	Tensor<int32_t> tensorA(getContext(), dataA);
+	Tensor<int32_t> tensorB(getContext(), dataB);
+	Tensor<int32_t> tensorOut(getContext(), 4);
+	Buffer<int32_t> buffer(getContext(), 4);
+
+	program->bindParameterList(tensorA, tensorB, tensorOut);
+
+	beginSequence(getContext())
+		.And(program->dispatch(4))
+		.Then(retrieveTensor(tensorOut, buffer))
+		.Submit();
+
+	REQUIRE(std::equal(dataOut.begin(), dataOut.end(), buffer.getMemory().begin()));
+
+	REQUIRE(!hasValidationErrorOccurred());
+}
+
+TEST_CASE("compiler can include files from header map", "[compiler]") {
+	Compiler::HeaderMap headers = {
+		{ "foo.glsl", "int foo(int a, int b) {\n\treturn 2 * a + b;\n}\n" },
+		{ "bar.glsl", "#include \"foo.glsl\"\n\nint bar(int a, int b) {\n\treturn foo(a,b);\n}\n" }
+	};
+
+	auto source = R"(
+		#version 460
+		#extension GL_GOOGLE_include_directive: require
+		#include "bar.glsl"
+
+		layout(local_size_x = 1) in;
+
+		readonly buffer tensorA { int in_a[]; };
+		readonly buffer tensorB { int in_b[]; };
+		writeonly buffer tensorOut { int out_c[]; };
+
+		void main() {
+			uint idx = gl_GlobalInvocationID.x;
+			out_c[idx] = bar(in_a[idx], in_b[idx]);
+		}
+	)";
+
+	Compiler compiler;
+	std::vector<uint32_t> code;
+	REQUIRE_NOTHROW(code = compiler.compile(source, headers));
+	REQUIRE(code.size() > 0);
+
+	std::unique_ptr<Program> program;
+	REQUIRE_NOTHROW(program = std::make_unique<Program>(getContext(), code));
+
+	Tensor<int32_t> tensorA(getContext(), dataA);
+	Tensor<int32_t> tensorB(getContext(), dataB);
+	Tensor<int32_t> tensorOut(getContext(), 4);
+	Buffer<int32_t> buffer(getContext(), 4);
+
+	program->bindParameterList(tensorA, tensorB, tensorOut);
+
+	beginSequence(getContext())
+		.And(program->dispatch(4))
+		.Then(retrieveTensor(tensorOut, buffer))
+		.Submit();
+
+	REQUIRE(std::equal(dataOut2.begin(), dataOut2.end(), buffer.getMemory().begin()));
+
+	REQUIRE(!hasValidationErrorOccurred());
+}

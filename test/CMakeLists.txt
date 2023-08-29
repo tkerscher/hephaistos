@@ -5,6 +5,7 @@ set(TESTROOT ${PROJECT_SOURCE_DIR}/test)
 set(TEST_FILES
     ${TESTROOT}/buffer.cpp
     ${TESTROOT}/command.cpp
+    ${TESTROOT}/compiler.cpp
     ${TESTROOT}/image.cpp
     ${TESTROOT}/program.cpp
     ${TESTROOT}/raytracing.cpp
@@ -18,6 +19,8 @@ FetchContent_Declare(
     GIT_SHALLOW 1
 )
 FetchContent_MakeAvailable(Catch2)
+set_target_properties(Catch2 PROPERTIES FOLDER "dependencies")
+set_target_properties(Catch2WithMain PROPERTIES FOLDER "dependencies")
 
 #create test executable
 add_executable(tests ${TEST_FILES})
