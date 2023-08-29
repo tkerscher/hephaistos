@@ -2,6 +2,7 @@
 
 #include "hephaistos/buffer.hpp"
 #include "hephaistos/command.hpp"
+#include "hephaistos/compiler.hpp"
 #include "hephaistos/context.hpp"
 #include "hephaistos/handles.hpp"
 #include "hephaistos/image.hpp"

@@ -7,6 +7,7 @@ set(PUBLIC_HEADERS
     ${INCROOT}/argument.hpp
     ${INCROOT}/buffer.hpp
     ${INCROOT}/command.hpp
+    ${INCROOT}/compiler.hpp
     ${INCROOT}/config.hpp
     ${INCROOT}/context.hpp
     ${INCROOT}/handles.hpp
@@ -22,6 +23,7 @@ set(PUBLIC_HEADERS
 set(SRC
     ${SRCROOT}/buffer.cpp
     ${SRCROOT}/command.cpp
+    ${SRCROOT}/compiler.cpp
     ${SRCROOT}/context.cpp    
     ${SRCROOT}/image.cpp
     ${SRCROOT}/program.cpp
@@ -51,6 +53,7 @@ target_link_libraries(hephaistos PRIVATE volk)
 target_link_libraries(hephaistos PRIVATE VulkanMemoryAllocator)
 target_link_libraries(hephaistos PRIVATE spirv-reflect)
 target_link_libraries(hephaistos PRIVATE stb)
+target_link_libraries(hephaistos PRIVATE glslang)
 
 #tell the compiler to hide all symbols by default
 set_target_properties(hephaistos PROPERTIES CXX_VISIBILITY hidden)
