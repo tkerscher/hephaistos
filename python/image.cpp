@@ -192,7 +192,7 @@ void registerImageModule(nb::module_& m) {
         .def("numpy", [](const hp::ImageBuffer& buffer) -> image_array {
                 size_t shape[3] = { buffer.getHeight(), buffer.getWidth(), 4 };
                 return image_array(static_cast<void*>(buffer.getMemory().data()), 3, shape);
-            });
+            }, nb::rv_policy::reference_internal);
     
     nb::class_<hp::RetrieveImageCommand>(m, "RetrieveImageCommand", commandClass)
         .def(nb::init<const hp::Image&, const hp::Buffer<std::byte>&>());

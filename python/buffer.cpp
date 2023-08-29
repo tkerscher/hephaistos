@@ -48,7 +48,7 @@ void registerBuffer(nb::module_& m, const char* name) {
         .def(nb::init<size_t>())
         .def_prop_ro("size", [](const TypedBuffer<T>& b) { return b.size(); }, "The number of elements in this buffer.")
         .def_prop_ro("size_bytes", [](const TypedBuffer<T>& b) { return b.size_bytes(); }, "The size of the buffer in bytes.")
-        .def("numpy", &TypedBuffer<T>::numpy, "Returns a numpy array using this buffer's memory.");
+        .def("numpy", &TypedBuffer<T>::numpy, "Returns a numpy array using this buffer's memory.", nb::rv_policy::reference_internal);
 }
 
 namespace {
@@ -75,7 +75,7 @@ void registerTensor(nb::module_& m, const char* name) {
     nb::class_<TypedTensor<T>, hp::Tensor<std::byte>>(m, name)
         .def(nb::init<size_t>())
         .def(nb::init<uint64_t, size_t>())
-        .def(nb::init<const TypedTensor<T>::array_type&>())
+        .def(nb::init<const typename TypedTensor<T>::array_type&>())
         .def_prop_ro("address", [](const TypedTensor<T>& t) { return t.address(); }, "The device address of this tensor.")
         .def_prop_ro("size", [](const TypedTensor<T>& t) { return t.size(); }, "The number of elements in this tensor.")
         .def_prop_ro("size_bytes", [](const TypedTensor<T>& t) { return t.size_bytes(); }, "The size of the tensor in bytes.")

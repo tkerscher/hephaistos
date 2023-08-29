@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.18...3.22)
 
 include(FetchContent)
-include(GNUInstallDirs)
 
 find_package(Git QUIET REQUIRED)
 
@@ -30,6 +29,7 @@ project("hephaistos"
     LANGUAGES C CXX
 )
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
+include(GNUInstallDirs)
 
 #add dependencies
 add_subdirectory(external)
