@@ -12,6 +12,7 @@ The `CMakeLists.txt` files in each directory are custom provided.
 
 The following is a list of the dependencies with links to their project page.
 
+- [glslang](https://github.com/KhronosGroup/glslang)
 - [SPIRV-Reflect](https://github.com/KhronosGroup/SPIRV-Reflect)
 - [stb](https://github.com/nothings/stb)
 - [VulkanMemoryAllocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator)
