@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdlib>
 #include <stdexcept>
+#include <unordered_set>
 
 #include "volk.h"
 #include "spirv_reflect.h"
@@ -276,6 +277,7 @@ Program::Program(ContextHandle context, std::span<const uint32_t> code, std::spa
 		bindingTraits.resize(param_count);
 
 		//Create bindings
+		std::unordered_set<uint32_t> bindingSet;
 		std::vector<VkDescriptorSetLayoutBinding> bindings(param_count);
 		for (auto i = -1; pBinding != pBindingEnd; ++pBinding) {
 			//if the file was compiled with auto binding mapping, unused bindings get mapped to 0
@@ -287,6 +289,12 @@ Program::Program(ContextHandle context, std::span<const uint32_t> code, std::spa
 				continue;
 			else
 				++i;
+
+			//save binding number to set so we can later check if there were any duplicates
+			if (bindingSet.contains(pBinding->binding))
+				throw std::runtime_error("Invalid shader code: A binding number has been assigned to multiple inputs!");
+			else
+				bindingSet.insert(pBinding->binding);
 
 			if (pBinding->count == 0)
 				throw std::runtime_error("Unbound arrays are not supported!");
