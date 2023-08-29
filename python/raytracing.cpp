@@ -4,6 +4,8 @@
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string_view.h>
 
+#include <cstring>
+
 #include <hephaistos/program.hpp>
 #include <hephaistos/raytracing.hpp>
 

@@ -5,6 +5,7 @@ set(PYROOT ${PROJECT_SOURCE_DIR}/python)
 set(SRC
     ${PYROOT}/buffer.cpp
     ${PYROOT}/command.cpp
+    ${PYROOT}/compiler.cpp
     ${PYROOT}/context.cpp
     ${PYROOT}/image.cpp
     ${PYROOT}/program.cpp
@@ -39,6 +40,10 @@ list(APPEND CMAKE_PREFIX_PATH "${NB_DIR}")
 
 # Now, import nanobind through CMake's find_package mechanism
 find_package(nanobind CONFIG REQUIRED)
+
+# FIX: linking errors without this on linux
+set_property(TARGET glslang PROPERTY POSITION_INDEPENDENT_CODE ON)
+set_property(TARGET hephaistos PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # We are now ready to compile the actual extension module
 nanobind_add_module(
