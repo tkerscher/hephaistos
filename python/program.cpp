@@ -14,8 +14,6 @@ namespace hp = hephaistos;
 namespace nb = nanobind;
 using namespace nb::literals;
 
-extern nb::class_<hp::Command> commandClass;
-
 namespace {
 
 hp::SubgroupProperties getSubgroupProperties(uint32_t i) {
@@ -63,7 +61,7 @@ void registerProgramModule(nb::module_& m) {
         .def_ro("imageTraits", &hp::BindingTraits::imageTraits)
         .def_ro("count", &hp::BindingTraits::count);
 
-    nb::class_<hp::DispatchCommand>(m, "DispatchCommand", commandClass)
+    nb::class_<hp::DispatchCommand, hp::Command>(m, "DispatchCommand")
         .def_rw("groupCountX", &hp::DispatchCommand::groupCountX)
         .def_rw("groupCountY", &hp::DispatchCommand::groupCountY)
         .def_rw("groupCountZ", &hp::DispatchCommand::groupCountZ);
@@ -93,7 +91,7 @@ void registerProgramModule(nb::module_& m) {
                 "push"_a, "x"_a = 1, "y"_a = 1, "z"_a = 1,
                 "Dispatches a program execution with the given push data and workgroup size.");
     
-    nb::class_<hp::FlushMemoryCommand>(m, "FlushMemoryCommand", commandClass)
+    nb::class_<hp::FlushMemoryCommand, hp::Command>(m, "FlushMemoryCommand")
         .def("__init__", [](hp::FlushMemoryCommand* cmd) { new (cmd) hp::FlushMemoryCommand(getCurrentContext()); });
     m.def("flushMemory", []() -> hp::FlushMemoryCommand { return hp::flushMemory(getCurrentContext()); },
         "Returns a command for flushing memory writes.");

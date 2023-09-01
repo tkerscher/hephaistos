@@ -112,8 +112,6 @@ hp::Sampler buildSampler(const nb::kwargs& kwargs) {
 
 }
 
-extern nb::class_<hp::Command> commandClass;
-
 //array shape of image buffer: [width, height, 4]
 using image_shape = nb::shape<nb::any, nb::any, 4>;
 using image_array = nb::ndarray<nb::numpy, uint8_t, image_shape>;
@@ -194,15 +192,15 @@ void registerImageModule(nb::module_& m) {
                 return image_array(static_cast<void*>(buffer.getMemory().data()), 3, shape);
             }, nb::rv_policy::reference_internal);
     
-    nb::class_<hp::RetrieveImageCommand>(m, "RetrieveImageCommand", commandClass)
+    nb::class_<hp::RetrieveImageCommand, hp::Command>(m, "RetrieveImageCommand")
         .def(nb::init<const hp::Image&, const hp::Buffer<std::byte>&>());
     m.def("retrieveImage", &hp::retrieveImage, "src"_a, "dst"_a,
         "Creates a command for copying the image back into the given buffer.");
-    nb::class_<hp::UpdateImageCommand>(m, "UpdateImageCommand", commandClass)
+    nb::class_<hp::UpdateImageCommand, hp::Command>(m, "UpdateImageCommand")
         .def(nb::init<const hp::Buffer<std::byte>&, const hp::Image&>());
     m.def("updateImage", &hp::updateImage, "src"_a, "dst"_a,
         "Creates a command for copying data from the given buffer into the image.");
-    nb::class_<hp::UpdateTextureCommand>(m, "UpdateTextureCommand", commandClass)
+    nb::class_<hp::UpdateTextureCommand, hp::Command>(m, "UpdateTextureCommand")
         .def(nb::init<const hp::Buffer<std::byte>&, const hp::Texture&>());
     m.def("updateTexture", &hp::updateTexture, "src"_a, "dst"_a,
         "Creates a command for copying data from the given buffer into the texture.");

@@ -7,10 +7,8 @@ namespace hp = hephaistos;
 namespace nb = nanobind;
 using namespace nb::literals;
 
-nb::class_<hp::Command> commandClass;
-
 void registerCommandModule(nb::module_& m) {
-    commandClass = nb::class_<hp::Command>(m, "Command");
+    nb::class_<hp::Command>(m, "Command");
 
     nb::class_<hp::Timeline>(m, "Timeline")
         .def("__init__", [](hp::Timeline* t) { new (t) hp::Timeline(getCurrentContext()); })
