@@ -116,3 +116,68 @@ TEST_CASE("compiler can include files from header map", "[compiler]") {
 
 	REQUIRE(!hasValidationErrorOccurred());
 }
+
+TEST_CASE("compiler can fetch headers from disk", "[compiler]") {
+	//create temp directory
+	//hard coded path is bad, but what are the chances of collision, right? Right?
+	auto tmp_dir = std::filesystem::temp_directory_path() / "hephaistos_test_EF45A4C2";
+	std::filesystem::create_directory(tmp_dir);
+	//nice trick to mimick defer in golang or zig
+	std::shared_ptr<void> defer_tmp_del(nullptr, [&tmp_dir](...){
+		std::filesystem::remove_all(tmp_dir);
+	});
+
+	//create two source files
+	{
+		std::ofstream file(tmp_dir / "foo.glsl");
+		file << "int foo(int a, int b) {\n\treturn 2 * a + b;\n}\n";
+		file.close();
+	}
+	{
+		std::ofstream file(tmp_dir / "bar.glsl");
+		file << "#include \"foo.glsl\"\n\nint bar(int a, int b) {\n\treturn foo(a,b);\n}\n";
+		file.close();
+	}
+
+	auto source = R"(
+		#version 460
+		#extension GL_GOOGLE_include_directive: require
+		#include "bar.glsl"
+
+		layout(local_size_x = 1) in;
+
+		readonly buffer tensorA { int in_a[]; };
+		readonly buffer tensorB { int in_b[]; };
+		writeonly buffer tensorOut { int out_c[]; };
+
+		void main() {
+			uint idx = gl_GlobalInvocationID.x;
+			out_c[idx] = bar(in_a[idx], in_b[idx]);
+		}
+	)";
+
+	Compiler compiler;
+	compiler.addIncludeDir(tmp_dir);
+	std::vector<uint32_t> code;
+	REQUIRE_NOTHROW(code = compiler.compile(source));
+	REQUIRE(code.size() > 0);
+
+	std::unique_ptr<Program> program;
+	REQUIRE_NOTHROW(program = std::make_unique<Program>(getContext(), code));
+
+	Tensor<int32_t> tensorA(getContext(), dataA);
+	Tensor<int32_t> tensorB(getContext(), dataB);
+	Tensor<int32_t> tensorOut(getContext(), 4);
+	Buffer<int32_t> buffer(getContext(), 4);
+
+	program->bindParameterList(tensorA, tensorB, tensorOut);
+
+	beginSequence(getContext())
+		.And(program->dispatch(4))
+		.Then(retrieveTensor(tensorOut, buffer))
+		.Submit();
+
+	REQUIRE(std::equal(dataOut2.begin(), dataOut2.end(), buffer.getMemory().begin()));
+
+	REQUIRE(!hasValidationErrorOccurred());
+}
