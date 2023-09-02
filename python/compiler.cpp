@@ -1,5 +1,6 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/bind_map.h>
+#include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
 
@@ -14,6 +15,12 @@ void registerCompilerModule(nb::module_& m) {
 
     nb::class_<hp::Compiler>(m, "Compiler")
         .def(nb::init<>())
+        .def("addIncludeDir", &hp::Compiler::addIncludeDir, "path"_a,
+            "Adds a path to the list of include directories that take part in resolving includes.")
+        .def("popIncludeDir", &hp::Compiler::popIncludeDir,
+            "Removes the last added include dir from the internal list")
+        .def("clearIncludeDir", &hp::Compiler::clearIncludeDir,
+            "Clears the internal list of include directories")
         .def("compile", [](const hp::Compiler& c, std::string_view code) -> nb::bytes {
             auto result = c.compile(code);
             return nb::bytes((const char*)result.data(), result.size()*4);
