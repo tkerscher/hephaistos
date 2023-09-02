@@ -1,8 +1,10 @@
 #include "hephaistos/compiler.hpp"
 
+#include <fstream>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
+#include <string.h>
 
 #include <glslang/Include/glslang_c_interface.h>
 #include <glslang/Public/resource_limits_c.h>
@@ -11,18 +13,21 @@ namespace hephaistos {
 
 namespace {
 
+using CompilerContext = std::pair<const Compiler::HeaderMap*, const std::vector<std::filesystem::path>* >;
+
 using Shader = std::unique_ptr<glslang_shader_t, decltype(&glslang_shader_delete)>;
 using Program = std::unique_ptr<glslang_program_t, decltype(&glslang_program_delete)>;
 
-glsl_include_result_t* resolve_include(
+glsl_include_result_t* resolve_include_map(
 	void* context,
 	const char* header_name,
 	const char* includer_name,
 	size_t include_depth
 ) {
-	auto headers = static_cast<Compiler::HeaderMap*>(context);
-	std::string name(header_name);
-	auto pHeader = headers->find(name);
+	auto headers = static_cast<CompilerContext*>(context)->first;
+	if (!headers)
+		return nullptr;
+	auto pHeader = headers->find(header_name);
 	if (pHeader != headers->end()) {
 		auto result = new glsl_include_result_t;
 		result->header_name = pHeader->first.c_str();
@@ -35,10 +40,57 @@ glsl_include_result_t* resolve_include(
 	}
 }
 
+glsl_include_result_t* resolve_include_dirs(
+	void* context,
+	const char* header_name,
+	const char* includer_name,
+	size_t include_depth
+) {
+	auto& dirs = *static_cast<CompilerContext*>(context)->second;
+	//check all directories
+	for (auto& dir : dirs) {
+		auto path = dir / header_name;
+		if (std::filesystem::exists(path) && std::filesystem::is_regular_file(path)) {
+			auto result = new glsl_include_result_t;
+			size_t size = std::filesystem::file_size(path);
+			auto data = new char[size];
+			//load data
+			std::ifstream file(path, std::ios::binary);
+			if (file.read(data, size)) {
+				result->header_name = strdup(header_name);
+				result->header_length = size;
+				result->header_data = data;
+				return result;
+			}
+			else {
+				//error -> clean up
+				delete[] data;
+				return result;
+			}
+		}
+	}
+
+	//nothing found
+	return nullptr;
+}
+
 int free_include_result(void* context, glsl_include_result_t* result) {
+	//check if local or loaded from disk
+	auto headers = static_cast<CompilerContext*>(context)->first;
+	if (!headers || !headers->contains(result->header_name)) {
+		//from disk -> free resources allocated in result
+		delete[] result->header_name;
+		delete[] result->header_data;
+	}
 	delete result;
 	return 0;
 }
+
+const glsl_include_callbacks_t includeCallbacks{
+	.include_system = resolve_include_dirs,
+	.include_local = resolve_include_map,
+	.free_include_result = free_include_result
+};
 
 void compile_error(const char* reason, glslang_shader_t* shader) {
 	std::stringstream sstream;
@@ -52,7 +104,7 @@ void compile_error(const char* reason, glslang_program_t* program) {
 	throw std::runtime_error(sstream.str());
 }
 
-std::vector<uint32_t> compileImpl(std::string_view code, const Compiler::HeaderMap* headerMap) {
+std::vector<uint32_t> compileImpl(std::string_view code, void* callbacks_ctx = nullptr) {
 	glslang_input_t input = {
 		.language = GLSLANG_SOURCE_GLSL,
 		.stage = GLSLANG_STAGE_COMPUTE,
@@ -67,15 +119,9 @@ std::vector<uint32_t> compileImpl(std::string_view code, const Compiler::HeaderM
 		.forward_compatible = false,
 		.messages = GLSLANG_MSG_DEFAULT_BIT,
 		.resource = glslang_default_resource(),
+		.callbacks = includeCallbacks,
+		.callbacks_ctx = callbacks_ctx
 	};
-	if (headerMap) {
-		input.callbacks = {
-			.include_system      = resolve_include,
-			.include_local       = nullptr,
-			.free_include_result = free_include_result
-		};
-		input.callbacks_ctx = (void*)headerMap;
-	}
 	Shader shaderHandle{ glslang_shader_create(&input), glslang_shader_delete };
 	auto shader = shaderHandle.get();
 
@@ -107,10 +153,22 @@ std::vector<uint32_t> compileImpl(std::string_view code, const Compiler::HeaderM
 }
 
 std::vector<uint32_t> Compiler::compile(std::string_view code) const {
-	return compileImpl(code, nullptr);
+	CompilerContext context(nullptr, &includeDirs);
+	return compileImpl(code, &context);
 }
 std::vector<uint32_t> Compiler::compile(std::string_view code, const HeaderMap& headers) const {
-	return compileImpl(code, &headers);
+	CompilerContext context(&headers, &includeDirs);
+	return compileImpl(code, &context);
+}
+
+void Compiler::addIncludeDir(std::filesystem::path path) {
+	includeDirs.emplace_back(std::move(path));
+}
+void Compiler::popIncludeDir() {
+	includeDirs.pop_back();
+}
+void Compiler::clearIncludeDir() {
+	includeDirs.clear();
 }
 
 Compiler& Compiler::operator=(Compiler&&) noexcept = default;
