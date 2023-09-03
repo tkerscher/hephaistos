@@ -142,7 +142,10 @@ std::vector<uint32_t> compileImpl(std::string_view code, void* callbacks_ctx = n
 	if (!glslang_program_map_io(program))
 		compile_error("GLSL binding remapping failed!", program);
 
-	glslang_program_SPIRV_generate(program, GLSLANG_STAGE_COMPUTE);
+	glslang_spv_options_t spv_options{
+		.optimize_size = true
+	};
+	glslang_program_SPIRV_generate_with_options(program, GLSLANG_STAGE_COMPUTE, &spv_options);
 	auto size = glslang_program_SPIRV_get_size(program);
 	std::vector<uint32_t> result(size);
 	glslang_program_SPIRV_get(program, result.data());
