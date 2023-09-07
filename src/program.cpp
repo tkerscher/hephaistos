@@ -131,9 +131,41 @@ DispatchCommand::~DispatchCommand() = default;
 
 namespace {
 
+#define STR(c) case SPV_REFLECT_RESULT_##c: return "Reflect: "#c;
+
+inline auto printSpvResult(SpvReflectResult result) {
+	switch (result) {
+		STR(SUCCESS)
+		STR(NOT_READY)
+		STR(ERROR_PARSE_FAILED)
+		STR(ERROR_ALLOC_FAILED)
+		STR(ERROR_RANGE_EXCEEDED)
+		STR(ERROR_NULL_POINTER)
+		STR(ERROR_INTERNAL_ERROR)
+		STR(ERROR_COUNT_MISMATCH)
+		STR(ERROR_ELEMENT_NOT_FOUND)
+		STR(ERROR_SPIRV_INVALID_CODE_SIZE)
+		STR(ERROR_SPIRV_INVALID_MAGIC_NUMBER)
+		STR(ERROR_SPIRV_UNEXPECTED_EOF)
+		STR(ERROR_SPIRV_INVALID_ID_REFERENCE)
+		STR(ERROR_SPIRV_SET_NUMBER_OVERFLOW)
+		STR(ERROR_SPIRV_INVALID_STORAGE_CLASS)
+		STR(ERROR_SPIRV_RECURSION)
+		STR(ERROR_SPIRV_INVALID_INSTRUCTION)
+		STR(ERROR_SPIRV_UNEXPECTED_BLOCK_DATA)
+		STR(ERROR_SPIRV_INVALID_BLOCK_MEMBER_REFERENCE)
+		STR(ERROR_SPIRV_INVALID_ENTRY_POINT)
+		STR(ERROR_SPIRV_INVALID_EXECUTION_MODE)
+	default:
+		return "Unknown result code";
+	}
+}
+
+#undef STR
+
 void spvCheckResult(SpvReflectResult result) {
 	if (result != SPV_REFLECT_RESULT_SUCCESS)
-		throw std::runtime_error("Failed to retrieve reflection information from the shader!");
+		throw std::runtime_error(printSpvResult(result));
 }
 
 ImageFormat castImageFormat(SpvImageFormat format) {

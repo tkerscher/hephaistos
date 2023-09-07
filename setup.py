@@ -12,7 +12,7 @@ except ImportError:
 
 setup(
     name="hephaistos",
-    version="0.2.0",
+    version="0.2.1",
     author="Kerscher Tobias",
     author_email="88444139+tkerscher@users.noreply.github.com",
     description="GPU computing framework using the Vulkan API",

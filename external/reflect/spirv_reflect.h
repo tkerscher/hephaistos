@@ -230,7 +230,9 @@ typedef enum SpvReflectShaderStageFlagBits {
   SPV_REFLECT_SHADER_STAGE_FRAGMENT_BIT                = 0x00000010, // = VK_SHADER_STAGE_FRAGMENT_BIT
   SPV_REFLECT_SHADER_STAGE_COMPUTE_BIT                 = 0x00000020, // = VK_SHADER_STAGE_COMPUTE_BIT
   SPV_REFLECT_SHADER_STAGE_TASK_BIT_NV                 = 0x00000040, // = VK_SHADER_STAGE_TASK_BIT_NV
+  SPV_REFLECT_SHADER_STAGE_TASK_BIT_EXT                = SPV_REFLECT_SHADER_STAGE_TASK_BIT_NV, // = VK_SHADER_STAGE_CALLABLE_BIT_EXT
   SPV_REFLECT_SHADER_STAGE_MESH_BIT_NV                 = 0x00000080, // = VK_SHADER_STAGE_MESH_BIT_NV
+  SPV_REFLECT_SHADER_STAGE_MESH_BIT_EXT                = SPV_REFLECT_SHADER_STAGE_MESH_BIT_NV, // = VK_SHADER_STAGE_CALLABLE_BIT_EXT
   SPV_REFLECT_SHADER_STAGE_RAYGEN_BIT_KHR              = 0x00000100, // = VK_SHADER_STAGE_RAYGEN_BIT_KHR
   SPV_REFLECT_SHADER_STAGE_ANY_HIT_BIT_KHR             = 0x00000200, // = VK_SHADER_STAGE_ANY_HIT_BIT_KHR
   SPV_REFLECT_SHADER_STAGE_CLOSEST_HIT_BIT_KHR         = 0x00000400, // = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR
@@ -329,6 +331,7 @@ typedef struct SpvReflectTypeDescription {
   struct SpvReflectTypeDescription* members;
 } SpvReflectTypeDescription;
 
+// -- GODOT begin --
 /*! @struct SpvReflectSpecializationConstant
 
 */
@@ -349,6 +352,7 @@ typedef struct SpvReflectSpecializationConstant {
     uint32_t int_bool_value;
   } default_value;
 } SpvReflectSpecializationConstant;
+// -- GODOT end --
 
 /*! @struct SpvReflectInterfaceVariable
 
@@ -399,6 +403,11 @@ typedef struct SpvReflectBlockVariable {
   struct SpvReflectBlockVariable*   members;
 
   SpvReflectTypeDescription*        type_description;
+
+  struct {
+    uint32_t                          offset;
+  } word_offset;
+
 } SpvReflectBlockVariable;
 
 /*! @struct SpvReflectDescriptorBinding
@@ -513,8 +522,10 @@ typedef struct SpvReflectShaderModule {
   SpvReflectInterfaceVariable*      interface_variables;                              // Uses value(s) from first entry point
   uint32_t                          push_constant_block_count;                        // Uses value(s) from first entry point
   SpvReflectBlockVariable*          push_constant_blocks;                             // Uses value(s) from first entry point
+  // -- GODOT begin --
   uint32_t                          specialization_constant_count;
   SpvReflectSpecializationConstant* specialization_constants;
+  // -- GODOT end --
 
   struct Internal {
     SpvReflectModuleFlags           module_flags;
@@ -787,6 +798,7 @@ SpvReflectResult spvReflectEnumerateInputVariables(
   SpvReflectInterfaceVariable** pp_variables
 );
 
+// -- GOODT begin --
 /*! @fn spvReflectEnumerateSpecializationConstants
  @brief  If the module contains multiple entry points, this will only get
          the specialization constants for the first one.
@@ -811,6 +823,7 @@ SpvReflectResult spvReflectEnumerateSpecializationConstants(
   uint32_t*                          p_count,
   SpvReflectSpecializationConstant** pp_constants
 );
+// -- GODOT end --
 
 /*! @fn spvReflectEnumerateEntryPointInputVariables
  @brief  Enumerate the input variables for a given entry point.
