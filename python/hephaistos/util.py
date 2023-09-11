@@ -13,6 +13,18 @@ def collectFields(struct: ctypes.Structure) -> list[tuple[str,ctypes._SimpleCDat
             fields.extend([
                 (f"{name}.{subname}", subT) for subname, subT in collectFields(T)
             ])
+        elif type(T) == type(ctypes.Array):
+            # array of structs or simple types?
+            if type(T._type_) == type(ctypes.Structure):
+                fields.extend([
+                    (f"{name}[{i}].{subname}", subT)
+                    for i in range(T._length_)
+                    for subname, subT in collectFields(T._type_)
+                ])
+            else:
+                fields.extend([
+                    (f"{name}[{i}]", T._type_) for i in range(T._length_)
+                ])
         else:
             fields.append((name, T))
     return fields
@@ -48,12 +60,13 @@ class ArrayBuffer(RawBuffer):
     def flatarray(self):
         return self._flat
     
-    def numpy(self):
+    def numpy(self, flat: bool = False):
         """
         Returns a structured numpy array sharing the same memory as the buffer.
-        The field names correspond the the flattened ones.
+        If flat is True, the field names correspond the the flattened ones, i.e.
+        ["dir.x"] instead of ["dir"]["x"].
         """
-        return as_array(self.flatarray)
+        return as_array(self.flatarray if flat else self.array)
     
     def __len__(self):
         return self._arr.__len__()
