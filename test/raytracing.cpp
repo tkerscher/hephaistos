@@ -106,44 +106,46 @@ TEST_CASE("ray queries are available in shaders", "[raytracing]") {
     if (!isRaytracingSupported(getDevice(getContext())))
         SKIP("No ray tracing hardware for testing available.");
     
-    //Define geometries
-    Geometry triangle{
-        .vertices = std::as_bytes(std::span<const float>(triangle_vertices)),
-        .vertexCount = 3
-    };
-    Geometry square{
-        .vertices = std::as_bytes(std::span<const float>(square_vertices)),
-        .vertexCount = 4,
-        .indices = square_indices
-    };
+    //build geometries
+    GeometryStore store(getContext(), std::to_array<Mesh>({
+        { //triangle
+            .vertices = std::as_bytes(std::span<const float>(triangle_vertices))
+        },
+        { //square
+            .vertices = std::as_bytes(std::span<const float>(square_vertices)),
+            .indices = square_indices
+        }
+    }));
+    auto& triangle = store[0];
+    auto& square = store[1];
     //create acceleration structure
     GeometryInstance topInstance{
-        .geometry = triangle,
+        .blas_address = triangle.blas_address,
         .transform = TopTransform,
         .customIndex = customIdx[0]
     };
     GeometryInstance bottomInstance{
-        .geometry = square,
+        .blas_address = square.blas_address,
         .transform = BottomTransform,
         .customIndex = customIdx[1]
     };
     GeometryInstance leftInstance{
-        .geometry = triangle,
+        .blas_address = triangle.blas_address,
         .transform = LeftTransform,
         .customIndex = customIdx[2]
     };
     GeometryInstance rightInstance{
-        .geometry = square,
+        .blas_address = square.blas_address,
         .transform = RightTransform,
         .customIndex = customIdx[3]
     };
     GeometryInstance backInstance{
-        .geometry = triangle,
+        .blas_address = triangle.blas_address,
         .transform = BackTransform,
         .customIndex = customIdx[4]
     };
     GeometryInstance frontInstance{
-        .geometry = square,
+        .blas_address = square.blas_address,
         .transform = FrontTransform,
         .customIndex = customIdx[5]
     };
