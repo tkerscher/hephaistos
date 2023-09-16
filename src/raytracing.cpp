@@ -291,8 +291,8 @@ GeometryStore::GeometryStore(
 		buildInfo[i] = {
 			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
 			.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,
-			.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
-			//	VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR,
+			.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR |
+					 VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR,
 			.geometryCount = 1,
 			.pGeometries = &geometries[i]
 		};
@@ -335,10 +335,22 @@ GeometryStore::GeometryStore(
 		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
 		VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
 
+	//create query pool for compacted blas sizes
+	VkQueryPool queryPool;
+	{
+		VkQueryPoolCreateInfo poolInfo{
+			.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
+			.queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR,
+			.queryCount = static_cast<uint32_t>(nMeshes)
+		};
+		vulkan::checkResult(context->fnTable.vkCreateQueryPool(
+			context->device, &poolInfo, nullptr, &queryPool));
+		context->fnTable.vkResetQueryPool(context->device, queryPool, 0, nMeshes);
+	}
+
 	//create blas
 	VkDeviceSize offset = 0;
 	std::vector<VkAccelerationStructureKHR> accStructures(nMeshes);
-	std::vector<VkDeviceAddress> accAddresses(nMeshes);
 	for (auto i = 0u; i < nMeshes; ++i) {
 		//create acceleration structure
 		VkAccelerationStructureCreateInfoKHR accInfo{
@@ -353,13 +365,6 @@ GeometryStore::GeometryStore(
 			offset += 256 - (accInfo.size % 256);
 		vulkan::checkResult(context->fnTable.vkCreateAccelerationStructureKHR(
 			context->device, &accInfo, nullptr, &accStructures[i]));
-		//fetch addresses
-		VkAccelerationStructureDeviceAddressInfoKHR addressInfo{
-			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
-			.accelerationStructure = accStructures[i]
-		};
-		accAddresses[i] = context->fnTable.vkGetAccelerationStructureDeviceAddressKHR(
-			context->device, &addressInfo);
 		//register
 		buildInfo[i].dstAccelerationStructure = accStructures[i];
 		buildInfo[i].scratchData.deviceAddress = scratchAddress;
@@ -379,7 +384,83 @@ GeometryStore::GeometryStore(
 			static_cast<uint32_t>(buildInfo.size()),
 			buildInfo.data(),
 			pRanges.data());
+		//memory barrier to ensure queries are valid
+		VkMemoryBarrier barrier{
+			.sType		   = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+			.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+			.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR
+		};
+		context->fnTable.vkCmdPipelineBarrier(cmd,
+			VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+			VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+			0, 1, &barrier, 0, nullptr, 0, nullptr);
+		//query
+		context->fnTable.vkCmdWriteAccelerationStructuresPropertiesKHR(cmd,
+			nMeshes, accStructures.data(),
+			VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR,
+			queryPool, 0);
 	});
+
+	//query compacted sizes
+	std::vector<VkDeviceSize> compactSizes(nMeshes);
+	context->fnTable.vkGetQueryPoolResults(
+		context->device,
+		queryPool,
+		0, nMeshes,
+		nMeshes * sizeof(VkDeviceSize),
+		compactSizes.data(),
+		sizeof(VkDeviceSize),
+		VK_QUERY_RESULT_WAIT_BIT);
+	//destroy query pool
+	context->fnTable.vkDestroyQueryPool(context->device, queryPool, nullptr);
+	
+	//update blas buffer size
+	blasTotalSize = 0;
+	for (auto size : compactSizes) {
+		blasTotalSize += size;
+		if (size % 256)
+			size += 256 - (size % 256);
+	}
+	//create new compact blas buffer
+	auto compactBlasBuffer = vulkan::createBuffer(context, blasTotalSize,
+		VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
+		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+		VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
+	//create compacted blas
+	offset = 0;
+	std::vector<VkAccelerationStructureKHR> compactAccStructures(nMeshes);
+	for (auto i = 0u; i < nMeshes; ++i) {
+		//create acceleration structure
+		VkAccelerationStructureCreateInfoKHR accInfo{
+			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR,
+			.buffer = compactBlasBuffer->buffer,
+			.offset = offset,
+			.size = compactSizes[i],
+			.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR
+		};
+		offset += accInfo.size;
+		if (accInfo.size % 256)
+			offset += 256 - (accInfo.size % 256);
+		vulkan::checkResult(context->fnTable.vkCreateAccelerationStructureKHR(
+			context->device, &accInfo, nullptr, &compactAccStructures[i]));
+	}
+	//copy blas
+	vulkan::oneTimeSubmit(*context, [&](VkCommandBuffer cmd) {
+		VkCopyAccelerationStructureInfoKHR copyInfo{
+			.sType = VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_INFO_KHR,
+			.mode  = VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_KHR
+		};
+		for (auto i = 0u; i < nMeshes; ++i) {
+			copyInfo.src = accStructures[i];
+			copyInfo.dst = compactAccStructures[i];
+			context->fnTable.vkCmdCopyAccelerationStructureKHR(cmd, &copyInfo);
+		}
+	});
+	//destroy inital blas
+	for (auto i = 0u; i < nMeshes; ++i) {
+		context->fnTable.vkDestroyAccelerationStructureKHR(
+			context->device, accStructures[i], nullptr);
+	}
 
 	//Done -> build result
 	pVertex = vertexAddress;
@@ -395,14 +476,14 @@ GeometryStore::GeometryStore(
 		//fetch device address
 		VkAccelerationStructureDeviceAddressInfoKHR addressInfo{
 			.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
-			.accelerationStructure = accStructures[i]
+			.accelerationStructure = compactAccStructures[i]
 		};
 		blasResult[i].blas_address = context->fnTable.vkGetAccelerationStructureDeviceAddressKHR(
 			context->device, &addressInfo);
 	}
 	//save results
-	pImp->blas = std::move(accStructures);
-	pImp->blasBuffer = std::move(blasBuffer);
+	pImp->blas = std::move(compactAccStructures);
+	pImp->blasBuffer = std::move(compactBlasBuffer);
 	pImp->geometries = std::move(blasResult);
 	if (keepGeometryData) {
 		pImp->dataBuffer = std::move(dataBuffer);
