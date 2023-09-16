@@ -1,25 +1,28 @@
 #version 460
 #extension GL_EXT_ray_tracing : enable
 #extension GL_EXT_ray_query : enable
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_scalar_block_layout : require
 
 //bit suboptimal but works for an example
 layout(local_size_x = 4, local_size_y = 4) in;
 
-//So the struct gonna be a bit weird since vec3 is aligned as vec4
-//but we have them stored compact
-struct Vertex {
-    float posX;
-    float posY;
-    float posZ;
-    float nomX;
-    float nomY;
-    float nomZ;
+layout(buffer_reference, scalar, buffer_reference_align=4) readonly buffer Vertex {
+    vec3 position;
+    vec3 normal;
+};
+// Indices of a triangle
+layout(buffer_reference, scalar, buffer_reference_align=4) readonly buffer Index {
+    ivec3 idx;
 };
 
 layout(binding = 0) uniform accelerationStructureEXT tlas;
-layout(binding = 1) readonly buffer inVertex { Vertex vertices[]; };
-layout(binding = 2) readonly buffer inInstance { uint instances[]; };
-layout(binding = 3, rgba8) uniform image2D outImage;
+layout(binding = 1, rgba8) uniform image2D outImage;
+
+layout(push_constant) uniform Push{
+    Vertex vertices;
+    Index indices;
+} push;
 
 void main() {
     //Get info about this invocation
@@ -38,7 +41,6 @@ void main() {
         rayQuery, tlas,
         gl_RayFlagsTerminateOnFirstHitEXT,
         0xFF, start, 0.01, dir, 4.0);
-
     rayQueryProceedEXT(rayQuery);
     
     //we start with something simple black/white
@@ -51,21 +53,14 @@ void main() {
         int idx = rayQueryGetIntersectionPrimitiveIndexEXT(rayQuery, true);
         vec2 _bar = rayQueryGetIntersectionBarycentricsEXT(rayQuery, true);
         vec3 bar = vec3(1.0 - _bar.x - _bar.y, _bar.x, _bar.y);
-        //get instances
-        uint i0 = instances[3 * idx + 0];
-        uint i1 = instances[3 * idx + 1];
-        uint i2 = instances[3 * idx + 2];
         //get vertices
-        Vertex v0 = vertices[i0];
-        Vertex v1 = vertices[i1];
-        Vertex v2 = vertices[i2];
-        //get normals
-        vec3 n0 = vec3(v0.nomX, v0.nomY, v0.nomZ);
-        vec3 n1 = vec3(v1.nomX, v1.nomY, v1.nomZ);
-        vec3 n2 = vec3(v2.nomX, v2.nomY, v2.nomZ);
+        ivec3 index = push.indices[idx].idx;
+        Vertex v0 = push.vertices[index.x];
+        Vertex v1 = push.vertices[index.y];
+        Vertex v2 = push.vertices[index.z];
         //interpolate normal
-        vec3 normal = n0 * bar.x + n1 * bar.y + n2 * bar.z;
-        //normalize normal
+        vec3 normal = v0.normal * bar.x + v1.normal * bar.y + v2.normal * bar.z;
+        //normalize normal to (0,1)
         normal = (normal + 1) / 2;
 
         float v = (t - 1) / 2;

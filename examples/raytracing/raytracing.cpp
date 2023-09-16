@@ -15,6 +15,12 @@ struct Vertex{
 //#include "model_monkey.h"
 #include "raytracing.h"
 
+//typed push descriptor
+struct Push {
+	uint64_t vertices_address;
+	uint64_t indices_address;
+};
+
 using namespace hephaistos;
 
 int main() {
@@ -36,34 +42,33 @@ int main() {
 	auto device = getDeviceInfo(context);
 	std::cout << "Selected Device: " << device.name << "\n\n";
 
-	//load data to device
-	Tensor<Vertex> vertexTensor(context, vertices);
-	Tensor<uint32_t> indexTensor(context, indices);
-
 	//create acceleration structure
 	auto vertexSpan = std::span<const Vertex>(vertices);
-	Geometry geometry{
+	Mesh mesh{
 		.vertices = std::as_bytes(std::span<const Vertex>(vertices)),
 		.vertexStride = sizeof(Vertex),
-		.vertexCount = static_cast<uint32_t>(vertexSpan.size()),
 		.indices = indices
 	};
-	GeometryInstance geoInstance{
-		.geometry = std::cref(geometry)
-	};
-	AccelerationStructure accStruct(context, geoInstance);
+	GeometryStore geometries(context, mesh, true);
+	auto instance = geometries.createInstance(0);
+	AccelerationStructure accStruct(context, instance);
 
+	//Fetch geometry data pointers and store in push descriptor
+	Push push{
+		.vertices_address = geometries[0].vertices_address,
+		.indices_address = geometries[0].indices_address
+	};
 	//create output image and buffer
 	ImageBuffer imgBuffer(context, 1024, 1024);
 	auto image = imgBuffer.createImage(false);
 
 	//create program
 	Program program(context, code);
-	program.bindParameterList(accStruct, vertexTensor, indexTensor, image);
+	program.bindParameterList(accStruct, image);
 
 	//Create sequence
 	beginSequence(context)
-		.And(program.dispatch(256, 256))
+		.And(program.dispatch(push, 256, 256))
 		.Then(retrieveImage(image, imgBuffer))
 		.Submit();
 
