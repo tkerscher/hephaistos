@@ -83,6 +83,9 @@ struct Timeline {
 	VkBufferUsageFlags usage,
 	VmaAllocationCreateFlags flags);
 void destroyBuffer(Buffer* buffer);
+[[nodiscard]] inline BufferHandle createEmptyBuffer() {
+	return { nullptr, destroyBuffer };
+}
 
 [[nodiscard]] ImageHandle createImage(
 	const ContextHandle& context,
