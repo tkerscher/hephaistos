@@ -471,7 +471,7 @@ GeometryStore::GeometryStore(
 			blasResult[i].vertices_address = pVertex;
 			blasResult[i].indices_address = meshes[i].indices.empty() ? 0 : pIndex;
 			pVertex += meshes[i].vertices.size_bytes();
-			pIndex = meshes[i].indices.size_bytes();
+			pIndex += meshes[i].indices.size_bytes();
 		}
 		//fetch device address
 		VkAccelerationStructureDeviceAddressInfoKHR addressInfo{
