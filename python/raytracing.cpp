@@ -71,7 +71,7 @@ void registerRaytracing(nb::module_& m) {
                 mesh.vertexArray = vertices;
                 size_t bytes = sizeof(float) * vertices.size();
                 mesh.vertices = { reinterpret_cast<std::byte*>(vertices.data()), bytes };
-                mesh.vertexStride = sizeof(float) * vertices.stride(0);
+                mesh.vertexStride = sizeof(float) * vertices.shape(1);
             }, "Numpy array holding the vertex data. The first three columns must be the x, y and z positions.")
         .def_prop_rw("indices",
             [](const NumpyMesh& mesh) -> IndexArray { return mesh.indexArray; },
