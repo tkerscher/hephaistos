@@ -419,7 +419,7 @@ GeometryStore::GeometryStore(
 	for (auto size : compactSizes) {
 		blasTotalSize += size;
 		if (size % 256)
-			size += 256 - (size % 256);
+			blasTotalSize += 256 - (size % 256);
 	}
 	//create new compact blas buffer
 	auto compactBlasBuffer = vulkan::createBuffer(context, blasTotalSize,
