@@ -62,6 +62,8 @@ struct Program {
 	VkPipeline pipeline = nullptr;
 	uint32_t set = 0;
 
+	LocalSize localSize{};
+
 	std::vector<VkWriteDescriptorSet> boundParams;
 
 	const Context& context;
@@ -220,6 +222,10 @@ uint8_t castDimension(SpvDim dim) {
 
 }
 
+const LocalSize& Program::getLocalSize() const noexcept {
+	return program->localSize;
+}
+
 const BindingTraits& Program::getBindingTraits(uint32_t i) const {
 	if (i >= bindingTraits.size())
 		throw std::runtime_error("There is no binding point at specified number!");
@@ -284,6 +290,14 @@ Program::Program(ContextHandle context, std::span<const uint32_t> code, std::spa
 		SPV_REFLECT_MODULE_FLAG_NO_COPY,
 		code.size_bytes(), code.data(),
 		&reflectModule));
+
+	//save local size
+	//we assume that there is exactly one entry_point
+	program->localSize = {
+		.x = reflectModule.entry_points->local_size.x,
+		.y = reflectModule.entry_points->local_size.y,
+		.z = reflectModule.entry_points->local_size.z
+	};
 
 	//create pipeline layout; we fill this as we gather more info
 	VkPipelineLayoutCreateInfo layoutInfo{

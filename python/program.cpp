@@ -5,6 +5,7 @@
 #include <nanobind/stl/vector.h>
 
 #include <algorithm>
+#include <sstream>
 #include <stdexcept>
 
 #include <hephaistos/program.hpp>
@@ -61,6 +62,17 @@ void registerProgramModule(nb::module_& m) {
         .def_ro("imageTraits", &hp::BindingTraits::imageTraits)
         .def_ro("count", &hp::BindingTraits::count);
 
+    nb::class_<hp::LocalSize>(m, "LocalSize")
+        .def(nb::init<>())
+        .def_rw("x", &hp::LocalSize::x)
+        .def_rw("y", &hp::LocalSize::y)
+        .def_rw("z", &hp::LocalSize::z)
+        .def("__repr__", [](const hp::LocalSize& s){
+            std::ostringstream str;
+            str << "{ x: " << s.x << ", y: " << s.y << ", z: " << s.z << " }\n";
+            return str.str();
+        });
+
     nb::class_<hp::DispatchCommand, hp::Command>(m, "DispatchCommand")
         .def_rw("groupCountX", &hp::DispatchCommand::groupCountX)
         .def_rw("groupCountY", &hp::DispatchCommand::groupCountY)
@@ -77,6 +89,7 @@ void registerProgramModule(nb::module_& m) {
                     std::span<const uint32_t>{ reinterpret_cast<const uint32_t*>(code.c_str()), code.size() / 4 },
                     std::span<const std::byte>{ reinterpret_cast<const std::byte*>(spec.c_str()), spec.size() });
             }, "code"_a, "specialization"_a)
+        .def_prop_ro("localSize", [](const hp::Program& p){ return p.getLocalSize(); }, "Returns the size of the local work group.")
         .def_prop_ro("bindings", [](const hp::Program& p){ return p.listBindings(); }, "Returns a list of all bindings.")
         .def("dispatch",
                 [](const hp::Program& p, uint32_t x, uint32_t y, uint32_t z) -> hp::DispatchCommand {

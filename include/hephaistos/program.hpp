@@ -78,8 +78,16 @@ private:
 	std::reference_wrapper<const vulkan::Program> program;
 };
 
+struct LocalSize {
+	uint32_t x;
+	uint32_t y;
+	uint32_t z;
+};
+
 class HEPHAISTOS_API Program : public Resource {
 public:
+	[[nodiscard]] const LocalSize& getLocalSize() const noexcept;
+
 	[[nodiscard]] const BindingTraits& getBindingTraits(uint32_t i) const;
 	[[nodiscard]] const BindingTraits& getBindingTraits(std::string_view name) const;
 	[[nodiscard]] const std::vector<BindingTraits>& listBindings() const noexcept;

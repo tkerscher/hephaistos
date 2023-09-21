@@ -11,6 +11,7 @@
 
 //shader code
 #include "shader/image.h"
+#include "shader/localsize.h"
 #include "shader/push.h"
 #include "shader/sbo.h"
 #include "shader/spec.h"
@@ -124,4 +125,13 @@ TEST_CASE("program can use storage image", "[program]") {
     REQUIRE(std::equal(dataIdx.begin(), dataIdx.end(), buffer.getMemory().begin()));
 
     REQUIRE(!hasValidationErrorOccurred());
+}
+
+TEST_CASE("program can reflect the local size", "[program]") {
+    Program program(getContext(), localsize_code);
+    auto& localSize = program.getLocalSize();
+
+    REQUIRE(localSize.x == 4);
+    REQUIRE(localSize.y == 4);
+    REQUIRE(localSize.z == 2);
 }

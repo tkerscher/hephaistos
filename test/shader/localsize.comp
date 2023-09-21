@@ -1,0 +1,10 @@
+#version 460
+
+layout(local_size_x = 4, local_size_y = 4, local_size_z = 2) in;
+
+layout(binding = 0) buffer tensor{ uvec3 result[]; };
+
+void main() {
+    uint i = gl_GlobalInvocationID.z * 16 + gl_GlobalInvocationID.y * 4 + gl_GlobalInvocationID.x;
+    result[i] = gl_LocalInvocationID;
+}
