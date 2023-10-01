@@ -112,3 +112,29 @@ TEST_CASE("tensors have a device address", "[buffer]") {
 
     REQUIRE(!hasValidationErrorOccurred());
 }
+
+TEST_CASE("tensors can be filled with constant data", "[buffer]") {
+    Tensor<int> tensor(getContext(), 16);
+    Buffer<int> buffer(getContext(), 16);
+    auto mem = buffer.getMemory();
+
+    beginSequence(getContext())
+        .And(fillTensor(tensor, { .data = 5 }))
+        .Then(retrieveTensor(tensor, buffer))
+        .Submit();
+
+    REQUIRE(std::all_of(mem.begin(), mem.end(), [](int i) -> bool { return i == 5; }));
+
+    beginSequence(getContext())
+        .And(fillTensor(tensor, { .offset = 32, .size = 16, .data = 12 }))
+        .Then(retrieveTensor(tensor, buffer))
+        .Submit();
+
+    std::array<int, 16> data{ {
+        5, 5, 5, 5,
+        5, 5, 5, 5,
+        12, 12, 12, 12,
+        5, 5, 5, 5
+    } };
+    REQUIRE(std::equal(data.begin(), data.end(), mem.begin()));
+}

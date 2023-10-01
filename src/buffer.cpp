@@ -138,7 +138,7 @@ Tensor<std::byte>::Tensor(ContextHandle context, std::span<const std::byte> data
 {}
 Tensor<std::byte>::~Tensor() = default;
 
-/*********************************** COPY *************************************/
+/*********************************** COMMANDS *************************************/
 
 namespace {
 
@@ -290,5 +290,66 @@ UpdateTensorCommand::UpdateTensorCommand(const Buffer<std::byte>& src, const Ten
 	, Destination(std::cref(dst))
 {}
 UpdateTensorCommand::~UpdateTensorCommand() = default;
+
+
+void FillTensorCommand::record(vulkan::Command& cmd) const {
+	//to shorten things
+	auto& context = tensor.get().getContext();
+	auto buffer = tensor.get().getBuffer().buffer; //ptr -> by value
+
+	//we're acting on the transfer stage
+	cmd.stage |= VK_PIPELINE_STAGE_TRANSFER_BIT;
+
+	//ensure tensor is safe to update
+	VkBufferMemoryBarrier barrier{
+		.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+		.srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+		.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+		.buffer = buffer,
+		.size = VK_WHOLE_SIZE
+	};
+	context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_DEPENDENCY_BY_REGION_BIT,
+		0, nullptr,
+		1, &barrier,
+		0, nullptr);
+
+	//fill buffer
+	context->fnTable.vkCmdFillBuffer(cmd.buffer,
+		buffer, offset, size, data);
+
+	//barrier to ensure transfer finished
+	barrier = VkBufferMemoryBarrier{
+		.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+		.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+		.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+		.buffer = buffer,
+		.size = VK_WHOLE_SIZE
+	};
+	context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_DEPENDENCY_BY_REGION_BIT,
+		0, nullptr,
+		1, &barrier,
+		0, nullptr);
+}
+
+FillTensorCommand::FillTensorCommand(const FillTensorCommand& other) = default;
+FillTensorCommand& FillTensorCommand::operator=(const FillTensorCommand& other) = default;
+
+FillTensorCommand::FillTensorCommand(FillTensorCommand&& other) noexcept = default;
+FillTensorCommand& FillTensorCommand::operator=(FillTensorCommand&& other) noexcept = default;
+
+FillTensorCommand::FillTensorCommand(const Tensor<std::byte>& tensor, const Params& params)
+	: Command()
+	, tensor(std::cref(tensor))
+	, offset(params.offset)
+	, size(params.size)
+	, data(params.data)
+{}
+FillTensorCommand::~FillTensorCommand() = default;
 
 }
