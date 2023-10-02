@@ -40,6 +40,7 @@ struct Context {
 	std::vector<std::string_view> extensions;
 
 	uint32_t queueFamily;
+	VkCommandPool subroutinePool;
 	VkCommandPool oneTimeSubmitPool;
 	VkCommandBuffer oneTimeSubmitBuffer;
 	VkFence oneTimeSubmitFence;

@@ -362,6 +362,7 @@ void destroyContext(vulkan::Context* context) {
 	context->fnTable.vkDestroyPipelineCache(context->device, context->cache, nullptr);
 	context->fnTable.vkDestroyFence(context->device, context->oneTimeSubmitFence, nullptr);
 	context->fnTable.vkDestroyCommandPool(context->device, context->oneTimeSubmitPool, nullptr);
+	context->fnTable.vkDestroyCommandPool(context->device, context->subroutinePool, nullptr);
 	while (!context->sequencePool.empty()) {
 		context->fnTable.vkDestroyCommandPool(
 			context->device, context->sequencePool.front(), nullptr);
@@ -478,6 +479,15 @@ ContextHandle createContext(
 	//get queue
 	context->fnTable.vkGetDeviceQueue(context->device, family, 0, &context->queue);
 
+	//create command pool for subroutines
+	{
+		VkCommandPoolCreateInfo poolInfo{
+			.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+			.queueFamilyIndex = family
+		};
+		vulkan::checkResult(context->fnTable.vkCreateCommandPool(
+			context->device, &poolInfo, nullptr, &context->subroutinePool));
+	}
 	//create command pool for internal one time submits
 	{
 		VkCommandPoolCreateInfo poolInfo{

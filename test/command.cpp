@@ -1,5 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <array>
+
+#include <hephaistos/buffer.hpp>
 #include <hephaistos/command.hpp>
 
 using namespace hephaistos;
@@ -52,6 +56,34 @@ TEST_CASE("sequences can wait for the cpu", "[command]") {
     REQUIRE(!submission.wait(100));
     timeline.setValue(5);
     REQUIRE(submission.wait(100));
+
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
+TEST_CASE("sequences can handle subroutines", "[command]") {
+    Tensor<int> tensor(getContext(), 8);
+    Buffer<int> buffer(getContext(), 8);
+
+    auto subA = createSubroutine(getContext(), simultaneous_use,
+        fillTensor(tensor, { .data = 5 }));
+    auto subB = createSubroutine(getContext(),
+        fillTensor(tensor, { .size = 8, .data = 19 }),
+        fillTensor(tensor, { .offset = 8, .size = 16, .data = 7 }));
+    auto subC = createSubroutine(getContext(),
+        fillTensor(tensor, { .offset = 24, .size = 8, .data = 23 }));
+
+    REQUIRE(subA.simultaneousUse());
+    REQUIRE(!subB.simultaneousUse());
+    REQUIRE(!subC.simultaneousUse());
+
+    beginSequence(getContext())
+        .And(subA).And(retrieveTensor(tensor, buffer))
+        .Then(subB).And(subC)
+        .Then(retrieveTensor(tensor, buffer))
+        .Submit();
+
+    auto data = std::to_array<int>({ 19, 19, 7, 7, 7, 7, 23, 23 });
+    REQUIRE(std::equal(data.begin(), data.end(), buffer.getMemory().data()));
 
     REQUIRE(!hasValidationErrorOccurred());
 }

@@ -18,6 +18,70 @@ public:
     virtual ~Command();
 };
 
+class HEPHAISTOS_API Subroutine : public Resource {
+public:
+    bool simultaneousUse() const;
+    const vulkan::Command& getCommandBuffer() const;
+
+    Subroutine(const Subroutine&) = delete;
+    Subroutine& operator=(const Subroutine&) = delete;
+
+    Subroutine(Subroutine&& other) noexcept;
+    Subroutine& operator=(Subroutine&& other) noexcept;
+
+    ~Subroutine() override;
+
+private:
+    Subroutine(
+        ContextHandle context,
+        std::unique_ptr<vulkan::Command> cmdBuffer,
+        bool simultaneous_use);
+
+    friend class SubroutineBuilder;
+
+private:
+    std::unique_ptr<vulkan::Command> cmdBuffer;
+    bool simultaneous_use;
+};
+
+class HEPHAISTOS_API SubroutineBuilder final {
+public:
+    explicit operator bool() const;
+
+    SubroutineBuilder& addCommand(const Command& command);
+    Subroutine finish();
+
+    SubroutineBuilder(const SubroutineBuilder& other) = delete;
+    SubroutineBuilder& operator=(const SubroutineBuilder& other) = delete;
+
+    SubroutineBuilder(SubroutineBuilder&& other) noexcept;
+    SubroutineBuilder& operator=(SubroutineBuilder&& other) noexcept;
+
+    explicit SubroutineBuilder(ContextHandle context, bool simultaneous_use = false);
+    ~SubroutineBuilder();
+
+private:
+    ContextHandle context;
+    std::unique_ptr<vulkan::Command> cmdBuffer;
+    bool simultaneous_use;
+};
+
+struct simultaneous_use_tag{};
+inline constexpr simultaneous_use_tag simultaneous_use{};
+
+template<class ...T>
+[[nodiscard]] Subroutine createSubroutine(ContextHandle context, T... commands) {
+    SubroutineBuilder builder(std::move(context));
+    (builder.addCommand(commands), ...);
+    return builder.finish();
+}
+template<class ...T>
+[[nodiscard]] Subroutine createSubroutine(ContextHandle context, simultaneous_use_tag, T... commands) {
+    SubroutineBuilder builder(std::move(context), true);
+    (builder.addCommand(commands), ...);
+    return builder.finish();
+}
+
 class HEPHAISTOS_API Timeline : public Resource {
 public:
     [[nodiscard]] uint64_t getValue() const;
@@ -67,8 +131,13 @@ private:
 
 class HEPHAISTOS_API SequenceBuilder final {
 public:
+    explicit operator bool() const;
+
     SequenceBuilder& And(const Command& command);
+    SequenceBuilder& And(const Subroutine& subroutine);
+    SequenceBuilder& NextStep();
     SequenceBuilder& Then(const Command& command);
+    SequenceBuilder& Then(const Subroutine& subroutine);
     SequenceBuilder& WaitFor(uint64_t value);
     Submission Submit();
 
