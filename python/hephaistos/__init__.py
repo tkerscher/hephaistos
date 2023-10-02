@@ -3,5 +3,6 @@ from .util import (
     ArrayBuffer,
     ArrayTensor,
     StructureBuffer,
-    StructureTensor
+    StructureTensor,
+    createSubroutine
 )

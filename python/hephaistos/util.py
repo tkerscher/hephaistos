@@ -1,7 +1,15 @@
 import ctypes
 from typing import Any, Union
 from numpy.ctypeslib import as_array
-from .pyhephaistos import RawBuffer, ByteTensor, Program
+from .pyhephaistos import (
+    ByteTensor,
+    Command,
+    Program,
+    RawBuffer,
+    Subroutine,
+    SubroutineBuilder
+)
+from typing import Iterable
 
 def collectFields(struct: ctypes.Structure) -> list[tuple[str,ctypes._SimpleCData]]:
     """
@@ -144,3 +152,12 @@ def _bindParams(program: Program, *params, **namedparams) -> None:
         p.bindParameter(program, name)
 #register function in class
 Program.bindParams = _bindParams
+
+def createSubroutine(commands: Iterable[Command], *, simultaneous_use: bool = False) -> Subroutine:
+    """
+    Helper function for creating a subroutine from a list of commands.
+    """
+    builder = SubroutineBuilder(simultaneous_use)
+    for cmd in commands:
+        builder.addCommand(cmd)
+    return builder.finish()

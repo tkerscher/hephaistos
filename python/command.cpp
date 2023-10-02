@@ -10,6 +10,21 @@ using namespace nb::literals;
 void registerCommandModule(nb::module_& m) {
     nb::class_<hp::Command>(m, "Command");
 
+    nb::class_<hp::Subroutine>(m, "Subroutine")
+        .def_prop_ro("simultaneousUse",
+            [](const hp::Subroutine& s) -> bool { return s.simultaneousUse(); },
+            "True, if the subroutine can be used simultaneous");
+    
+    nb::class_<hp::SubroutineBuilder>(m, "SubroutineBuilder")
+        .def("__init__", [](hp::SubroutineBuilder* sb, bool simultaneous) {
+            new (sb) hp::SubroutineBuilder(getCurrentContext(), simultaneous);
+        }, "simultaneous"_a = false)
+        .def("addCommand", [](hp::SubroutineBuilder& sb, const hp::Command& c) -> hp::SubroutineBuilder& {
+            return sb.addCommand(c);
+        }, "cmd"_a, "Adds the next command to the subroutine", nb::rv_policy::reference_internal)
+        .def("finish", &hp::SubroutineBuilder::finish,
+            "Builds the subroutine from the recorded commands");
+
     nb::class_<hp::Timeline>(m, "Timeline")
         .def("__init__", [](hp::Timeline* t) { new (t) hp::Timeline(getCurrentContext()); })
         .def("__init__", [](hp::Timeline* t, uint64_t v) { new (t) hp::Timeline(getCurrentContext(), v); }, "initialValue"_a)
@@ -37,7 +52,11 @@ void registerCommandModule(nb::module_& m) {
         .def("__init__", [](hp::SequenceBuilder* sb, hp::Timeline& t, uint64_t v) { new (sb) hp::SequenceBuilder(t, v); }, "timeline"_a, "startValue"_a)
         .def("And", [](hp::SequenceBuilder& sb, const hp::Command& h) -> hp::SequenceBuilder& { return sb.And(h); }, "cmd"_a,
             "Issues the command to run parallel in the current step.", nb::rv_policy::reference_internal)
+        .def("And", [](hp::SequenceBuilder& sb, const hp::Subroutine& s) -> hp::SequenceBuilder& { return sb.And(s); }, "subroutine"_a,
+            "Issues the subroutine to run parallel in the current step.", nb::rv_policy::reference_internal)
         .def("Then", [](hp::SequenceBuilder& sb, const hp::Command& h) -> hp::SequenceBuilder& { return sb.Then(h); }, "cmd"_a,
+            "Issues a new step to execute after waiting for the previous one to finish.", nb::rv_policy::reference_internal)
+        .def("Then", [](hp::SequenceBuilder& sb, const hp::Subroutine& s) -> hp::SequenceBuilder& { return sb.Then(s); }, "subroutine"_a,
             "Issues a new step to execute after waiting for the previous one to finish.", nb::rv_policy::reference_internal)
         .def("WaitFor", &hp::SequenceBuilder::WaitFor, "value"_a,
             "Issues a new step to execute after the timeline reaches the given value.", nb::rv_policy::reference_internal)
