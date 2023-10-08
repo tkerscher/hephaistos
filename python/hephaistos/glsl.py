@@ -91,3 +91,15 @@ def stackVector(arrays, vecType):
       dtype=[('x', '<f4'), ('y', '<f4'), ('z', '<f4')])
     """
     return np.stack(arrays, axis=-1, dtype=np.dtype(vecType._scalar_)).ravel().view(dtype=vecType)
+
+def addVector(v1, v2, vecType):
+    """
+    Adds two vectors of given type and returns their element-wise sum.
+    """
+    return stackVector([v1[f[0]] + v2[f[0]] for f in vecType._fields_], vecType)
+
+def scaleVector(v, s, vecType):
+    """
+    Scales a given vector and returns the element-wise multiplication.
+    """
+    return stackVector([v[f[0]] * s for f in vecType._fields_], vecType)
