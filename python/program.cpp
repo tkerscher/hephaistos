@@ -100,7 +100,10 @@ void registerProgramModule(nb::module_& m) {
             [](const hp::Program& p, nb::bytes push, uint32_t x, uint32_t y, uint32_t z)
                  -> hp::DispatchCommand {
                     return p.dispatch(
-                        std::span<const std::byte>{ reinterpret_cast<const std::byte*>(push.c_str()), push.size() }, x, y, z); },
+                        std::span<const std::byte>{ reinterpret_cast<const std::byte*>(push.c_str()), push.size() },
+                        x, y, z
+                    );
+                }, nb::keep_alive<0,2>(), //keep push bytes as long alive as the dispatch command
                 "push"_a, "x"_a = 1, "y"_a = 1, "z"_a = 1,
                 "Dispatches a program execution with the given push data and workgroup size.");
     
