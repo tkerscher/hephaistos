@@ -56,4 +56,4 @@ target_link_libraries(pyhephaistos PRIVATE hephaistos)
 target_include_directories(pyhephaistos PRIVATE ${PYROOT})
 
 # install
-install(TARGETS pyhephaistos LIBRARY DESTINATION .)
+install(TARGETS pyhephaistos LIBRARY DESTINATION hephaistos)

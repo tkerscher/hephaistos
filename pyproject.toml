@@ -1,11 +1,31 @@
 [build-system]
 requires = [
-    "setuptools>=42",
-    "wheel",
-    "scikit-build>=0.16.0",
-    "cmake>=3.18",
-    "nanobind>=1.5.0",
-    "ninja; platform_system!='Windows'"
+    "scikit-build-core >= 0.6.0",
+    "nanobind >= 1.7.0"
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "hephaistos"
+version = "0.4.0"
+description = "GPU computing framework using the Vulkan API"
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [
+    { name = "Kerscher Tobias", email = "88444139+tkerscher@users.noreply.github.com" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: GPU",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: C++",
+    "Programming Language :: Python",
 ]
 
-build-backend = "setuptools.build_meta"
+[tool.scikit-build]
+build-dir = "build/{wheel_tag}"
+cmake.minimum-version = "3.18"
+minimum-version = "0.6"
+wheel.license-files = ["LICENSE"]
+wheel.packages = ["python/hephaistos"]
+wheel.py-api = "cp312"
