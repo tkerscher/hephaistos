@@ -1,5 +1,6 @@
 #include "hephaistos/program.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdlib>
 #include <stdexcept>
@@ -73,11 +74,28 @@ struct Program {
 	{}
 };
 
+bool isDescriptorSetEmpty(const VkWriteDescriptorSet& set) {
+	return set.pNext == nullptr &&
+		set.pImageInfo == nullptr &&
+		set.pBufferInfo == nullptr &&
+		set.pTexelBufferView == nullptr;
+}
+
 }
 
 void DispatchCommand::record(vulkan::Command& cmd) const {
 	auto& prog = program.get();
 	auto& context = prog.context;
+
+	//sanity check: all params are bound
+	if (std::any_of(
+		prog.boundParams.begin(),
+		prog.boundParams.end(),
+		vulkan::isDescriptorSetEmpty)
+	) {
+		throw std::logic_error(
+			"Cannot dispatch program! At least one parameter is not bound!");
+	}
 
 	//we're working in the compute stage
 	cmd.stage |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;

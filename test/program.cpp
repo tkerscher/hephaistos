@@ -135,3 +135,8 @@ TEST_CASE("program can reflect the local size", "[program]") {
     REQUIRE(localSize.y == 4);
     REQUIRE(localSize.z == 2);
 }
+
+TEST_CASE("dispatch command checks if all params are bound", "[program]") {
+    Program program(getContext(), ubo_code);
+    CHECK_THROWS(beginSequence(getContext()).And(program.dispatch(3)));
+}
