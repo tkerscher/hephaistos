@@ -25,6 +25,37 @@ hp::SubgroupProperties getSubgroupProperties(uint32_t i) {
     return hp::getSubgroupProperties(devices[i]);
 }
 
+void printBindingType(std::ostringstream& str, hp::DescriptorType type) {
+    switch(type) {
+    case hp::DescriptorType::COMBINED_IMAGE_SAMPLER:
+        str << "COMBINED_IMAGE_SAMPLER";
+        break;
+    case hp::DescriptorType::STORAGE_IMAGE:
+        str << "STORAGE_IMAGE";
+        break;
+    case hp::DescriptorType::UNIFORM_BUFFER:
+        str << "UNIFORM_BUFFER";
+        break;
+    case hp::DescriptorType::STORAGE_BUFFER:
+        str << "STORAGE_BUFFER";
+        break;
+    case hp::DescriptorType::ACCELERATION_STRUCTURE:
+        str << "ACCELERATION_STRUCTURE";
+        break;
+    default:
+        str << "UNKNOWN";
+        break;
+    }
+}
+
+void printBinding(std::ostringstream& str, const hp::BindingTraits& b) {
+    str << b.binding << ": " << b.name << " (";
+    printBindingType(str, b.type);
+    if (b.count > 1)
+        str << '[' << b.count << ']';
+    str << ")\n";
+}
+
 }
 
 void registerProgramModule(nb::module_& m) {
@@ -37,7 +68,20 @@ void registerProgramModule(nb::module_& m) {
         .def_ro("shuffleSupport", &hp::SubgroupProperties::shuffleSupport)
         .def_ro("shuffleRelativeSupport", &hp::SubgroupProperties::shuffleRelativeSupport)
         .def_ro("shuffleClusteredSupport", &hp::SubgroupProperties::shuffleClusteredSupport)
-        .def_ro("quadSupport", &hp::SubgroupProperties::quadSupport);
+        .def_ro("quadSupport", &hp::SubgroupProperties::quadSupport)
+        .def("__repr__", [](const hp::SubgroupProperties& props) {
+            std::ostringstream str;
+            str << "subgroupSize:            " << props.subgroupSize << '\n';
+            str << "basicSupport:            " << props.basicSupport << '\n';
+            str << "voteSupport:             " << props.voteSupport << '\n';
+            str << "arithmeticSupport:       " << props.arithmeticSupport << '\n';
+            str << "ballotSupport:           " << props.ballotSupport << '\n';
+            str << "shuffleSupport:          " << props.shuffleSupport << '\n';
+            str << "shuffleRelativeSupport:  " << props.shuffleRelativeSupport << '\n';
+            str << "shuffleClusteredSupport: " << props.shuffleClusteredSupport << '\n';
+            str << "quadSupport:             " << props.quadSupport;
+            return str.str();
+        });
     m.def("getSubgroupProperties",
         []() -> hp::SubgroupProperties { return hp::getSubgroupProperties(getCurrentContext()); },
         "Returns the properties specific to subgroups (waves).");
@@ -60,7 +104,12 @@ void registerProgramModule(nb::module_& m) {
         .def_ro("binding", &hp::BindingTraits::binding)
         .def_ro("type", &hp::BindingTraits::type)
         .def_ro("imageTraits", &hp::BindingTraits::imageTraits)
-        .def_ro("count", &hp::BindingTraits::count);
+        .def_ro("count", &hp::BindingTraits::count)
+        .def("__repr__", [](const hp::BindingTraits& b){
+            std::ostringstream str;
+            printBinding(str, b);
+            return str.str();
+        });
 
     nb::class_<hp::LocalSize>(m, "LocalSize")
         .def(nb::init<>())
@@ -105,7 +154,15 @@ void registerProgramModule(nb::module_& m) {
                     );
                 }, nb::keep_alive<0,2>(), //keep push bytes as long alive as the dispatch command
                 "push"_a, "x"_a = 1, "y"_a = 1, "z"_a = 1,
-                "Dispatches a program execution with the given push data and workgroup size.");
+                "Dispatches a program execution with the given push data and workgroup size.")
+        .def("__repr__", [](const hp::Program& p) {
+            std::ostringstream str;
+            auto& ls = p.getLocalSize();
+            str << "Program (x: " << ls.x << ", y: " << ls.y << ", z: " << ls.z << ")\n";
+            for (auto& b : p.listBindings())
+                printBinding(str, b);
+            return str.str();
+        });
     
     nb::class_<hp::FlushMemoryCommand, hp::Command>(m, "FlushMemoryCommand")
         .def("__init__", [](hp::FlushMemoryCommand* cmd) { new (cmd) hp::FlushMemoryCommand(getCurrentContext()); });

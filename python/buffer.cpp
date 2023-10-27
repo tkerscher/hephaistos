@@ -1,7 +1,11 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/optional.h>
+#include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
+
+#include <sstream>
+#include <string>
 
 #include <hephaistos/buffer.hpp>
 #include <hephaistos/program.hpp>
@@ -47,7 +51,14 @@ void registerBuffer(nb::module_& m, const char* name) {
         .def(nb::init<size_t>())
         .def_prop_ro("size", [](const TypedBuffer<T>& b) { return b.size(); }, "The number of elements in this buffer.")
         .def_prop_ro("size_bytes", [](const TypedBuffer<T>& b) { return b.size_bytes(); }, "The size of the buffer in bytes.")
-        .def("numpy", &TypedBuffer<T>::numpy, "Returns a numpy array using this buffer's memory.", nb::rv_policy::reference_internal);
+        .def("numpy", &TypedBuffer<T>::numpy, "Returns a numpy array using this buffer's memory.", nb::rv_policy::reference_internal)
+        .def("__repr__", [name = std::string(name)](const TypedBuffer<T>& t) {
+            std::ostringstream str;
+            str << name
+                << "[" << t.size() << "] ("
+                << t.size_bytes() << " bytes)\n";
+            return str.str();
+        });
 }
 
 namespace {
@@ -79,7 +90,15 @@ void registerTensor(nb::module_& m, const char* name) {
         .def_prop_ro("size", [](const TypedTensor<T>& t) { return t.size(); }, "The number of elements in this tensor.")
         .def_prop_ro("size_bytes", [](const TypedTensor<T>& t) { return t.size_bytes(); }, "The size of the tensor in bytes.")
         .def("bindParameter", [](const TypedTensor<T>& t, hp::Program& p, uint32_t b) { t.bindParameter(p.getBinding(b)); } )
-        .def("bindParameter", [](const TypedTensor<T>& t, hp::Program& p, std::string_view b) { t.bindParameter(p.getBinding(b)); } );
+        .def("bindParameter", [](const TypedTensor<T>& t, hp::Program& p, std::string_view b) { t.bindParameter(p.getBinding(b)); } )
+        .def("__repr__", [name = std::string(name)](const TypedTensor<T>& t) {
+            std::ostringstream str;
+            str << name
+                << "[" << t.size() << "] ("
+                << t.size_bytes() << " bytes) at 0x"
+                << std::uppercase << std::hex << t.address() <<'\n';
+            return str.str();
+        });
 }
 
 void registerBufferModule(nb::module_& m) {
@@ -90,7 +109,12 @@ void registerBufferModule(nb::module_& m) {
         .def(nb::init<uint64_t>())
         .def_prop_ro("address", [](const RawBuffer& b) { return b.getAddress(); } , "The memory address of the allocated buffer.")
         .def_prop_ro("size", [](const RawBuffer& b) { return b.size(); }, "The size of the buffer in bytes.")
-        .def_prop_ro("size_bytes", [](const RawBuffer& b) { return b.size_bytes(); }, "The size of the buffer in bytes.");
+        .def_prop_ro("size_bytes", [](const RawBuffer& b) { return b.size_bytes(); }, "The size of the buffer in bytes.")
+        .def("__repr__", [](const RawBuffer& b) {
+            std::ostringstream str;
+            str << "RawBuffer: " << b.size_bytes() << " bytes\n";
+            return str.str();
+        });
 
     //Register typed buffers
     registerBuffer<float>(m, "FloatBuffer");

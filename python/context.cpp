@@ -1,6 +1,8 @@
 #include "context.hpp"
 
 #include <stdexcept>
+#include <sstream>
+#include <string>
 #include <string_view>
 
 #include <nanobind/nanobind.h>
@@ -117,7 +119,15 @@ void registerContextModule(nb::module_& m) {
 
     nb::class_<hp::DeviceInfo>(m, "Device")
         .def_ro("name", &hp::DeviceInfo::name)
-        .def_ro("isDiscrete", &hp::DeviceInfo::isDiscrete);
+        .def_ro("isDiscrete", &hp::DeviceInfo::isDiscrete)
+        .def("__repr__", [](const hp::DeviceInfo& info){
+            std::ostringstream str;
+            str << info.name;
+            if (info.isDiscrete)
+                str << " (discrete)";
+            str << '\n';
+            return str.str();
+        });
     m.def("enumerateDevices", &enumerateDevices, "Returns a list of all supported installed devices.");
     m.def("getCurrentDevice", []() { return hp::getDeviceInfo(getCurrentContext()); }, "Returns the currently active device. Note that this may initialize the context.");
     m.def("selectDevice", &selectDevice, "id"_a, "force"_a = false, "Sets the device on which the context will be initialized. Set force=True if an existing context should be destroyed.");
