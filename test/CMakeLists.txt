@@ -3,6 +3,7 @@ set(TESTROOT ${PROJECT_SOURCE_DIR}/test)
 
 #test files
 set(TEST_FILES
+    ${TESTROOT}/atomic.cpp
     ${TESTROOT}/buffer.cpp
     ${TESTROOT}/command.cpp
     ${TESTROOT}/compiler.cpp

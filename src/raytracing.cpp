@@ -72,8 +72,10 @@ bool isRaytracingSupported(const DeviceHandle& device) {
 bool isRaytracingEnabled(const ContextHandle& context) {
 	//to shorten things
 	auto& ext = context->extensions;
-	std::string_view name{ ExtensionName };
-	return std::find(ext.begin(), ext.end(), name) != ext.end();
+	return std::find_if(ext.begin(), ext.end(),
+		[](const ExtensionHandle& h) -> bool {
+			return h->getExtensionName() == ExtensionName;
+		}) != ext.end();
 }
 
 class RaytracingExtension : public Extension {

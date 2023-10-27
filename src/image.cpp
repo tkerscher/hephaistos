@@ -106,7 +106,7 @@ Image::Image(ContextHandle context, ImageFormat format,
 {
     //transition image from undefined to general
     auto& con = *getContext();
-    oneTimeSubmit(con, [&image = image->image, con](VkCommandBuffer cmdBuffer) {
+    oneTimeSubmit(con, [&image = image->image, &con](VkCommandBuffer cmdBuffer) {
         VkImageMemoryBarrier barrier{
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
             .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,

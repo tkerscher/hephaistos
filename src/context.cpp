@@ -416,13 +416,13 @@ ContextHandle createContext(
 		for (auto& ext : extensions) {
 			//chain features
 			pNext = ext->chain(pNext);
-			//save name
-			context->extensions.push_back(ext->getExtensionName());
 			//add extensions
 			auto extNames = ext->getDeviceExtensions();
 			allDeviceExtensions.insert(
 				allDeviceExtensions.end(),
 				extNames.begin(), extNames.end());
+			//save extension
+			context->extensions.emplace_back(std::move(ext));
 		}
 
 		VkDeviceQueueCreateInfo queueInfo{

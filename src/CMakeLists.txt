@@ -5,6 +5,7 @@ set(SRCROOT ${PROJECT_SOURCE_DIR}/src)
 #Public API
 set(PUBLIC_HEADERS
     ${INCROOT}/argument.hpp
+    ${INCROOT}/atomic.hpp
     ${INCROOT}/buffer.hpp
     ${INCROOT}/command.hpp
     ${INCROOT}/compiler.hpp
@@ -21,6 +22,7 @@ set(PUBLIC_HEADERS
 )
 #Source
 set(SRC
+    ${SRCROOT}/atomic.cpp
     ${SRCROOT}/buffer.cpp
     ${SRCROOT}/command.cpp
     ${SRCROOT}/compiler.cpp

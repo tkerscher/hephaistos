@@ -8,6 +8,7 @@
 #include "volk.h"
 #include "vk_mem_alloc.h"
 #include "hephaistos/config.hpp"
+#include "hephaistos/context.hpp"
 #include "hephaistos/handles.hpp"
 
 namespace hephaistos::vulkan {
@@ -36,8 +37,7 @@ struct Context {
 	VkPipelineCache cache;
 
 	//List of enabled hephaistos extensions (not vulkan!)
-	//TODO: Is this one of the rare cases where I want a set instead?
-	std::vector<std::string_view> extensions;
+	std::vector<ExtensionHandle> extensions;
 
 	uint32_t queueFamily;
 	VkCommandPool subroutinePool;

@@ -3,6 +3,7 @@
 #Collect source files
 set(PYROOT ${PROJECT_SOURCE_DIR}/python)
 set(SRC
+    ${PYROOT}/atomic.cpp
     ${PYROOT}/buffer.cpp
     ${PYROOT}/command.cpp
     ${PYROOT}/compiler.cpp
