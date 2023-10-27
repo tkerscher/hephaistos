@@ -128,7 +128,27 @@ void registerContextModule(nb::module_& m) {
             str << '\n';
             return str.str();
         });
-    m.def("enumerateDevices", &enumerateDevices, "Returns a list of all supported installed devices.");
-    m.def("getCurrentDevice", []() { return hp::getDeviceInfo(getCurrentContext()); }, "Returns the currently active device. Note that this may initialize the context.");
-    m.def("selectDevice", &selectDevice, "id"_a, "force"_a = false, "Sets the device on which the context will be initialized. Set force=True if an existing context should be destroyed.");
+    m.def("enumerateDevices", &enumerateDevices,
+        "Returns a list of all supported installed devices.");
+    m.def("getCurrentDevice", []() { return hp::getDeviceInfo(getCurrentContext()); },
+        "Returns the currently active device. Note that this may initialize the context.");
+    m.def("selectDevice", &selectDevice, "id"_a, "force"_a = false,
+        "Sets the device on which the context will be initialized. Set force=True if an existing context should be destroyed.");
+    
+    m.def("isDeviceSuitable", [](uint32_t id) {
+        //range check
+        if (id >= getDevices().size())
+            throw std::runtime_error("There is no device with the selected id!");
+        
+        return hp::isDeviceSuitable(getDevices()[id], extensions);
+    }, "Returns True if the device given by its id supports all enabled extensions");
+    m.def("suitableDeviceAvailable", []() {
+        //check all devices
+        for (auto& device : getDevices()) {
+            if (hp::isDeviceSuitable(device, extensions))
+                return true;
+        }
+        //no suitable device found
+        return false;
+    }, "Returns True, if there is a device available supporting all enabled extensions");
 }
