@@ -125,32 +125,31 @@ void registerBufferModule(nb::module_& m) {
         .def(nb::init<const hp::Buffer<std::byte>&, const hp::Tensor<std::byte>&>());
     m.def("updateTensor", &hp::updateTensor, "src"_a, "dst"_a,
         "Creates a command for copying the src buffer into the destination tensor. They must match in size.");
-    //fill tensor command
-    nb::class_<hp::FillTensorCommand, hp::Command>(m, "FillTensorCommand")
+    //clear tensor command
+    nb::class_<hp::ClearTensorCommand, hp::Command>(m, "ClearTensorCommand")
         .def("__init__", [](
-            hp::FillTensorCommand* cmd,
+            hp::ClearTensorCommand* cmd,
             const hp::Tensor<std::byte>& tensor,
             std::optional<uint64_t> offset,
             std::optional<uint64_t> size,
             std::optional<uint32_t> data) {
-                hp::FillTensorCommand::Params params{};
+                hp::ClearTensorCommand::Params params{};
                 if (offset) params.offset = *offset;
                 if (size) params.size = *size;
                 if (data) params.data = *data;
-                new (cmd) hp::FillTensorCommand(tensor, params);
+                new (cmd) hp::ClearTensorCommand(tensor, params);
             }, "tensor"_a, "offset"_a.none() = nb::none(), "size"_a.none() = nb::none(), "data"_a.none() = nb::none(),
             "Creates a command for filling a tensor with constant data over a given range. Defaults to zeroing the complete tensor");
-    m.def("fillTensor", [](
+    m.def("clearTensor", [](
         const hp::Tensor<std::byte>& tensor,
         std::optional<uint64_t> offset,
         std::optional<uint64_t> size,
         std::optional<uint32_t> data) {
-            hp::FillTensorCommand::Params params{};
+            hp::ClearTensorCommand::Params params{};
             if (offset) params.offset = *offset;
             if (size) params.size = *size;
             if (data) params.data = *data;
-            return hp::fillTensor(tensor, params);
+            return hp::clearTensor(tensor, params);
         }, "tensor"_a, "offset"_a.none() = nb::none(), "size"_a.none() = nb::none(), "data"_a.none() = nb::none(),
         "Creates a command for filling a tensor with constant data over a given range. Defaults to zeroing the complete tensor");
 }
-
