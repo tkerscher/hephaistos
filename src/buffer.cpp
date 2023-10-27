@@ -292,7 +292,7 @@ UpdateTensorCommand::UpdateTensorCommand(const Buffer<std::byte>& src, const Ten
 UpdateTensorCommand::~UpdateTensorCommand() = default;
 
 
-void FillTensorCommand::record(vulkan::Command& cmd) const {
+void ClearTensorCommand::record(vulkan::Command& cmd) const {
 	//to shorten things
 	auto& context = tensor.get().getContext();
 	auto buffer = tensor.get().getBuffer().buffer; //ptr -> by value
@@ -337,19 +337,19 @@ void FillTensorCommand::record(vulkan::Command& cmd) const {
 		0, nullptr);
 }
 
-FillTensorCommand::FillTensorCommand(const FillTensorCommand& other) = default;
-FillTensorCommand& FillTensorCommand::operator=(const FillTensorCommand& other) = default;
+ClearTensorCommand::ClearTensorCommand(const ClearTensorCommand& other) = default;
+ClearTensorCommand& ClearTensorCommand::operator=(const ClearTensorCommand& other) = default;
 
-FillTensorCommand::FillTensorCommand(FillTensorCommand&& other) noexcept = default;
-FillTensorCommand& FillTensorCommand::operator=(FillTensorCommand&& other) noexcept = default;
+ClearTensorCommand::ClearTensorCommand(ClearTensorCommand&& other) noexcept = default;
+ClearTensorCommand& ClearTensorCommand::operator=(ClearTensorCommand&& other) noexcept = default;
 
-FillTensorCommand::FillTensorCommand(const Tensor<std::byte>& tensor, const Params& params)
+ClearTensorCommand::ClearTensorCommand(const Tensor<std::byte>& tensor, const Params& params)
 	: Command()
 	, tensor(std::cref(tensor))
 	, offset(params.offset)
 	, size(params.size)
 	, data(params.data)
 {}
-FillTensorCommand::~FillTensorCommand() = default;
+ClearTensorCommand::~ClearTensorCommand() = default;
 
 }

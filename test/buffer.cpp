@@ -119,14 +119,14 @@ TEST_CASE("tensors can be filled with constant data", "[buffer]") {
     auto mem = buffer.getMemory();
 
     beginSequence(getContext())
-        .And(fillTensor(tensor, { .data = 5 }))
+        .And(clearTensor(tensor, { .data = 5 }))
         .Then(retrieveTensor(tensor, buffer))
         .Submit();
 
     REQUIRE(std::all_of(mem.begin(), mem.end(), [](int i) -> bool { return i == 5; }));
 
     beginSequence(getContext())
-        .And(fillTensor(tensor, { .offset = 32, .size = 16, .data = 12 }))
+        .And(clearTensor(tensor, { .offset = 32, .size = 16, .data = 12 }))
         .Then(retrieveTensor(tensor, buffer))
         .Submit();
 

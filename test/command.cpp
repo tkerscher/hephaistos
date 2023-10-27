@@ -65,12 +65,12 @@ TEST_CASE("sequences can handle subroutines", "[command]") {
     Buffer<int> buffer(getContext(), 8);
 
     auto subA = createSubroutine(getContext(), simultaneous_use,
-        fillTensor(tensor, { .data = 5 }));
+        clearTensor(tensor, { .data = 5 }));
     auto subB = createSubroutine(getContext(),
-        fillTensor(tensor, { .size = 8, .data = 19 }),
-        fillTensor(tensor, { .offset = 8, .size = 16, .data = 7 }));
+        clearTensor(tensor, { .size = 8, .data = 19 }),
+        clearTensor(tensor, { .offset = 8, .size = 16, .data = 7 }));
     auto subC = createSubroutine(getContext(),
-        fillTensor(tensor, { .offset = 24, .size = 8, .data = 23 }));
+        clearTensor(tensor, { .offset = 24, .size = 8, .data = 23 }));
 
     REQUIRE(subA.simultaneousUse());
     REQUIRE(!subB.simultaneousUse());

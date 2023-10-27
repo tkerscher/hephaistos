@@ -191,7 +191,7 @@ public:
 	return UpdateTensorCommand(src, dst);
 }
 
-class HEPHAISTOS_API FillTensorCommand : public Command {
+class HEPHAISTOS_API ClearTensorCommand : public Command {
 public:
 	struct Params {
 		uint64_t offset = 0;
@@ -207,19 +207,19 @@ public:
 
 	virtual void record(vulkan::Command& cmd) const override;
 
-	FillTensorCommand(const FillTensorCommand& other);
-	FillTensorCommand& operator=(const FillTensorCommand& other);
+	ClearTensorCommand(const ClearTensorCommand& other);
+	ClearTensorCommand& operator=(const ClearTensorCommand& other);
 
-	FillTensorCommand(FillTensorCommand&& other) noexcept;
-	FillTensorCommand& operator=(FillTensorCommand&& other) noexcept;
+	ClearTensorCommand(ClearTensorCommand&& other) noexcept;
+	ClearTensorCommand& operator=(ClearTensorCommand&& other) noexcept;
 
-	FillTensorCommand(const Tensor<std::byte>& tensor, const Params& params);
-	~FillTensorCommand() override;
+	ClearTensorCommand(const Tensor<std::byte>& tensor, const Params& params);
+	~ClearTensorCommand() override;
 };
-[[nodiscard]] inline FillTensorCommand fillTensor(
-	const Tensor<std::byte>& tensor, const FillTensorCommand::Params& params)
+[[nodiscard]] inline ClearTensorCommand clearTensor(
+	const Tensor<std::byte>& tensor, const ClearTensorCommand::Params& params)
 {
-	return FillTensorCommand(tensor, params);
+	return ClearTensorCommand(tensor, params);
 }
 
 }
