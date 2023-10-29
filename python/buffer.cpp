@@ -102,8 +102,8 @@ void registerTensor(nb::module_& m, const char* name) {
 }
 
 void registerBufferModule(nb::module_& m) {
-    nb::class_<hp::Buffer<std::byte>>(m, "_Buffer");
-    nb::class_<hp::Tensor<std::byte>>(m, "_Tensor");
+    nb::class_<hp::Buffer<std::byte>>(m, "Buffer");
+    nb::class_<hp::Tensor<std::byte>>(m, "Tensor");
 
     nb::class_<RawBuffer, hp::Buffer<std::byte>>(m, "RawBuffer")
         .def(nb::init<uint64_t>())
