@@ -580,6 +580,25 @@ void execute(const ContextHandle& context, const Command& command) {
 	});
 }
 
+void execute(const ContextHandle& context, const Subroutine& subroutine) {
+	//submit with fence, so we can wait for it to finish
+	VkSubmitInfo submitInfo{
+		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.commandBufferCount = 1,
+		.pCommandBuffers = &subroutine.getCommandBuffer().buffer
+	};
+	vulkan::checkResult(context->fnTable.vkQueueSubmit(
+		context->queue, 1, &submitInfo, context->oneTimeSubmitFence));
+
+	//wait for it to finish
+	vulkan::checkResult(context->fnTable.vkWaitForFences(
+		context->device, 1, &context->oneTimeSubmitFence, VK_TRUE, UINT64_MAX));
+
+	//reset fence for next use
+	vulkan::checkResult(context->fnTable.vkResetFences(
+		context->device, 1, &context->oneTimeSubmitFence));
+}
+
 void execute(const ContextHandle& context,
 	const std::function<void(vulkan::Command& cmd)>& emitter)
 {

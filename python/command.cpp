@@ -16,16 +16,14 @@ void registerCommandModule(nb::module_& m) {
         .def_prop_ro("simultaneousUse",
             [](const hp::Subroutine& s) -> bool { return s.simultaneousUse(); },
             "True, if the subroutine can be used simultaneous");
-    
-    nb::class_<hp::SubroutineBuilder>(m, "SubroutineBuilder")
-        .def("__init__", [](hp::SubroutineBuilder* sb, bool simultaneous) {
-            new (sb) hp::SubroutineBuilder(getCurrentContext(), simultaneous);
-        }, "simultaneous"_a = false)
-        .def("addCommand", [](hp::SubroutineBuilder& sb, const hp::Command& c) -> hp::SubroutineBuilder& {
-            return sb.addCommand(c);
-        }, "cmd"_a, "Adds the next command to the subroutine", nb::rv_policy::reference_internal)
-        .def("finish", &hp::SubroutineBuilder::finish,
-            "Builds the subroutine from the recorded commands");
+    m.def("createSubroutine", [](nb::list list, bool simultaneous) -> hp::Subroutine {
+        hp::SubroutineBuilder builder(getCurrentContext(), simultaneous);
+        for (nb::handle h : list) {
+            builder.addCommand(nb::cast<const hp::Command&>(h));
+        }
+        return builder.finish();
+    }, "list"_a, "simultaneous"_a = false,
+    "creates a subroutine from the list of commands");
 
     nb::class_<hp::Timeline>(m, "Timeline")
         .def("__init__", [](hp::Timeline* t) { new (t) hp::Timeline(getCurrentContext()); })
@@ -89,6 +87,8 @@ void registerCommandModule(nb::module_& m) {
     
     m.def("execute", [](const hp::Command& cmd) { hp::execute(getCurrentContext(), cmd); },
         "cmd"_a, "Runs the given command synchronous.");
+    m.def("execute", [](const hp::Subroutine& sub) { hp::execute(getCurrentContext(), sub); },
+        "sub"_a, "Runs the given subroutine synchronous.");
     m.def("executeList", [](nb::list list)
         {
             hp::execute(getCurrentContext(), [&list](hp::vulkan::Command& cmd) {

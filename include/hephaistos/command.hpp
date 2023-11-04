@@ -175,6 +175,7 @@ inline SequenceBuilder beginSequence(const ContextHandle& context) {
 }
 
 HEPHAISTOS_API void execute(const ContextHandle& context, const Command& command);
+HEPHAISTOS_API void execute(const ContextHandle& context, const Subroutine& subroutine);
 HEPHAISTOS_API void execute(const ContextHandle& context,
     const std::function<void(vulkan::Command& cmd)>& emitter);
 template<std::derived_from<Command> ...T>

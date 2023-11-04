@@ -4,5 +4,4 @@ from .util import (
     ArrayTensor,
     StructureBuffer,
     StructureTensor,
-    createSubroutine
 )
