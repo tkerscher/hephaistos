@@ -87,3 +87,19 @@ TEST_CASE("sequences can handle subroutines", "[command]") {
 
     REQUIRE(!hasValidationErrorOccurred());
 }
+
+TEST_CASE("one time submits can handle a list of commands", "[command]") {
+    Tensor<int> tensor(getContext(), 8);
+    Buffer<int> buffer(getContext(), 8);
+
+    executeList(getContext(),
+        clearTensor(tensor, { .size = 8, .data = 19 }),
+        clearTensor(tensor, { .offset = 8, .size = 16, .data = 7 }),
+        clearTensor(tensor, { .offset = 24, .size = 8, .data = 23 }),
+        retrieveTensor(tensor, buffer));
+
+    auto data = std::to_array<int>({ 19, 19, 7, 7, 7, 7, 23, 23 });
+    REQUIRE(std::equal(data.begin(), data.end(), buffer.getMemory().data()));
+
+    REQUIRE(!hasValidationErrorOccurred());
+}

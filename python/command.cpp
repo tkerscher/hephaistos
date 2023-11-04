@@ -1,5 +1,7 @@
 #include <nanobind/nanobind.h>
 
+#include <stdexcept>
+
 #include <hephaistos/command.hpp>
 #include "context.hpp"
 
@@ -54,6 +56,24 @@ void registerCommandModule(nb::module_& m) {
             "Issues the command to run parallel in the current step.", nb::rv_policy::reference_internal)
         .def("And", [](hp::SequenceBuilder& sb, const hp::Subroutine& s) -> hp::SequenceBuilder& { return sb.And(s); }, "subroutine"_a,
             "Issues the subroutine to run parallel in the current step.", nb::rv_policy::reference_internal)
+        .def("AndList", [](hp::SequenceBuilder& sb, nb::list list) -> hp::SequenceBuilder&
+            {
+                for (nb::handle h : list) {
+                    if (nb::isinstance<hp::Command>(h)) {
+                        sb.And(nb::cast<const hp::Command&>(h));
+                    }
+                    else if (nb::isinstance<hp::Subroutine>(h)) {
+                        sb.And(nb::cast<const hp::Subroutine&>(h));
+                    }
+                    else {
+                        //conversion failed
+                        throw std::invalid_argument("Entries in the list must either be subroutines or derive from Command!");
+                    }                    
+                }
+                //done
+                return sb;
+            }, "list"_a, nb::rv_policy::reference_internal,
+            "Issues each element of the list to run parallel in the current step")
         .def("Then", [](hp::SequenceBuilder& sb, const hp::Command& h) -> hp::SequenceBuilder& { return sb.Then(h); }, "cmd"_a,
             "Issues a new step to execute after waiting for the previous one to finish.", nb::rv_policy::reference_internal)
         .def("Then", [](hp::SequenceBuilder& sb, const hp::Subroutine& s) -> hp::SequenceBuilder& { return sb.Then(s); }, "subroutine"_a,
@@ -69,4 +89,12 @@ void registerCommandModule(nb::module_& m) {
     
     m.def("execute", [](const hp::Command& cmd) { hp::execute(getCurrentContext(), cmd); },
         "cmd"_a, "Runs the given command synchronous.");
+    m.def("executeList", [](nb::list list)
+        {
+            hp::execute(getCurrentContext(), [&list](hp::vulkan::Command& cmd) {
+                for (nb::handle h : list) {
+                    nb::cast<const hp::Command&>(h).record(cmd);
+                }
+            });
+        }, "list"_a, "Runs the given of list commands synchronous");
 }

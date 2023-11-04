@@ -580,4 +580,13 @@ void execute(const ContextHandle& context, const Command& command) {
 	});
 }
 
+void execute(const ContextHandle& context,
+	const std::function<void(vulkan::Command& cmd)>& emitter)
+{
+	vulkan::oneTimeSubmit(*context, [&emitter](VkCommandBuffer cmd){
+		vulkan::Command wrapper{ cmd, 0 };
+		emitter(wrapper);
+	});
+}
+
 }

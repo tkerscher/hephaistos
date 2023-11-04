@@ -1,5 +1,9 @@
 #pragma once
 
+#include <concepts>
+#include <functional>
+#include <utility>
+
 #include "hephaistos/context.hpp"
 #include "hephaistos/handles.hpp"
 
@@ -69,13 +73,13 @@ private:
 struct simultaneous_use_tag{};
 inline constexpr simultaneous_use_tag simultaneous_use{};
 
-template<class ...T>
+template<std::derived_from<Command> ...T>
 [[nodiscard]] Subroutine createSubroutine(ContextHandle context, T... commands) {
     SubroutineBuilder builder(std::move(context));
     (builder.addCommand(commands), ...);
     return builder.finish();
 }
-template<class ...T>
+template<std::derived_from<Command> ...T>
 [[nodiscard]] Subroutine createSubroutine(ContextHandle context, simultaneous_use_tag, T... commands) {
     SubroutineBuilder builder(std::move(context), true);
     (builder.addCommand(commands), ...);
@@ -135,6 +139,11 @@ public:
 
     SequenceBuilder& And(const Command& command);
     SequenceBuilder& And(const Subroutine& subroutine);
+    template<class ...T>
+    SequenceBuilder& AndList(const T& ...steps) {
+        (And(steps), ...);
+        return *this;
+    }
     SequenceBuilder& NextStep();
     SequenceBuilder& Then(const Command& command);
     SequenceBuilder& Then(const Subroutine& subroutine);
@@ -166,5 +175,13 @@ inline SequenceBuilder beginSequence(const ContextHandle& context) {
 }
 
 HEPHAISTOS_API void execute(const ContextHandle& context, const Command& command);
+HEPHAISTOS_API void execute(const ContextHandle& context,
+    const std::function<void(vulkan::Command& cmd)>& emitter);
+template<std::derived_from<Command> ...T>
+void executeList(const ContextHandle& context, const T& ...commands) {
+    execute(context, [&commands...](vulkan::Command& cmd) {
+        (commands.record(cmd), ...);
+    });
+}
 
 }
