@@ -147,10 +147,21 @@ public:
     ~Tensor() override = default;
 };
 
+constexpr uint64_t whole_size = (~0ULL);
+struct CopyRegion {
+	uint64_t bufferOffset = 0;
+	uint64_t tensorOffset = 0;
+	uint64_t size = whole_size;
+};
+
 class HEPHAISTOS_API RetrieveTensorCommand : public Command {
 public:
-	std::reference_wrapper<const Tensor<std::byte>> Source;
-	std::reference_wrapper<const Buffer<std::byte>> Destination;
+	std::reference_wrapper<const Tensor<std::byte>> source;
+	std::reference_wrapper<const Buffer<std::byte>> destination;
+
+	uint64_t sourceOffset;
+	uint64_t destinationOffset;
+	uint64_t size;
 
 	virtual void record(vulkan::Command& cmd) const override;
 
@@ -160,19 +171,28 @@ public:
 	RetrieveTensorCommand(RetrieveTensorCommand&& other) noexcept;
 	RetrieveTensorCommand& operator=(RetrieveTensorCommand&& other) noexcept;
 	
-	RetrieveTensorCommand(const Tensor<std::byte>& src, const Buffer<std::byte>& dst);
+	RetrieveTensorCommand(
+		const Tensor<std::byte>& src,
+		const Buffer<std::byte>& dst,
+		const CopyRegion& region = {});
 	~RetrieveTensorCommand() override;
 };
 [[nodiscard]] inline RetrieveTensorCommand retrieveTensor(
-	const Tensor<std::byte>& src, const Buffer<std::byte>& dst)
+	const Tensor<std::byte>& src,
+	const Buffer<std::byte>& dst,
+	const CopyRegion& region = {})
 {
-	return RetrieveTensorCommand(src, dst);
+	return RetrieveTensorCommand(src, dst, region);
 }
 
 class HEPHAISTOS_API UpdateTensorCommand : public Command {
 public:
-	std::reference_wrapper<const Buffer<std::byte>> Source;
-	std::reference_wrapper<const Tensor<std::byte>> Destination;
+	std::reference_wrapper<const Buffer<std::byte>> source;
+	std::reference_wrapper<const Tensor<std::byte>> destination;
+
+	uint64_t sourceOffset;
+	uint64_t destinationOffset;
+	uint64_t size;
 
 	virtual void record(vulkan::Command& cmd) const override;
 
@@ -182,20 +202,25 @@ public:
 	UpdateTensorCommand(UpdateTensorCommand&& other) noexcept;
 	UpdateTensorCommand& operator=(UpdateTensorCommand&& other) noexcept;
 
-	UpdateTensorCommand(const Buffer<std::byte>& src, const Tensor<std::byte>& dst);
+	UpdateTensorCommand(
+		const Buffer<std::byte>& src,
+		const Tensor<std::byte>& dst,
+		const CopyRegion& region = {});
 	~UpdateTensorCommand() override;
 };
 [[nodiscard]] inline UpdateTensorCommand updateTensor(
-	const Buffer<std::byte>& src, const Tensor<std::byte>& dst)
+	const Buffer<std::byte>& src,
+	const Tensor<std::byte>& dst,
+	const CopyRegion& region = {})
 {
-	return UpdateTensorCommand(src, dst);
+	return UpdateTensorCommand(src, dst, region);
 }
 
 class HEPHAISTOS_API ClearTensorCommand : public Command {
 public:
 	struct Params {
 		uint64_t offset = 0;
-		uint64_t size   = (~0ULL); //whole size
+		uint64_t size	= whole_size;
 		uint32_t data   = 0;
 	};
 

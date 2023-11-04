@@ -140,15 +140,74 @@ void registerBufferModule(nb::module_& m) {
     registerTensor<int32_t>(m, "IntTensor");
     registerTensor<int64_t>(m, "LongTensor");
 
-    //register copy commands
+    //retrieve tensor command
     nb::class_<hp::RetrieveTensorCommand, hp::Command>(m, "RetrieveTensorCommand")
-        .def(nb::init<const hp::Tensor<std::byte>&, const hp::Buffer<std::byte>&>());
-    m.def("retrieveTensor", &hp::retrieveTensor, "src"_a, "dst"_a,
-        "Creates a command for copying the src tensor back to the destination buffer. They must match in size.");
+        .def("__init__", [](
+            hp::RetrieveTensorCommand* cmd,
+            const hp::Tensor<std::byte>& src,
+            const hp::Buffer<std::byte>& dst,
+            std::optional<uint64_t> bufferOffset,
+            std::optional<uint64_t> tensorOffset,
+            std::optional<uint64_t> size) {
+                hp::CopyRegion region{};
+                if (bufferOffset) region.bufferOffset = *bufferOffset;
+                if (tensorOffset) region.tensorOffset = *tensorOffset;
+                if (size) region.size = *size;
+                new (cmd) hp::RetrieveTensorCommand(src, dst, region);
+            }, "src"_a, "dst"_a,
+            "bufferOffset"_a.none() = nb::none(),
+            "tensorOffset"_a.none() = nb::none(),
+            "size"_a.none() = nb::none());
+    m.def("retrieveTensor", [](
+        const hp::Tensor<std::byte>& src,
+        const hp::Buffer<std::byte>& dst,
+        std::optional<uint64_t> bufferOffset,
+        std::optional<uint64_t> tensorOffset,
+        std::optional<uint64_t> size) {
+            hp::CopyRegion region{};
+            if (bufferOffset) region.bufferOffset = *bufferOffset;
+            if (tensorOffset) region.tensorOffset = *tensorOffset;
+            if (size) region.size = *size;
+            return hp::retrieveTensor(src, dst, region);
+        }, "src"_a, "dst"_a,
+        "bufferOffset"_a.none() = nb::none(),
+        "tensorOffset"_a.none() = nb::none(),
+        "size"_a.none() = nb::none(),
+        "Creates a command for copying the src tensor back to the destination buffer");
+    //update tensor command
     nb::class_<hp::UpdateTensorCommand, hp::Command>(m, "UpdateTensorCommand")
-        .def(nb::init<const hp::Buffer<std::byte>&, const hp::Tensor<std::byte>&>());
-    m.def("updateTensor", &hp::updateTensor, "src"_a, "dst"_a,
-        "Creates a command for copying the src buffer into the destination tensor. They must match in size.");
+        .def("__init__", [](
+            hp::UpdateTensorCommand* cmd,
+            const hp::Buffer<std::byte>& src,
+            const hp::Tensor<std::byte>& dst,
+            std::optional<uint64_t> bufferOffset,
+            std::optional<uint64_t> tensorOffset,
+            std::optional<uint64_t> size) {
+                hp::CopyRegion region{};
+                if (bufferOffset) region.bufferOffset = *bufferOffset;
+                if (tensorOffset) region.tensorOffset = *tensorOffset;
+                if (size) region.size = *size;
+                new (cmd) hp::UpdateTensorCommand(src, dst, region);
+            }, "src"_a, "dst"_a,
+            "bufferOffset"_a.none() = nb::none(),
+            "tensorOffset"_a.none() = nb::none(),
+            "size"_a.none() = nb::none());
+    m.def("updateTensor", [](
+        const hp::Buffer<std::byte>& src,
+        const hp::Tensor<std::byte>& dst,
+        std::optional<uint64_t> bufferOffset,
+        std::optional<uint64_t> tensorOffset,
+        std::optional<uint64_t> size) {
+            hp::CopyRegion region{};
+            if (bufferOffset) region.bufferOffset = *bufferOffset;
+            if (tensorOffset) region.tensorOffset = *tensorOffset;
+            if (size) region.size = *size;
+            return hp::updateTensor(src, dst, region);
+        }, "src"_a, "dst"_a,
+        "bufferOffset"_a.none() = nb::none(),
+        "tensorOffset"_a.none() = nb::none(),
+        "size"_a.none() = nb::none(),
+        "Creates a command for copying the src buffer into the destination tensor");
     //clear tensor command
     nb::class_<hp::ClearTensorCommand, hp::Command>(m, "ClearTensorCommand")
         .def("__init__", [](

@@ -145,22 +145,34 @@ namespace {
 constexpr auto DIFFERENT_CONTEXT_ERROR_STR =
 	"Source and destination of a copy command must originate from the same context!";
 constexpr auto SIZE_MISMATCH_ERROR_STR =
-	"Source and destination must have the same size!";
+	"Source and destination copy region must have the same size!";
+constexpr auto COPY_REGION_OUT_OF_SOURCE =
+	"Copy region is not contained within the source!";
+constexpr auto COPY_REGION_OUT_OF_DESTINATION =
+	"Copy region is not contained within the destination!";
 
 }
 
 void RetrieveTensorCommand::record(vulkan::Command& cmd) const {
 	//alias for shorter code
-	auto& src = Source.get();
-	auto& dst = Destination.get();
+	auto& src = source.get();
+	auto& dst = destination.get();
 	//Check for src and dst to be from the same context
 	if (src.getContext().get() != dst.getContext().get())
 		throw std::logic_error(DIFFERENT_CONTEXT_ERROR_STR);
 	auto& context = src.getContext();
 	//check both have the same size
-	if (src.size_bytes() != dst.size_bytes())
+	auto srcSize = (size == whole_size ? src.size_bytes() - sourceOffset : size);
+	auto dstSize = (size == whole_size ? dst.size_bytes() - destinationOffset : size);
+	if (srcSize != dstSize)
 		throw std::logic_error(SIZE_MISMATCH_ERROR_STR);
-	auto size = src.size_bytes();
+	//shadow size with actual value
+	auto size = srcSize;
+	//boundary check
+	if (size + sourceOffset > src.size_bytes())
+		throw std::logic_error(COPY_REGION_OUT_OF_SOURCE);
+	if (size + destinationOffset > dst.size_bytes())
+		throw std::logic_error(COPY_REGION_OUT_OF_DESTINATION);
 
 	//we're acting on the transfer stage
 	cmd.stage |= VK_PIPELINE_STAGE_TRANSFER_BIT;
@@ -171,7 +183,8 @@ void RetrieveTensorCommand::record(vulkan::Command& cmd) const {
 		.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
 		.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
 		.buffer = src.getBuffer().buffer,
-		.size = VK_WHOLE_SIZE
+		.offset = sourceOffset,
+		.size = size
 	};
 	context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -183,6 +196,8 @@ void RetrieveTensorCommand::record(vulkan::Command& cmd) const {
 
 	//actually copy the buffer
 	VkBufferCopy copyRegion{
+		.srcOffset = sourceOffset,
+		.dstOffset = destinationOffset,
 		.size = size
 	};
 	context->fnTable.vkCmdCopyBuffer(cmd.buffer,
@@ -196,7 +211,8 @@ void RetrieveTensorCommand::record(vulkan::Command& cmd) const {
 		.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
 		.dstAccessMask = VK_ACCESS_HOST_READ_BIT,
 		.buffer = dst.getBuffer().buffer,
-		.size = VK_WHOLE_SIZE
+		.offset = destinationOffset,
+		.size = size
 	};
 	context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
 		VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -213,25 +229,39 @@ RetrieveTensorCommand& RetrieveTensorCommand::operator=(const RetrieveTensorComm
 RetrieveTensorCommand::RetrieveTensorCommand(RetrieveTensorCommand&& other) noexcept = default;
 RetrieveTensorCommand& RetrieveTensorCommand::operator=(RetrieveTensorCommand&& other) noexcept = default;
 
-RetrieveTensorCommand::RetrieveTensorCommand(const Tensor<std::byte>& src, const Buffer<std::byte>& dst)
+RetrieveTensorCommand::RetrieveTensorCommand(
+	const Tensor<std::byte>& src,
+	const Buffer<std::byte>& dst,
+	const CopyRegion& region)
 	: Command()
-	, Source(std::cref(src))
-	, Destination(std::cref(dst))
+	, source(std::cref(src))
+	, destination(std::cref(dst))
+	, sourceOffset(region.tensorOffset)
+	, destinationOffset(region.bufferOffset)
+	, size(region.size)
 {}
 RetrieveTensorCommand::~RetrieveTensorCommand() = default;
 
 void UpdateTensorCommand::record(vulkan::Command& cmd) const {
 	//to shorten the code
-	auto& src = Source.get();
-	auto& dst = Destination.get();
+	auto& src = source.get();
+	auto& dst = destination.get();
 	//Check for src and dst to be from the same context
 	if (src.getContext().get() != dst.getContext().get())
 		throw std::logic_error(DIFFERENT_CONTEXT_ERROR_STR);
 	auto& context = src.getContext();
 	//check both have the same size
-	if (src.size_bytes() != dst.size_bytes())
+	auto srcSize = (size == whole_size ? src.size_bytes() - sourceOffset : size);
+	auto dstSize = (size == whole_size ? dst.size_bytes() - destinationOffset : size);
+	if (srcSize != dstSize)
 		throw std::logic_error(SIZE_MISMATCH_ERROR_STR);
-	auto size = src.size_bytes();
+	//shadow size with actual size
+	auto size = srcSize;
+	//boundary check
+	if (size + sourceOffset > src.size_bytes())
+		throw std::logic_error(COPY_REGION_OUT_OF_SOURCE);
+	if (size + destinationOffset > dst.size_bytes())
+		throw std::logic_error(COPY_REGION_OUT_OF_DESTINATION);
 
 	//we're acting on the transfer stage
 	cmd.stage |= VK_PIPELINE_STAGE_TRANSFER_BIT;
@@ -242,7 +272,8 @@ void UpdateTensorCommand::record(vulkan::Command& cmd) const {
 		.srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 		.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
 		.buffer = dst.getBuffer().buffer,
-		.size = VK_WHOLE_SIZE
+		.offset = destinationOffset,
+		.size = size
 	};
 	context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
 		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -254,6 +285,8 @@ void UpdateTensorCommand::record(vulkan::Command& cmd) const {
 
 	//actually copy the buffer
 	VkBufferCopy copyRegion{
+		.srcOffset = sourceOffset,
+		.dstOffset = destinationOffset,
 		.size = size
 	};
 	context->fnTable.vkCmdCopyBuffer(cmd.buffer,
@@ -267,7 +300,8 @@ void UpdateTensorCommand::record(vulkan::Command& cmd) const {
 		.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
 		.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
 		.buffer = dst.getBuffer().buffer,
-		.size = VK_WHOLE_SIZE
+		.offset = destinationOffset,
+		.size = size
 	};
 	context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
 		VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -284,10 +318,16 @@ UpdateTensorCommand& UpdateTensorCommand::operator=(const UpdateTensorCommand& o
 UpdateTensorCommand::UpdateTensorCommand(UpdateTensorCommand&& other) noexcept = default;
 UpdateTensorCommand& UpdateTensorCommand::operator=(UpdateTensorCommand&& other) noexcept = default;
 
-UpdateTensorCommand::UpdateTensorCommand(const Buffer<std::byte>& src, const Tensor<std::byte>& dst)
+UpdateTensorCommand::UpdateTensorCommand(
+	const Buffer<std::byte>& src,
+	const Tensor<std::byte>& dst,
+	const CopyRegion& region)
 	: Command()
-	, Source(std::cref(src))
-	, Destination(std::cref(dst))
+	, source(std::cref(src))
+	, destination(std::cref(dst))
+	, sourceOffset(region.bufferOffset)
+	, destinationOffset(region.tensorOffset)
+	, size(region.size)
 {}
 UpdateTensorCommand::~UpdateTensorCommand() = default;
 

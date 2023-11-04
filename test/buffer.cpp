@@ -82,6 +82,28 @@ TEST_CASE("buffers and tensors can be copied into each other", "[buffer]") {
     REQUIRE(!hasValidationErrorOccurred());
 }
 
+TEST_CASE("subregions of buffer and tensors can be copied into each other", "[buffer]") {
+    Buffer<int> bufferIn(getContext(), 10);
+    Buffer<int> bufferOut(getContext(), 10);
+    Tensor<int> tensor(getContext(), 10);
+
+    std::copy(data.begin(), data.end(), bufferIn.getMemory().data());
+    std::memset(bufferOut.getMemory().data(), 0, 40);
+
+    beginSequence(getContext())
+        .And(updateTensor(bufferIn, tensor, { .bufferOffset = 20, .size = 20 }))
+        .And(updateTensor(bufferIn, tensor, { .tensorOffset = 20, .size = 20 }))
+        .Then(retrieveTensor(tensor, bufferOut, { .bufferOffset = 8, .tensorOffset = 12, .size = 24 }))
+        .Submit();
+
+    auto scrambled = std::to_array({
+        0, 0, 1500, -45123, 10, -5, 6, 45, 0, 0 
+    });
+    REQUIRE(std::equal(scrambled.begin(), scrambled.end(), bufferOut.getMemory().begin()));
+
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
 TEST_CASE("tensors can be initialized with data", "[buffer]") {
     Tensor<int> tensor(getContext(), data);
     Buffer<int> buffer(getContext(), tensor.size());
