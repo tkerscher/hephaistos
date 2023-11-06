@@ -5,39 +5,39 @@
 namespace hephaistos {
 
 struct AtomicsProperties {
-	bool bufferInt64Atomics;
+    bool bufferInt64Atomics;
 
-	bool bufferFloat16Atomics;
-	bool bufferFloat16AtomicAdd;
-	bool bufferFloat16AtomicMinMax;
+    bool bufferFloat16Atomics;
+    bool bufferFloat16AtomicAdd;
+    bool bufferFloat16AtomicMinMax;
 
-	bool bufferFloat32Atomics;
-	bool bufferFloat32AtomicAdd;
-	bool bufferFloat32AtomicMinMax;
+    bool bufferFloat32Atomics;
+    bool bufferFloat32AtomicAdd;
+    bool bufferFloat32AtomicMinMax;
 
-	bool bufferFloat64Atomics;
-	bool bufferFloat64AtomicAdd;
-	bool bufferFloat64AtomicMinMax;
+    bool bufferFloat64Atomics;
+    bool bufferFloat64AtomicAdd;
+    bool bufferFloat64AtomicMinMax;
 
-	bool sharedInt64Atomics;
+    bool sharedInt64Atomics;
 
-	bool sharedFloat16Atomics;
-	bool sharedFloat16AtomicAdd;
-	bool sharedFloat16AtomicMinMax;
+    bool sharedFloat16Atomics;
+    bool sharedFloat16AtomicAdd;
+    bool sharedFloat16AtomicMinMax;
 
-	bool sharedFloat32Atomics;
-	bool sharedFloat32AtomicAdd;
-	bool sharedFloat32AtomicMinMax;
+    bool sharedFloat32Atomics;
+    bool sharedFloat32AtomicAdd;
+    bool sharedFloat32AtomicMinMax;
 
-	bool sharedFloat64Atomics;
-	bool sharedFloat64AtomicAdd;
-	bool sharedFloat64AtomicMinMax;
+    bool sharedFloat64Atomics;
+    bool sharedFloat64AtomicAdd;
+    bool sharedFloat64AtomicMinMax;
 
-	bool imageInt64Atomics;
+    bool imageInt64Atomics;
 
-	bool imageFloat32Atomics;
-	bool imageFloat32AtomicAdd;
-	bool imageFloat32AtomicMinMax;
+    bool imageFloat32Atomics;
+    bool imageFloat32AtomicAdd;
+    bool imageFloat32AtomicMinMax;
 };
 
 [[nodiscard]]

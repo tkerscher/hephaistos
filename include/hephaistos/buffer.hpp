@@ -235,7 +235,7 @@ class HEPHAISTOS_API ClearTensorCommand : public Command {
 public:
     struct Params {
         uint64_t offset = 0;
-        uint64_t size	= whole_size;
+        uint64_t size   = whole_size;
         uint32_t data   = 0;
     };
 

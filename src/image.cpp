@@ -327,17 +327,17 @@ ImageBuffer ImageBuffer::load(ContextHandle context, const char* filename) {
 }
 ImageBuffer ImageBuffer::load(ContextHandle context, std::span<const std::byte> memory) {
     int x, y, n;
-	auto data = stbi_load_from_memory(
-		reinterpret_cast<const unsigned char*>(memory.data()),
-		static_cast<int>(memory.size_bytes()),
-		&x, &y, &n, STBI_rgb_alpha);
-	ImageBuffer result(context, x, y);
-	auto mem = result.getMemory();
+    auto data = stbi_load_from_memory(
+        reinterpret_cast<const unsigned char*>(memory.data()),
+        static_cast<int>(memory.size_bytes()),
+        &x, &y, &n, STBI_rgb_alpha);
+    ImageBuffer result(context, x, y);
+    auto mem = result.getMemory();
 
-	memcpy(mem.data(), data, mem.size_bytes());
-	stbi_image_free(data);
+    memcpy(mem.data(), data, mem.size_bytes());
+    stbi_image_free(data);
 
-	return result;
+    return result;
 }
 
 void ImageBuffer::save(const char* filename) const {

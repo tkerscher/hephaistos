@@ -15,12 +15,12 @@ namespace hephaistos {
 [[nodiscard]] HEPHAISTOS_API ExtensionHandle createRaytracingExtension();
 
 struct TransformMatrix {
-	float matrix[3][4];
+    float matrix[3][4];
 };
 constexpr TransformMatrix IdentityTransform = {
-	1.0f, 0.0f, 0.0f, 0.0f,
-	0.0f, 1.0f, 0.0f, 0.0f,
-	0.0f, 0.0f, 1.0f, 0.0f
+    1.0f, 0.0f, 0.0f, 0.0f,
+    0.0f, 1.0f, 0.0f, 0.0f,
+    0.0f, 0.0f, 1.0f, 0.0f
 };
 
 struct Mesh {
@@ -81,21 +81,21 @@ private:
 
 class HEPHAISTOS_API AccelerationStructure : public Argument, public Resource {
 public:
-	void bindParameter(VkWriteDescriptorSet& binding) const final override;
+    void bindParameter(VkWriteDescriptorSet& binding) const final override;
 
-	AccelerationStructure(const AccelerationStructure&) = delete;
-	AccelerationStructure& operator=(const AccelerationStructure&) = delete;
+    AccelerationStructure(const AccelerationStructure&) = delete;
+    AccelerationStructure& operator=(const AccelerationStructure&) = delete;
 
-	AccelerationStructure(AccelerationStructure&&) noexcept;
-	AccelerationStructure& operator=(AccelerationStructure&&) noexcept;
+    AccelerationStructure(AccelerationStructure&&) noexcept;
+    AccelerationStructure& operator=(AccelerationStructure&&) noexcept;
 
-	AccelerationStructure(ContextHandle context, const GeometryInstance& instance);
-	AccelerationStructure(ContextHandle context, std::span<const GeometryInstance> instances);
-	~AccelerationStructure() override;
+    AccelerationStructure(ContextHandle context, const GeometryInstance& instance);
+    AccelerationStructure(ContextHandle context, std::span<const GeometryInstance> instances);
+    ~AccelerationStructure() override;
 
 private:
-	struct Parameter;
-	std::unique_ptr<Parameter> param;
+    struct Parameter;
+    std::unique_ptr<Parameter> param;
 };
 
 }
