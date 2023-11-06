@@ -4,6 +4,7 @@
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
 
+#include <cstdint>
 #include <sstream>
 #include <string>
 
@@ -75,28 +76,42 @@ class TypedTensor : public hp::Tensor<T> {
 public:
     using array_type = nb::ndarray<T, nb::shape<nb::any>, nb::c_contig, nb::device::cpu>;
 
-    TypedTensor(size_t count) : hp::Tensor<T>(getCurrentContext(), count) {}
-    TypedTensor(uint64_t addr, size_t n) : hp::Tensor<T>(getCurrentContext(), { reinterpret_cast<const T*>(addr), n }) {}
-    TypedTensor(const array_type& array) : hp::Tensor<T>(getCurrentContext(), span_cast(array)) {}
+    TypedTensor(size_t count, bool mapped)
+        : hp::Tensor<T>(getCurrentContext(), count, mapped) {}
+    TypedTensor(uint64_t addr, size_t n, bool mapped)
+        : hp::Tensor<T>(getCurrentContext(), { reinterpret_cast<const T*>(addr), n }, mapped) {}
+    TypedTensor(const array_type& array, bool mapped)
+        : hp::Tensor<T>(getCurrentContext(), span_cast(array), mapped) {}
     ~TypedTensor() override = default;
 };
 template<class T>
 void registerTensor(nb::module_& m, const char* name) {
     nb::class_<TypedTensor<T>, hp::Tensor<std::byte>>(m, name)
-        .def(nb::init<size_t>())
-        .def(nb::init<uint64_t, size_t>())
-        .def(nb::init<const typename TypedTensor<T>::array_type&>())
-        .def_prop_ro("address", [](const TypedTensor<T>& t) { return t.address(); }, "The device address of this tensor.")
-        .def_prop_ro("size", [](const TypedTensor<T>& t) { return t.size(); }, "The number of elements in this tensor.")
-        .def_prop_ro("size_bytes", [](const TypedTensor<T>& t) { return t.size_bytes(); }, "The size of the tensor in bytes.")
-        .def("bindParameter", [](const TypedTensor<T>& t, hp::Program& p, uint32_t b) { t.bindParameter(p.getBinding(b)); } )
+        .def(nb::init<size_t, bool>(), "size"_a, "mapped"_a = false)
+        .def(nb::init<uint64_t, size_t, bool>(), "addr"_a, "n"_a, "mapped"_a = false)
+        .def(nb::init<const typename TypedTensor<T>::array_type&, bool>(), "array"_a, "mapped"_a = false)
+        .def_prop_ro("address", [](const TypedTensor<T>& t) { return t.address(); },
+            "The device address of this tensor.")
+        .def_prop_ro("isMapped", [](const TypedTensor<T>& t) { return t.isMapped(); },
+            "True, if the underlying memory is writable by the CPU.")
+        .def_prop_ro("memory", [](const TypedTensor<T>& t) { return reinterpret_cast<intptr_t>(t.getMemory().data()); },
+            "Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.")
+        .def_prop_ro("size", [](const TypedTensor<T>& t) { return t.size(); },
+            "The number of elements in this tensor.")
+        .def_prop_ro("size_bytes", [](const TypedTensor<T>& t) { return t.size_bytes(); },
+            "The size of the tensor in bytes.")
+        .def("bindParameter", [](const TypedTensor<T>& t, hp::Program& p, uint32_t b) {t.bindParameter(p.getBinding(b)); } )
         .def("bindParameter", [](const TypedTensor<T>& t, hp::Program& p, std::string_view b) { t.bindParameter(p.getBinding(b)); } )
         .def("__repr__", [name = std::string(name)](const TypedTensor<T>& t) {
             std::ostringstream str;
             str << name
                 << "[" << t.size() << "] ("
                 << t.size_bytes() << " bytes) at 0x"
-                << std::uppercase << std::hex << t.address() <<'\n';
+                << std::uppercase << std::hex << t.address();
+            if (t.isMapped())
+                str << " (mapped)\n";
+            else
+                str << '\n';
             return str.str();
         });
 }

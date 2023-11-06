@@ -66,6 +66,16 @@ uint64_t Tensor<std::byte>::address() const noexcept {
 	return parameter->address;
 }
 
+std::span<std::byte> Tensor<std::byte>::getMemory() const {
+	if (!isMapped()) return {};
+
+	return { static_cast<std::byte*>(buffer->allocInfo.pMappedData), _size };
+}
+
+bool Tensor<std::byte>::isMapped() const noexcept {
+	return buffer->allocInfo.pMappedData != nullptr;
+}
+
 uint64_t Tensor<std::byte>::size_bytes() const noexcept {
 	return _size;
 }
@@ -97,17 +107,29 @@ Tensor<std::byte>& Tensor<std::byte>::operator=(Tensor<std::byte>&& other) noexc
 	return *this;
 }
 
-Tensor<std::byte>::Tensor(ContextHandle context, uint64_t size)
+namespace {
+
+constexpr VkBufferUsageFlags tensor_usage =
+	VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+	VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+	VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+	VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+	VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+constexpr VmaAllocationCreateFlags tensor_mapped_flags =
+	VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+	VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT |
+	VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+}
+
+Tensor<std::byte>::Tensor(ContextHandle context, uint64_t size, bool mapped)
 	: Resource(std::move(context))
 	, _size(size)
 	, buffer(vulkan::createBuffer(
 		getContext(), size,
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-		VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-		VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-		0))
+		tensor_usage,
+		mapped ? tensor_mapped_flags : 0))
 	, parameter(std::make_unique<Parameter>())
 {
 	parameter->buffer = VkDescriptorBufferInfo{
@@ -123,8 +145,8 @@ Tensor<std::byte>::Tensor(ContextHandle context, uint64_t size)
 	parameter->address = getContext()->fnTable.vkGetBufferDeviceAddress(
 		getContext()->device, &addressInfo);
 }
-Tensor<std::byte>::Tensor(const Buffer<std::byte>& source)
-	: Tensor<std::byte>(source.getContext(), source.size_bytes())
+Tensor<std::byte>::Tensor(const Buffer<std::byte>& source, bool mapped)
+	: Tensor<std::byte>(source.getContext(), source.size_bytes(), mapped)
 {
 	//one time submit copy buffer to source
 	UpdateTensorCommand command(source, *this);
@@ -133,8 +155,8 @@ Tensor<std::byte>::Tensor(const Buffer<std::byte>& source)
 		command.record(wrapper);
 	});
 }
-Tensor<std::byte>::Tensor(ContextHandle context, std::span<const std::byte> data)
-	: Tensor<std::byte>(Buffer<std::byte>(std::move(context), data))
+Tensor<std::byte>::Tensor(ContextHandle context, std::span<const std::byte> data, bool mapped)
+	: Tensor<std::byte>(Buffer<std::byte>(std::move(context), data), mapped)
 {}
 Tensor<std::byte>::~Tensor() = default;
 

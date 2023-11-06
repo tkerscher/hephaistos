@@ -65,6 +65,24 @@ TEST_CASE("tensor know about their size", "[buffer]") {
     REQUIRE(!hasValidationErrorOccurred());
 }
 
+TEST_CASE("tensors can be mapped", "[buffer]") {
+    Tensor<int> tensor(getContext(), 10, true);
+    if (!tensor.isMapped()) {
+        SKIP("device has no host visible, devive local memory");
+    }
+    Buffer<int> buffer(getContext(), 10);
+    auto mem = buffer.getMemory();
+
+    std::memset(mem.data(), 0, 40);
+    std::memcpy(tensor.getMemory().data(), data.data(), 40);
+
+    execute(getContext(), retrieveTensor(tensor, buffer));
+
+    REQUIRE(std::equal(data.begin(), data.end(), mem.begin()));
+
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
 TEST_CASE("buffers and tensors can be copied into each other", "[buffer]") {
     Buffer<int> bufferIn(getContext(), 10);
     Buffer<int> bufferOut(getContext(), 10);
