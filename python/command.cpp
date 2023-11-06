@@ -76,6 +76,8 @@ void registerCommandModule(nb::module_& m) {
             "Issues a new step to execute after waiting for the previous one to finish.", nb::rv_policy::reference_internal)
         .def("Then", [](hp::SequenceBuilder& sb, const hp::Subroutine& s) -> hp::SequenceBuilder& { return sb.Then(s); }, "subroutine"_a,
             "Issues a new step to execute after waiting for the previous one to finish.", nb::rv_policy::reference_internal)
+        .def("NextStep", &hp::SequenceBuilder::NextStep, nb::rv_policy::reference_internal,
+            "Issues a new step. Following calls to And are ensured to run after previous ones finished.")
         .def("WaitFor", &hp::SequenceBuilder::WaitFor, "value"_a,
             "Issues a new step to execute after the timeline reaches the given value.", nb::rv_policy::reference_internal)
         .def("Submit", &hp::SequenceBuilder::Submit, "Submits the recorded steps as a single batch to the GPU.");
