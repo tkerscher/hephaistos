@@ -115,6 +115,7 @@ void registerRaytracing(nb::module_& m) {
     nb::class_<hp::GeometryStore>(m, "GeometryStore")
         .def("__init__",
             [](hp::GeometryStore* gs, std::vector<NumpyMesh> meshes, bool keepMeshData) {
+                nb::gil_scoped_release release;
                 //we need to transform numpy meshes to hp::Meshes
                 //before passing to the constructor
                 std::vector<hp::Mesh> plainMeshes(meshes.size());
@@ -132,12 +133,14 @@ void registerRaytracing(nb::module_& m) {
             "Number of geometries stored")
         .def("createInstance",
             [](const hp::GeometryStore& gs, size_t idx) -> hp::GeometryInstance {
+                nb::gil_scoped_release release;
                 return gs.createInstance(idx);
             }, "idx"_a, "Creates a new instance of the specified geometry",
             nb::rv_policy::reference_internal);
     
     nb::class_<hp::AccelerationStructure>(m, "AccelerationStructure")
         .def("__init__", [](hp::AccelerationStructure* as, std::vector<hp::GeometryInstance> instances) {
+            nb::gil_scoped_release release;
             new (as) hp::AccelerationStructure(getCurrentContext(), instances);
         }, "instances"_a, "Creates an acceleration structure for consumption in shaders from the given geometry instances.")
         .def("bindParameter",

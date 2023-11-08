@@ -11,6 +11,7 @@ using namespace nb::literals;
 void registerStopWatchModule(nb::module_& m) {
     nb::class_<hp::StopWatch>(m, "StopWatch")
         .def("__init__", [](hp::StopWatch* w, uint32_t stops) {
+                nb::gil_scoped_release release;
                 new (w) hp::StopWatch(getCurrentContext(), stops);
             }, "stops"_a = 1, "Creates a new stopwatch for measuring elapsed time between commands.")
         .def_prop_ro("stopCount", [](const hp::StopWatch& w) -> uint32_t { return w.getStopCount(); },

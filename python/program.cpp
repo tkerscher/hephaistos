@@ -129,10 +129,12 @@ void registerProgramModule(nb::module_& m) {
     
     nb::class_<hp::Program>(m, "Program")
         .def("__init__", [](hp::Program* p, nb::bytes code) {
+                nb::gil_scoped_release release;
                 new (p) hp::Program(getCurrentContext(),
                     std::span<const uint32_t>{ reinterpret_cast<const uint32_t*>(code.c_str()), code.size() / 4 });
             }, "code"_a)
         .def("__init__", [](hp::Program* p, nb::bytes code, nb::bytes spec) {
+                nb::gil_scoped_release release;
                 new (p) hp::Program(
                     getCurrentContext(),
                     std::span<const uint32_t>{ reinterpret_cast<const uint32_t*>(code.c_str()), code.size() / 4 },

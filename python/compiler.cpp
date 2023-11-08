@@ -22,11 +22,21 @@ void registerCompilerModule(nb::module_& m) {
         .def("clearIncludeDir", &hp::Compiler::clearIncludeDir,
             "Clears the internal list of include directories")
         .def("compile", [](const hp::Compiler& c, std::string_view code) -> nb::bytes {
-            auto result = c.compile(code);
+            std::vector<uint32_t> result;
+            {
+                //release gil during compilation
+                nb::gil_scoped_release release;
+                result = c.compile(code);
+            }
             return nb::bytes((const char*)result.data(), result.size()*4);
         }, "code"_a, "Compiles the given GLSL code and returns the SPIR-V code as bytes")
         .def("compile", [](const hp::Compiler& c, std::string_view code, const hp::Compiler::HeaderMap& headers) -> nb::bytes {
-            auto result = c.compile(code, headers);
+            std::vector<uint32_t> result;
+            {
+                //release GIL during compilation
+                nb::gil_scoped_release release;
+                result = c.compile(code, headers);
+            }
             return nb::bytes((const char*)result.data(), result.size()*4);
         }, "code"_a, "headers"_a, "Compiles the given GLSL code using the provided header files and returns the SPIR-V code as bytes");
 }
