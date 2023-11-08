@@ -206,12 +206,11 @@ AtomicsExtension::AtomicsExtension(const AtomicsProperties& props)
     //check which extensions we need
     if (flags & imageExtFlags)
         extensions.push_back(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME);
-    if (flags & int64ExtFlags)
-        extensions.push_back(VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME);
     if (flags & floatExt1Flags)
         extensions.push_back(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
     if (flags & floatExt2Flags)
         extensions.push_back(VK_EXT_SHADER_ATOMIC_FLOAT_2_EXTENSION_NAME);
+    //VK_KHR_SHADER_ATOMIC_INT64 is part of Vulkan 1.2
 
     //fill feature structs
     imageFeat = VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT{
