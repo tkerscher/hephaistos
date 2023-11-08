@@ -148,6 +148,7 @@ public:
     SequenceBuilder& Then(const Command& command);
     SequenceBuilder& Then(const Subroutine& subroutine);
     SequenceBuilder& WaitFor(uint64_t value);
+    SequenceBuilder& WaitFor(const Timeline& timeline, uint64_t value);
     Submission Submit();
 
     SequenceBuilder(SequenceBuilder&) = delete;

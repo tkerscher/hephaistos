@@ -60,6 +60,36 @@ TEST_CASE("sequences can wait for the cpu", "[command]") {
     REQUIRE(!hasValidationErrorOccurred());
 }
 
+TEST_CASE("sequences can wait on multiple timelines", "[command]") {
+    Timeline timeline(getContext());
+    Tensor<int> tensor(getContext(), 8);
+    Buffer<int> buffer(getContext(), 8);
+    auto mem = buffer.getMemory();
+    std::memset(mem.data(), 0, 40);
+
+    auto submission = beginSequence(getContext())
+        .AndList(
+            clearTensor(tensor, { .size = 8, .data = 19 }),
+            clearTensor(tensor, { .offset = 8, .size = 16, .data = 7 }),
+            clearTensor(tensor, { .offset = 24, .size = 8, .data = 23 })
+        ).WaitFor(timeline, 5)
+        .And(retrieveTensor(tensor, buffer)).Submit();
+
+    REQUIRE(!submission.wait(100));
+    REQUIRE(std::all_of(mem.begin(), mem.end(), [](int i) { return i == 0; }));
+
+    timeline.setValue(3);
+    REQUIRE(!submission.wait(100));
+    REQUIRE(std::all_of(mem.begin(), mem.end(), [](int i) { return i == 0; }));
+
+    timeline.setValue(5);
+    REQUIRE(submission.wait(100));
+    auto data = std::to_array<int>({ 19, 19, 7, 7, 7, 7, 23, 23 });
+    REQUIRE(std::equal(mem.begin(), mem.end(), data.begin()));
+
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
 TEST_CASE("sequences can handle subroutines", "[command]") {
     Tensor<int> tensor(getContext(), 8);
     Buffer<int> buffer(getContext(), 8);
