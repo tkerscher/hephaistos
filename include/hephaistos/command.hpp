@@ -114,6 +114,10 @@ public:
     const Timeline& getTimeline() const;
     uint64_t getFinalStep() const;
 
+    //true, if submission manages no internal resources
+    //i.e. destruction causes no wait on completion
+    [[nodiscard]] bool forgettable() const noexcept;
+
     void wait() const;
     [[nodiscard]] bool wait(uint64_t timeout) const;
 

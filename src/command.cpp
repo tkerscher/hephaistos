@@ -192,6 +192,10 @@ struct SubmissionResources {
 const Timeline& Submission::getTimeline() const { return timeline.get(); }
 uint64_t Submission::getFinalStep() const { return finalStep; }
 
+bool Submission::forgettable() const noexcept {
+    return !resources || resources->commands.empty();
+}
+
 void Submission::wait() const {
     if (finalStep > 0)
         timeline.get().waitValue(finalStep);
@@ -225,7 +229,7 @@ Submission::Submission(const Timeline& timeline, uint64_t finalStep, std::unique
 {}
 Submission::~Submission() {
     //reset pool if there is one
-    if (resources && resources->commands.size() > 0) {
+    if (!forgettable()) {
         //ensure we're save to reset pool by waiting submission to finish
         wait();
 
