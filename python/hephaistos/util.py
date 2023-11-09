@@ -90,11 +90,11 @@ class ArrayTensor(ByteTensor):
     and size.
     """
 
-    def __init__(self, type: ctypes.Structure, size: int):
+    def __init__(self, type: ctypes.Structure, size: int, mapped: bool = False):
         """
         Create a typed array tensor of given type and size.
         """
-        super().__init__(ctypes.sizeof(type) * size)
+        super().__init__(ctypes.sizeof(type) * size, mapped)
 
 class StructureBuffer(RawBuffer):
     """
@@ -125,14 +125,14 @@ class StructureTensor(ByteTensor):
     Helper class for creating tensors matching the size of a given struct.
     """
 
-    def __init__(self, typeOrData: Union[ctypes.Structure,Any]):
+    def __init__(self, typeOrData: Union[ctypes.Structure,Any], mapped: bool = False):
         """
         Creates a tensor with the exact size to hold the given structure.
         """
         if type(typeOrData) == type(ctypes.Structure):
-            super().__init__(ctypes.sizeof(typeOrData))
+            super().__init__(ctypes.sizeof(typeOrData), mapped)
         else:
-            super().__init__(ctypes.addressof(typeOrData), ctypes.sizeof(typeOrData))
+            super().__init__(ctypes.addressof(typeOrData), ctypes.sizeof(typeOrData), mapped)
 
 def _bindParams(program: Program, *params, **namedparams) -> None:
     """
