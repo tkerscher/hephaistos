@@ -10,6 +10,7 @@
 #include <hephaistos/program.hpp>
 
 //shader code
+#include "shader/dispatchIndirect.h"
 #include "shader/image.h"
 #include "shader/localsize.h"
 #include "shader/push.h"
@@ -139,4 +140,26 @@ TEST_CASE("program can reflect the local size", "[program]") {
 TEST_CASE("dispatch command checks if all params are bound", "[program]") {
     Program program(getContext(), ubo_code);
     CHECK_THROWS(beginSequence(getContext()).And(program.dispatch(3)));
+}
+
+TEST_CASE("dispatch indirect correctly reads work group size from buffer", "[program]") {
+    Tensor<uint32_t> tensor(getContext(), 3);
+    Buffer<uint32_t> buffer(getContext(), 3);
+    auto mem = buffer.getMemory();
+
+    Buffer<uint32_t> paramBuffer(getContext(), { 12,45,13,46,45,16,5,39 });
+    Tensor<uint32_t> paramTensor(getContext(), paramBuffer.size());
+    Program program(getContext(), dispatchIndirect_code);
+    program.bindParameterList(tensor);
+
+    beginSequence(getContext()).AndList(
+        updateTensor(paramBuffer, paramTensor),
+        program.dispatchIndirect(paramTensor, 12),
+        retrieveTensor(tensor, buffer)
+    ).Submit().wait();
+
+    auto expected = std::to_array<uint32_t>({ 46,45,16 });
+    REQUIRE(std::equal(expected.begin(), expected.end(), mem.begin()));
+
+    REQUIRE(!hasValidationErrorOccurred());
 }

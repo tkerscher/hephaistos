@@ -1,0 +1,23 @@
+#version 460
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) int;
+
+layout(std430, binding = 0) writeonly buffer Output{
+    uint x;
+    uint y;
+    uint z;
+};
+
+void main() {
+    //write group size
+    uint id = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y + gl_GlobalInvocationID.z;
+    if (
+        gl_GlobalInvocationID.x +
+        gl_GlobalInvocationID.y +
+        gl_GlobalInvocationID.z == 0
+    ) {
+        x = gl_NumWorkGroups.x;
+        y = gl_NumWorkGroups.y;
+        z = gl_NumWorkGroups.z;
+    }
+}

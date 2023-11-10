@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "hephaistos/argument.hpp"
+#include "hephaistos/buffer.hpp"
 #include "hephaistos/command.hpp"
 #include "hephaistos/imageformat.hpp"
 
@@ -26,8 +27,10 @@ struct SubgroupProperties {
     bool shuffleClusteredSupport;
     bool quadSupport;
 };
-HEPHAISTOS_API SubgroupProperties getSubgroupProperties(const DeviceHandle& device);
-HEPHAISTOS_API SubgroupProperties getSubgroupProperties(const ContextHandle& context);
+[[nodiscard]] HEPHAISTOS_API SubgroupProperties
+    getSubgroupProperties(const DeviceHandle& device);
+[[nodiscard]] HEPHAISTOS_API SubgroupProperties
+    getSubgroupProperties(const ContextHandle& context);
 
 enum class DescriptorType {
     /*SAMPLER = 0,*/
@@ -71,8 +74,42 @@ public:
     DispatchCommand(DispatchCommand&&) noexcept;
     DispatchCommand& operator=(DispatchCommand&&) noexcept;
 
-    DispatchCommand(const vulkan::Program& program, uint32_t x, uint32_t y, uint32_t z, std::span<const std::byte> push);
+    DispatchCommand(
+        const vulkan::Program& program,
+        uint32_t x, uint32_t y, uint32_t z,
+        std::span<const std::byte> push);
     ~DispatchCommand() override;
+
+private:
+    std::reference_wrapper<const vulkan::Program> program;
+};
+
+struct DispatchIndirect {
+    uint32_t groupCountX;
+    uint32_t groupCountY;
+    uint32_t groupCountZ;
+};
+
+class HEPHAISTOS_API DispatchIndirectCommand : public Command {
+public:
+    std::reference_wrapper<const Tensor<std::byte>> tensor;
+    uint64_t offset;
+    std::span<const std::byte> pushData;
+
+    void record(vulkan::Command& cmd) const override;
+
+    DispatchIndirectCommand(const DispatchIndirectCommand&);
+    DispatchIndirectCommand& operator=(const DispatchIndirectCommand&);
+
+    DispatchIndirectCommand(DispatchIndirectCommand&&) noexcept;
+    DispatchIndirectCommand& operator=(DispatchIndirectCommand&&) noexcept;
+
+    DispatchIndirectCommand(
+        const vulkan::Program& program,
+        const Tensor<std::byte>& tensor,
+        uint64_t offset,
+        std::span<const std::byte> push);
+    ~DispatchIndirectCommand() override;
 
 private:
     std::reference_wrapper<const vulkan::Program> program;
@@ -109,11 +146,25 @@ public:
         (param.bindParameter(getBinding(binding++)),...);
     }
 
-    DispatchCommand dispatch(std::span<const std::byte> push, uint32_t x = 1, uint32_t y = 1, uint32_t z = 1) const;
-    DispatchCommand dispatch(uint32_t x = 1, uint32_t y = 1, uint32_t z = 1) const;
+    [[nodiscard]] DispatchCommand dispatch(
+        std::span<const std::byte> push,
+        uint32_t x = 1, uint32_t y = 1, uint32_t z = 1) const;
+    [[nodiscard]] DispatchCommand dispatch(
+        uint32_t x = 1, uint32_t y = 1, uint32_t z = 1) const;
     template<class T, typename = typename std::enable_if_t<std::is_standard_layout_v<T> && !std::is_integral_v<T>>>
-    DispatchCommand dispatch(const T& push, uint32_t x = 1, uint32_t y = 1, uint32_t z = 1) const {
+    [[nodiscard]] DispatchCommand dispatch(const T& push, uint32_t x = 1, uint32_t y = 1, uint32_t z = 1) const {
         return dispatch({ reinterpret_cast<const std::byte*>(&push), sizeof(T)}, x, y, z);
+    }
+
+    [[nodiscard]] DispatchIndirectCommand dispatchIndirect(
+        std::span<const std::byte> push, const Tensor<std::byte>& tensor, uint64_t offset = 0) const;
+    [[nodiscard]] DispatchIndirectCommand dispatchIndirect(
+        const Tensor<std::byte>& tensor, uint64_t offset = 0) const;
+    template<class T, typename = typename std::enable_if_t<std::is_standard_layout_v<T>>>
+    [[nodiscard]] DispatchIndirectCommand dispatchIndirect(
+        const T& push, const Tensor<std::byte>& tensor, uint64_t offset = 0) const
+    {
+        return dispatchIndirect({ reinterpret_cast<const std::byte*>(&push), sizeof(T) }, tensor, offset);
     }
 
     Program(const Program&) = delete;

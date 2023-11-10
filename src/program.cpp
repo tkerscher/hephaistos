@@ -147,6 +147,87 @@ DispatchCommand::DispatchCommand(
 {}
 DispatchCommand::~DispatchCommand() = default;
 
+void DispatchIndirectCommand::record(vulkan::Command& cmd) const {
+    auto buffer = tensor.get().getBuffer().buffer;
+    auto& prog = program.get();
+    auto& context = prog.context;
+
+    //sanity check: all params are bound
+    if (std::any_of(
+        prog.boundParams.begin(),
+        prog.boundParams.end(),
+        vulkan::isDescriptorSetEmpty)
+        ) {
+        throw std::logic_error(
+            "Cannot dispatch program! At least one parameter is not bound!");
+    }
+
+    //we're working in the compute stage
+    cmd.stage |=
+        VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT |
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+
+    //bind pipeline
+    context.fnTable.vkCmdBindPipeline(cmd.buffer,
+        VK_PIPELINE_BIND_POINT_COMPUTE,
+        prog.pipeline);
+
+    //bind params
+    context.fnTable.vkCmdPushDescriptorSetKHR(cmd.buffer,
+        VK_PIPELINE_BIND_POINT_COMPUTE,
+        prog.pipeLayout,
+        prog.set,
+        static_cast<uint32_t>(prog.boundParams.size()),
+        prog.boundParams.data());
+
+    //push constant if there is any
+    if (!pushData.empty()) {
+        context.fnTable.vkCmdPushConstants(cmd.buffer,
+            prog.pipeLayout,
+            VK_SHADER_STAGE_COMPUTE_BIT,
+            0,
+            static_cast<uint32_t>(pushData.size_bytes()),
+            pushData.data());
+    }
+
+    //barrier to ensure indirect data is complete
+    VkBufferMemoryBarrier barrier{
+        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT,
+        .buffer = buffer,
+        .offset = offset,
+        .size = 12 // 3 * int
+    };
+    context.fnTable.vkCmdPipelineBarrier(cmd.buffer,
+        VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0,
+        0, nullptr,
+        1, &barrier,
+        0, nullptr);
+
+    //disptach indirect
+    context.fnTable.vkCmdDispatchIndirect(cmd.buffer, buffer, offset);
+}
+
+DispatchIndirectCommand::DispatchIndirectCommand(const DispatchIndirectCommand&) = default;
+DispatchIndirectCommand& DispatchIndirectCommand::operator=(const DispatchIndirectCommand&) = default;
+
+DispatchIndirectCommand::DispatchIndirectCommand(DispatchIndirectCommand&&) noexcept = default;
+DispatchIndirectCommand& DispatchIndirectCommand::operator=(DispatchIndirectCommand&&) noexcept = default;
+
+DispatchIndirectCommand::DispatchIndirectCommand(
+    const vulkan::Program& program,
+    const Tensor<std::byte>& tensor,
+    uint64_t offset,
+    std::span<const std::byte> push)
+    : tensor(std::cref(tensor))
+    , offset(offset)
+    , pushData(push)
+    , program(std::cref(program))
+{}
+DispatchIndirectCommand::~DispatchIndirectCommand() = default;
+
 /*********************************** PROGRAM **********************************/
 
 namespace {
@@ -290,6 +371,15 @@ DispatchCommand Program::dispatch(std::span<const std::byte> push, uint32_t x, u
 }
 DispatchCommand Program::dispatch(uint32_t x, uint32_t y, uint32_t z) const {
     return dispatch({}, x, y, z);
+}
+
+DispatchIndirectCommand Program::dispatchIndirect(
+    std::span<const std::byte> push, const Tensor<std::byte>& tensor, uint64_t offset) const
+{
+    return DispatchIndirectCommand(*program, tensor, offset, push);
+}
+DispatchIndirectCommand Program::dispatchIndirect(const Tensor<std::byte>& tensor, uint64_t offset) const {
+    return DispatchIndirectCommand(*program, tensor, offset, {});
 }
 
 Program::Program(Program&&) noexcept = default;
