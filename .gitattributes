@@ -1,0 +1,3 @@
+# linguist settings
+*.ipynb linguist-detectable=false
+external/** linguist-vendored
