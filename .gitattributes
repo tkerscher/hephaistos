@@ -1,3 +1,6 @@
 # linguist settings
+*.comp linguist-language=GLSL
+examples/**/*.h linguist-generated
+test/shader/*.h linguist-generated
 *.ipynb linguist-detectable=false
 external/** linguist-vendored
