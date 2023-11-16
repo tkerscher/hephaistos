@@ -2,6 +2,7 @@
 
 #include <concepts>
 #include <functional>
+#include <string>
 #include <utility>
 
 #include "hephaistos/context.hpp"
@@ -52,7 +53,8 @@ class HEPHAISTOS_API SubroutineBuilder final {
 public:
     explicit operator bool() const;
 
-    SubroutineBuilder& addCommand(const Command& command);
+    SubroutineBuilder& addCommand(const Command& command) &;
+    SubroutineBuilder addCommand(const Command& command) &&;
     Subroutine finish();
 
     SubroutineBuilder(const SubroutineBuilder& other) = delete;
@@ -88,6 +90,8 @@ template<std::derived_from<Command> ...T>
 
 class HEPHAISTOS_API Timeline : public Resource {
 public:
+    [[nodiscard]] uint64_t getId() const;
+
     [[nodiscard]] uint64_t getValue() const;
     void setValue(uint64_t value);
     void waitValue(uint64_t value) const;
@@ -141,19 +145,35 @@ class HEPHAISTOS_API SequenceBuilder final {
 public:
     explicit operator bool() const;
 
-    SequenceBuilder& And(const Command& command);
-    SequenceBuilder& And(const Subroutine& subroutine);
+    SequenceBuilder& And(const Command& command) &;
+    SequenceBuilder& And(const Subroutine& subroutine) &;
     template<class ...T>
-    SequenceBuilder& AndList(const T& ...steps) {
+    SequenceBuilder& AndList(const T& ...steps) & {
         (And(steps), ...);
         return *this;
     }
-    SequenceBuilder& NextStep();
-    SequenceBuilder& Then(const Command& command);
-    SequenceBuilder& Then(const Subroutine& subroutine);
-    SequenceBuilder& WaitFor(uint64_t value);
-    SequenceBuilder& WaitFor(const Timeline& timeline, uint64_t value);
+    SequenceBuilder& NextStep() &;
+    SequenceBuilder& Then(const Command& command) &;
+    SequenceBuilder& Then(const Subroutine& subroutine) &;
+    SequenceBuilder& WaitFor(uint64_t value) &;
+    SequenceBuilder& WaitFor(const Timeline& timeline, uint64_t value) &;
+
+    SequenceBuilder And(const Command& command) &&;
+    SequenceBuilder And(const Subroutine& subroutine) &&;
+    template<class ...T>
+    SequenceBuilder AndList(const T& ...steps) && {
+        (And(steps), ...);
+        return std::move(*this);
+    }
+    SequenceBuilder NextStep() &&;
+    SequenceBuilder Then(const Command& command) &&;
+    SequenceBuilder Then(const Subroutine& subroutine) &&;
+    SequenceBuilder WaitFor(uint64_t value) &&;
+    SequenceBuilder WaitFor(const Timeline& timeline, uint64_t value) &&;
+
     Submission Submit();
+
+    std::string printWaitGraph() const;
 
     SequenceBuilder(SequenceBuilder&) = delete;
     SequenceBuilder& operator=(SequenceBuilder&) = delete;

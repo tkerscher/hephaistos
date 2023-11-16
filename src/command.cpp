@@ -1,6 +1,7 @@
 #include "hephaistos/command.hpp"
 
 #include <algorithm>
+#include <sstream>
 #include <vector>
 
 #include "volk.h"
@@ -46,12 +47,16 @@ SubroutineBuilder::operator bool() const {
     return static_cast<bool>(cmdBuffer);
 }
 
-SubroutineBuilder& SubroutineBuilder::addCommand(const Command& command) {
+SubroutineBuilder& SubroutineBuilder::addCommand(const Command& command) & {
     if (!*this)
         throw std::runtime_error("SubroutineBuilder has already finished!");
 
     command.record(*cmdBuffer);
     return *this;
+}
+SubroutineBuilder SubroutineBuilder::addCommand(const Command& command) && {
+    static_cast<SubroutineBuilder&>(*this).addCommand(command);
+    return std::move(*this);
 }
 Subroutine SubroutineBuilder::finish() {
     if (!*this)
@@ -97,6 +102,10 @@ SubroutineBuilder::~SubroutineBuilder() {
 }
 
 /********************************* TIMELINE ***********************************/
+
+uint64_t Timeline::getId() const {
+    return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(timeline->semaphore));
+}
 
 uint64_t Timeline::getValue() const {
     uint64_t value;
@@ -346,7 +355,7 @@ SequenceBuilder::operator bool() const {
     return static_cast<bool>(_pImp);
 }
 
-SequenceBuilder& SequenceBuilder::And(const Command& command) {
+SequenceBuilder& SequenceBuilder::And(const Command& command) & {
     if (!*this)
         throw std::runtime_error("SequenceBuilder has already finished!");
 
@@ -374,7 +383,7 @@ SequenceBuilder& SequenceBuilder::And(const Command& command) {
     return *this;
 }
 
-SequenceBuilder& SequenceBuilder::And(const Subroutine& subroutine) {
+SequenceBuilder& SequenceBuilder::And(const Subroutine& subroutine) & {
     if (!*this)
         throw std::runtime_error("SequenceBuilder has already finished!");
 
@@ -387,7 +396,7 @@ SequenceBuilder& SequenceBuilder::And(const Subroutine& subroutine) {
     return *this;
 }
 
-SequenceBuilder& SequenceBuilder::NextStep() {
+SequenceBuilder& SequenceBuilder::NextStep() & {
     if (!*this)
         throw std::runtime_error("SequenceBuilder has already finished!");
 
@@ -419,19 +428,19 @@ SequenceBuilder& SequenceBuilder::NextStep() {
     return *this;
 }
 
-SequenceBuilder& SequenceBuilder::Then(const Command& command) {
+SequenceBuilder& SequenceBuilder::Then(const Command& command) & {
     NextStep();
     And(command);
     return *this;
 }
 
-SequenceBuilder& SequenceBuilder::Then(const Subroutine& subroutine) {
+SequenceBuilder& SequenceBuilder::Then(const Subroutine& subroutine) & {
     NextStep();
     And(subroutine);
     return *this;
 }
 
-SequenceBuilder& SequenceBuilder::WaitFor(uint64_t value) {
+SequenceBuilder& SequenceBuilder::WaitFor(uint64_t value) & {
     if (!*this)
         throw std::runtime_error("SequenceBuilder has already finished!");
 
@@ -452,9 +461,13 @@ SequenceBuilder& SequenceBuilder::WaitFor(uint64_t value) {
     return *this;
 }
 
-SequenceBuilder& SequenceBuilder::WaitFor(const Timeline& timeline, uint64_t value) {
+SequenceBuilder& SequenceBuilder::WaitFor(const Timeline& timeline, uint64_t value) & {
     if (!*this)
         throw std::runtime_error("SequenceBuilder has already finished!");
+
+    //check if timeline is the internal one
+    if (timeline.getTimeline().semaphore == _pImp->semaphore)
+        return WaitFor(value);
 
     //check if we have an open submission
     if (_pImp->submitInfos.back().commandBufferCount > 0)
@@ -473,12 +486,33 @@ SequenceBuilder& SequenceBuilder::WaitFor(const Timeline& timeline, uint64_t val
     return *this;
 }
 
-void execute(const ContextHandle& context, const Command& command) {
-    //run a one time submit command
-    vulkan::oneTimeSubmit(*context, [&command](VkCommandBuffer cmd) {
-        vulkan::Command wrapper { cmd, 0 };
-        command.record(wrapper);
-    });
+SequenceBuilder SequenceBuilder::And(const Command& command) && {
+    static_cast<SequenceBuilder&>(*this).And(command);
+    return std::move(*this);
+}
+SequenceBuilder SequenceBuilder::And(const Subroutine& subroutine) && {
+    static_cast<SequenceBuilder&>(*this).And(subroutine);
+    return std::move(*this);
+}
+SequenceBuilder SequenceBuilder::NextStep() && {
+    static_cast<SequenceBuilder&>(*this).NextStep();
+    return std::move(*this);
+}
+SequenceBuilder SequenceBuilder::Then(const Command& command) && {
+    static_cast<SequenceBuilder&>(*this).Then(command);
+    return std::move(*this);
+}
+SequenceBuilder SequenceBuilder::Then(const Subroutine& subroutine) && {
+    static_cast<SequenceBuilder&>(*this).Then(subroutine);
+    return std::move(*this);
+}
+SequenceBuilder SequenceBuilder::WaitFor(uint64_t value) && {
+    static_cast<SequenceBuilder&>(*this).WaitFor(value);
+    return std::move(*this);
+}
+SequenceBuilder SequenceBuilder::WaitFor(const Timeline& timeline, uint64_t value) && {
+    static_cast<SequenceBuilder&>(*this).WaitFor(timeline, value);
+    return std::move(*this);
 }
 
 Submission SequenceBuilder::Submit() {
@@ -553,6 +587,30 @@ Submission SequenceBuilder::Submit() {
     };
 }
 
+std::string SequenceBuilder::printWaitGraph() const {
+    if (!*this)
+        throw std::runtime_error("SequenceBuilder has already finished!");
+
+    std::stringstream out;
+    auto n = _pImp->submitInfos.size();
+    auto pSub = _pImp->submitInfos.data();
+    auto pWait = _pImp->waitValues.data();
+    auto pWaitSem = _pImp->waitSemaphores.data();
+    auto pSig = _pImp->signalValues.data();
+    for (auto i = 0u; i < n; ++i) {
+        // print wait values
+        auto nWaits = _pImp->timelineInfos[i].waitSemaphoreValueCount;
+        for (auto ii = 0u; ii < nWaits; ++ii) {
+            out << *(pWaitSem++) << '(' << *(pWait++) << ") ";
+        }
+        // print #commands/subroutines
+        out << "-> (" << (pSub++)->commandBufferCount << ") -> ";
+        // print signal values
+        out << _pImp->semaphore << '(' << *(pSig++) << ")\n";
+    }
+    return out.str();
+}
+
 SequenceBuilder::SequenceBuilder(SequenceBuilder&& other) noexcept = default;
 SequenceBuilder& SequenceBuilder::operator=(SequenceBuilder&& other) noexcept = default;
 
@@ -590,6 +648,14 @@ SequenceBuilder::~SequenceBuilder() {
         //return pool to context
         _pImp->context.sequencePool.push(_pImp->pool);
     }
+}
+
+void execute(const ContextHandle& context, const Command& command) {
+    //run a one time submit command
+    vulkan::oneTimeSubmit(*context, [&command](VkCommandBuffer cmd) {
+        vulkan::Command wrapper{ cmd, 0 };
+        command.record(wrapper);
+        });
 }
 
 void execute(const ContextHandle& context, const Subroutine& subroutine) {

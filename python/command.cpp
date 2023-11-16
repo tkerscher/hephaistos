@@ -1,5 +1,7 @@
 #include <nanobind/nanobind.h>
+#include <nanobind/stl/string.h>
 
+#include <sstream>
 #include <stdexcept>
 #include <variant>
 
@@ -39,7 +41,9 @@ void registerCommandModule(nb::module_& m) {
 
     nb::class_<hp::Timeline>(m, "Timeline")
         .def("__init__", [](hp::Timeline* t) { new (t) hp::Timeline(getCurrentContext()); })
-        .def("__init__", [](hp::Timeline* t, uint64_t v) { new (t) hp::Timeline(getCurrentContext(), v); }, "initialValue"_a)
+        .def("__init__", [](hp::Timeline* t, uint64_t v)
+            { new (t) hp::Timeline(getCurrentContext(), v); }, "initialValue"_a)
+        .def_prop_ro("id", [](const hp::Timeline& t) { return t.getId(); }, "Id of this timeline")
         .def_prop_rw("value",
             [](const hp::Timeline& t) { return t.getValue(); },
             [](hp::Timeline& t, uint64_t v) { t.setValue(v); },
@@ -53,7 +57,13 @@ void registerCommandModule(nb::module_& m) {
                 nb::gil_scoped_release release;
                 return t.waitValue(v, d);
             }, "value"_a, "ns"_a,
-            "Waits for the timeline to reach the given value for a certain amount. Returns True if the value was reached and False if it timed out.");
+            "Waits for the timeline to reach the given value for a certain amount. "
+            "Returns True if the value was reached and False if it timed out.")
+        .def("__repr__", [](const hp::Timeline& t) -> std::string {
+            std::ostringstream str;
+            str << "Timeline (ID: 0x" << std::hex << t.getId() << ")\n";
+            return str.str();
+        });
 
     nb::class_<hp::Submission>(m, "Submission")
         .def_prop_ro("timeline", [](const hp::Submission& s) -> const hp::Timeline& { return s.getTimeline(); },
@@ -70,7 +80,8 @@ void registerCommandModule(nb::module_& m) {
                 nb::gil_scoped_release release;
                 return s.wait(t);
             }, "ns"_a,
-            "Blocks the caller until the submission finished or the specified time elapsed. Returns True in the first, False in the second case.");
+            "Blocks the caller until the submission finished or the specified time elapsed. "
+            "Returns True in the first, False in the second case.");
 
     nb::class_<hp::SequenceBuilder>(m, "SequenceBuilder")
         .def("__init__", [](hp::SequenceBuilder* sb, hp::Timeline& t) { new (sb) hp::SequenceBuilder(t); }, "timeline"_a)
@@ -100,7 +111,8 @@ void registerCommandModule(nb::module_& m) {
                     }
                     else {
                         //conversion failed
-                        throw std::invalid_argument("Entries in the list must either be subroutines or derive from Command!");
+                        throw std::invalid_argument(
+                            "Entries in the list must either be subroutines or derive from Command!");
                     } 
                 }
 
@@ -139,10 +151,15 @@ void registerCommandModule(nb::module_& m) {
             "Issues the following steps to wait on the sequence timeline to reach the given value.")
         .def("WaitFor", [](hp::SequenceBuilder& sb, const hp::Timeline& t, uint64_t v) -> hp::SequenceBuilder& {
                 nb::gil_scoped_release release;
-                return sb.WaitFor(v);
+                return sb.WaitFor(t, v);
             }, "timeline"_a, "value"_a, nb::rv_policy::reference_internal,
             "Issues the following steps to wait for the given timeline to reach the given value")
-        .def("Submit", &hp::SequenceBuilder::Submit, "Submits the recorded steps as a single batch to the GPU.");
+        .def("printWaitGraph", [](const hp::SequenceBuilder& sb) { return sb.printWaitGraph(); },
+            "Returns a visualization of the current wait graph in the form: "
+            "(Timeline.ID(WaitValue))* -> (submissions) -> (Timeline.ID(SignalValue)). "
+            "Must be called before Submit().")
+        .def("Submit", &hp::SequenceBuilder::Submit,
+            "Submits the recorded steps as a single batch to the GPU.");
     
     m.def("beginSequence", [](hp::Timeline& t, uint64_t v) { return hp::beginSequence(t, v); },
         "timeline"_a, "startValue"_a = 0, "Starts a new sequence.", nb::rv_policy::move);
