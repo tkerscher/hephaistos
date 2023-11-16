@@ -1,11 +1,7 @@
 import ctypes
 from typing import Any, Union
 from numpy.ctypeslib import as_array
-from .pyhephaistos import (
-    ByteTensor,
-    Program,
-    RawBuffer,
-)
+from .pyhephaistos import ByteTensor, RawBuffer
 
 def collectFields(struct: ctypes.Structure) -> list[tuple[str,ctypes._SimpleCData]]:
     """
@@ -133,18 +129,3 @@ class StructureTensor(ByteTensor):
             super().__init__(ctypes.sizeof(typeOrData), mapped)
         else:
             super().__init__(ctypes.addressof(typeOrData), ctypes.sizeof(typeOrData), mapped)
-
-def _bindParams(program: Program, *params, **namedparams) -> None:
-    """
-    Helper function to bind a list of params in a program.
-    """
-    for i, p in enumerate(params):
-        p.bindParameter(program, i)
-    
-    names = [b.name for b in program.bindings]
-    for name, p in namedparams.items():
-        if name not in names:
-            continue
-        p.bindParameter(program, name)
-#register function in class
-Program.bindParams = _bindParams
