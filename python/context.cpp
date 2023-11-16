@@ -51,7 +51,9 @@ void selectDevice(uint32_t id, bool force) {
             //instance should have been deleted now (doesn't really matter)
         }
         else {
-            throw std::runtime_error("Cannot change device: There is already an active context! Specify force=True if you want to invalidate and replace active one.");
+            throw std::runtime_error(
+                "Cannot change device: There is already an active context! Specify "
+                "force=True if you want to invalidate and replace active one.");
         }
     }
 
@@ -105,7 +107,9 @@ void addExtension(hp::ExtensionHandle extension, bool force) {
             //instance should have been deleted now (doesn't really matter)
         }
         else {
-            throw std::runtime_error("Cannot change device: There is already an active context! Specify force=True if you want to invalidate and replace active one.");
+            throw std::runtime_error(
+                "Cannot change device: There is already an active context! Specify "
+                "force=True if you want to invalidate and replace active one.");
         }
     }
 
@@ -115,7 +119,8 @@ void addExtension(hp::ExtensionHandle extension, bool force) {
 }
 
 void registerContextModule(nb::module_& m) {
-    m.def("isVulkanAvailable", &hp::isVulkanAvailable, "Returns True if Vulkan is available on this system.");
+    m.def("isVulkanAvailable", &hp::isVulkanAvailable,
+        "Returns True if Vulkan is available on this system.");
 
     nb::class_<hp::DeviceInfo>(m, "Device")
         .def_ro("name", &hp::DeviceInfo::name)
@@ -133,7 +138,8 @@ void registerContextModule(nb::module_& m) {
     m.def("getCurrentDevice", []() { return hp::getDeviceInfo(getCurrentContext()); },
         "Returns the currently active device. Note that this may initialize the context.");
     m.def("selectDevice", &selectDevice, "id"_a, "force"_a = false,
-        "Sets the device on which the context will be initialized. Set force=True if an existing context should be destroyed.");
+        "Sets the device on which the context will be initialized. "
+        "Set force=True if an existing context should be destroyed.");
     
     m.def("isDeviceSuitable", [](uint32_t id) {
         //range check
@@ -143,12 +149,13 @@ void registerContextModule(nb::module_& m) {
         return hp::isDeviceSuitable(getDevices()[id], extensions);
     }, "Returns True if the device given by its id supports all enabled extensions");
     m.def("suitableDeviceAvailable", []() {
-        //check all devices
-        for (auto& device : getDevices()) {
-            if (hp::isDeviceSuitable(device, extensions))
-                return true;
-        }
-        //no suitable device found
-        return false;
-    }, "Returns True, if there is a device available supporting all enabled extensions");
+            //check all devices
+            for (auto& device : getDevices()) {
+                if (hp::isDeviceSuitable(device, extensions))
+                    return true;
+            }
+            //no suitable device found
+            return false;
+        },
+        "Returns True, if there is a device available supporting all enabled extensions");
 }

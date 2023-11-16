@@ -143,29 +143,50 @@ void registerImageModule(nb::module_& m) {
             {
                 new (image) hp::Image(getCurrentContext(), format, width, height, depth);
             }, "format"_a, "width"_a, "height"_a = 1, "depth"_a = 1)
-        .def_prop_ro("width", [](const hp::Image& img) -> uint32_t { return img.getWidth(); })
-        .def_prop_ro("height", [](const hp::Image& img) -> uint32_t { return img.getHeight(); })
-        .def_prop_ro("depth", [](const hp::Image& img) -> uint32_t { return img.getDepth(); })
-        .def_prop_ro("format", [](const hp::Image& img) -> hp::ImageFormat { return img.getFormat(); })
-        .def_prop_ro("size_bytes", [](const hp::Image& img) -> uint64_t { return img.size_bytes(); })
-        .def("bindParameter", [](const hp::Image& img, hp::Program& p, uint32_t b) { img.bindParameter(p.getBinding(b)); })
-        .def("bindParameter", [](const hp::Image& img, hp::Program& p, std::string_view b) { img.bindParameter(p.getBinding(b)); });
+        .def_prop_ro("width",
+            [](const hp::Image& img) -> uint32_t { return img.getWidth(); })
+        .def_prop_ro("height",
+            [](const hp::Image& img) -> uint32_t { return img.getHeight(); })
+        .def_prop_ro("depth",
+            [](const hp::Image& img) -> uint32_t { return img.getDepth(); })
+        .def_prop_ro("format",
+            [](const hp::Image& img) -> hp::ImageFormat { return img.getFormat(); })
+        .def_prop_ro("size_bytes",
+            [](const hp::Image& img) -> uint64_t { return img.size_bytes(); })
+        .def("bindParameter",
+            [](const hp::Image& img, hp::Program& p, uint32_t b)
+                { img.bindParameter(p.getBinding(b)); })
+        .def("bindParameter",
+            [](const hp::Image& img, hp::Program& p, std::string_view b)
+                { img.bindParameter(p.getBinding(b)); });
     
     nb::class_<hp::Texture>(m, "Texture")
         .def("__init__",
             [](hp::Texture* texture, hp::ImageFormat format,
                uint32_t width, uint32_t height, uint32_t depth, nb::kwargs kwargs)
-            {
-                auto sampler = buildSampler(kwargs);
-                new (texture) hp::Texture(getCurrentContext(), format, width, height, depth, sampler);
-            }, "format"_a, "width"_a, "height"_a = 1, "depth"_a = 1, "kwargs"_a = nb::kwargs())
-        .def_prop_ro("width", [](const hp::Texture& tex) -> uint32_t { return tex.getWidth(); })
-        .def_prop_ro("height", [](const hp::Texture& tex) -> uint32_t { return tex.getHeight(); })
-        .def_prop_ro("depth", [](const hp::Texture& tex) -> uint32_t { return tex.getDepth(); })
-        .def_prop_ro("format", [](const hp::Texture& tex) -> hp::ImageFormat { return tex.getFormat(); })
-        .def_prop_ro("size_bytes", [](const hp::Texture& tex) -> uint64_t { return tex.size_bytes(); })
-        .def("bindParameter", [](const hp::Texture& tex, hp::Program& p, uint32_t b) { tex.bindParameter(p.getBinding(b)); })
-        .def("bindParameter", [](const hp::Texture& tex, hp::Program& p, std::string_view b) { tex.bindParameter(p.getBinding(b)); });
+                {
+                    auto sampler = buildSampler(kwargs);
+                    new (texture) hp::Texture(getCurrentContext(),
+                        format, width, height, depth, sampler);
+                },
+            "format"_a, "width"_a, "height"_a = 1, "depth"_a = 1,
+            "kwargs"_a = nb::kwargs())
+        .def_prop_ro("width",
+            [](const hp::Texture& tex) -> uint32_t { return tex.getWidth(); })
+        .def_prop_ro("height",
+            [](const hp::Texture& tex) -> uint32_t { return tex.getHeight(); })
+        .def_prop_ro("depth",
+            [](const hp::Texture& tex) -> uint32_t { return tex.getDepth(); })
+        .def_prop_ro("format",
+            [](const hp::Texture& tex) -> hp::ImageFormat { return tex.getFormat(); })
+        .def_prop_ro("size_bytes",
+            [](const hp::Texture& tex) -> uint64_t { return tex.size_bytes(); })
+        .def("bindParameter",
+            [](const hp::Texture& tex, hp::Program& p, uint32_t b)
+                { tex.bindParameter(p.getBinding(b)); })
+        .def("bindParameter",
+            [](const hp::Texture& tex, hp::Program& p, std::string_view b)
+                { tex.bindParameter(p.getBinding(b)); });
 
     nb::class_<hp::ImageBuffer, hp::Buffer<std::byte>>(m, "ImageBuffer")
         .def("__init__",
@@ -185,11 +206,20 @@ void registerImageModule(nb::module_& m) {
         .def_static("loadMemory", [](nb::bytes data) -> hp::ImageBuffer {
                 return hp::ImageBuffer::load(
                     getCurrentContext(),
-                    std::span<const std::byte>{ reinterpret_cast<const std::byte*>(data.c_str()), data.size() });
+                    std::span<const std::byte>{
+                        reinterpret_cast<const std::byte*>(data.c_str()),
+                        data.size()
+                    });
             }, "data"_a)
-        .def("numpy", [](const hp::ImageBuffer& buffer) -> image_array {
-                size_t shape[3] = { buffer.getHeight(), buffer.getWidth(), 4 };
-                return image_array(static_cast<void*>(buffer.getMemory().data()), 3, shape);
+        .def("numpy",
+            [](const hp::ImageBuffer& buffer) -> image_array {
+                size_t shape[3] = {
+                    buffer.getHeight(),
+                    buffer.getWidth(),
+                    4
+                };
+                return image_array(static_cast<void*>(
+                    buffer.getMemory().data()), 3, shape);
             }, nb::rv_policy::reference_internal);
     
     nb::class_<hp::RetrieveImageCommand, hp::Command>(m, "RetrieveImageCommand")

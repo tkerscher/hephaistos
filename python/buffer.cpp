@@ -50,9 +50,12 @@ template<class T>
 void registerBuffer(nb::module_& m, const char* name) {
     nb::class_<TypedBuffer<T>, hp::Buffer<std::byte>>(m, name)
         .def(nb::init<size_t>())
-        .def_prop_ro("size", [](const TypedBuffer<T>& b) { return b.size(); }, "The number of elements in this buffer.")
-        .def_prop_ro("size_bytes", [](const TypedBuffer<T>& b) { return b.size_bytes(); }, "The size of the buffer in bytes.")
-        .def("numpy", &TypedBuffer<T>::numpy, "Returns a numpy array using this buffer's memory.", nb::rv_policy::reference_internal)
+        .def_prop_ro("size", [](const TypedBuffer<T>& b) { return b.size(); },
+            "The number of elements in this buffer.")
+        .def_prop_ro("size_bytes", [](const TypedBuffer<T>& b) { return b.size_bytes(); },
+            "The size of the buffer in bytes.")
+        .def("numpy", &TypedBuffer<T>::numpy, nb::rv_policy::reference_internal,
+            "Returns a numpy array using this buffer's memory.")
         .def("__repr__", [name = std::string(name)](const TypedBuffer<T>& t) {
             std::ostringstream str;
             str << name
@@ -87,21 +90,27 @@ public:
 template<class T>
 void registerTensor(nb::module_& m, const char* name) {
     nb::class_<TypedTensor<T>, hp::Tensor<std::byte>>(m, name)
-        .def(nb::init<size_t, bool>(), "size"_a, "mapped"_a = false)
-        .def(nb::init<uint64_t, size_t, bool>(), "addr"_a, "n"_a, "mapped"_a = false)
-        .def(nb::init<const typename TypedTensor<T>::array_type&, bool>(), "array"_a, "mapped"_a = false)
+        .def(nb::init<size_t, bool>(),
+            "size"_a, "mapped"_a = false)
+        .def(nb::init<uint64_t, size_t, bool>(),
+            "addr"_a, "n"_a, "mapped"_a = false)
+        .def(nb::init<const typename TypedTensor<T>::array_type&, bool>(),
+            "array"_a, "mapped"_a = false)
         .def_prop_ro("address", [](const TypedTensor<T>& t) { return t.address(); },
             "The device address of this tensor.")
         .def_prop_ro("isMapped", [](const TypedTensor<T>& t) { return t.isMapped(); },
             "True, if the underlying memory is writable by the CPU.")
-        .def_prop_ro("memory", [](const TypedTensor<T>& t) { return reinterpret_cast<intptr_t>(t.getMemory().data()); },
+        .def_prop_ro("memory", [](const TypedTensor<T>& t)
+                { return reinterpret_cast<intptr_t>(t.getMemory().data()); },
             "Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.")
         .def_prop_ro("size", [](const TypedTensor<T>& t) { return t.size(); },
             "The number of elements in this tensor.")
         .def_prop_ro("size_bytes", [](const TypedTensor<T>& t) { return t.size_bytes(); },
             "The size of the tensor in bytes.")
-        .def("bindParameter", [](const TypedTensor<T>& t, hp::Program& p, uint32_t b) {t.bindParameter(p.getBinding(b)); } )
-        .def("bindParameter", [](const TypedTensor<T>& t, hp::Program& p, std::string_view b) { t.bindParameter(p.getBinding(b)); } )
+        .def("bindParameter", [](const TypedTensor<T>& t, hp::Program& p, uint32_t b)
+            {t.bindParameter(p.getBinding(b)); } )
+        .def("bindParameter", [](const TypedTensor<T>& t, hp::Program& p, std::string_view b)
+            { t.bindParameter(p.getBinding(b)); } )
         .def("__repr__", [name = std::string(name)](const TypedTensor<T>& t) {
             std::ostringstream str;
             str << name
@@ -122,9 +131,12 @@ void registerBufferModule(nb::module_& m) {
 
     nb::class_<RawBuffer, hp::Buffer<std::byte>>(m, "RawBuffer")
         .def(nb::init<uint64_t>())
-        .def_prop_ro("address", [](const RawBuffer& b) { return b.getAddress(); } , "The memory address of the allocated buffer.")
-        .def_prop_ro("size", [](const RawBuffer& b) { return b.size(); }, "The size of the buffer in bytes.")
-        .def_prop_ro("size_bytes", [](const RawBuffer& b) { return b.size_bytes(); }, "The size of the buffer in bytes.")
+        .def_prop_ro("address", [](const RawBuffer& b) { return b.getAddress(); },
+            "The memory address of the allocated buffer.")
+        .def_prop_ro("size", [](const RawBuffer& b) { return b.size(); },
+            "The size of the buffer in bytes.")
+        .def_prop_ro("size_bytes", [](const RawBuffer& b) { return b.size_bytes(); },
+            "The size of the buffer in bytes.")
         .def("__repr__", [](const RawBuffer& b) {
             std::ostringstream str;
             str << "RawBuffer: " << b.size_bytes() << " bytes\n";
@@ -236,8 +248,13 @@ void registerBufferModule(nb::module_& m) {
                 if (size) params.size = *size;
                 if (data) params.data = *data;
                 new (cmd) hp::ClearTensorCommand(tensor, params);
-            }, "tensor"_a, "offset"_a.none() = nb::none(), "size"_a.none() = nb::none(), "data"_a.none() = nb::none(),
-            "Creates a command for filling a tensor with constant data over a given range. Defaults to zeroing the complete tensor");
+            },
+            "tensor"_a,
+            "offset"_a.none() = nb::none(),
+            "size"_a.none() = nb::none(),
+            "data"_a.none() = nb::none(),
+            "Creates a command for filling a tensor with constant data over a given range. "
+            "Defaults to zeroing the complete tensor");
     m.def("clearTensor", [](
         const hp::Tensor<std::byte>& tensor,
         std::optional<uint64_t> offset,
@@ -248,6 +265,11 @@ void registerBufferModule(nb::module_& m) {
             if (size) params.size = *size;
             if (data) params.data = *data;
             return hp::clearTensor(tensor, params);
-        }, "tensor"_a, "offset"_a.none() = nb::none(), "size"_a.none() = nb::none(), "data"_a.none() = nb::none(),
-        "Creates a command for filling a tensor with constant data over a given range. Defaults to zeroing the complete tensor");
+        },
+        "tensor"_a,
+        "offset"_a.none() = nb::none(),
+        "size"_a.none() = nb::none(),
+        "data"_a.none() = nb::none(),
+        "Creates a command for filling a tensor with constant data over a given range. "
+        "Defaults to zeroing the complete tensor");
 }

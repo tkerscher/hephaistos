@@ -132,30 +132,51 @@ void registerProgramModule(nb::module_& m) {
         .def_rw("offset", &hp::DispatchIndirectCommand::offset);
     
     nb::class_<hp::Program>(m, "Program")
-        .def("__init__", [](hp::Program* p, nb::bytes code) {
+        .def("__init__",
+            [](hp::Program* p, nb::bytes code) {
                 nb::gil_scoped_release release;
                 new (p) hp::Program(getCurrentContext(),
-                    std::span<const uint32_t>{ reinterpret_cast<const uint32_t*>(code.c_str()), code.size() / 4 });
+                    std::span<const uint32_t>{
+                        reinterpret_cast<const uint32_t*>(code.c_str()),
+                        code.size() / 4
+                    }
+                );
             }, "code"_a)
-        .def("__init__", [](hp::Program* p, nb::bytes code, nb::bytes spec) {
+        .def("__init__",
+            [](hp::Program* p, nb::bytes code, nb::bytes spec) {
                 nb::gil_scoped_release release;
                 new (p) hp::Program(
                     getCurrentContext(),
-                    std::span<const uint32_t>{ reinterpret_cast<const uint32_t*>(code.c_str()), code.size() / 4 },
-                    std::span<const std::byte>{ reinterpret_cast<const std::byte*>(spec.c_str()), spec.size() });
+                    std::span<const uint32_t>{
+                        reinterpret_cast<const uint32_t*>(code.c_str()),
+                        code.size() / 4
+                    },
+                    std::span<const std::byte>{
+                        reinterpret_cast<const std::byte*>(spec.c_str()),
+                        spec.size()
+                    }
+                );
             }, "code"_a, "specialization"_a)
-        .def_prop_ro("localSize", [](const hp::Program& p){ return p.getLocalSize(); }, "Returns the size of the local work group.")
-        .def_prop_ro("bindings", [](const hp::Program& p){ return p.listBindings(); }, "Returns a list of all bindings.")
+        .def_prop_ro("localSize",
+            [](const hp::Program& p) { return p.getLocalSize(); },
+            "Returns the size of the local work group.")
+        .def_prop_ro("bindings",
+            [](const hp::Program& p){ return p.listBindings(); },
+            "Returns a list of all bindings.")
         .def("dispatch",
-                [](const hp::Program& p, uint32_t x, uint32_t y, uint32_t z) -> hp::DispatchCommand {
-                    return p.dispatch(x, y, z); },
+                [](const hp::Program& p, uint32_t x, uint32_t y, uint32_t z)
+                    -> hp::DispatchCommand
+                    { return p.dispatch(x, y, z); },
             "x"_a = 1, "y"_a = 1, "z"_a = 1,
             "Dispatches a program execution with the given amount of workgroups.")
         .def("dispatchPush",
             [](const hp::Program& p, nb::bytes push, uint32_t x, uint32_t y, uint32_t z)
                  -> hp::DispatchCommand {
                     return p.dispatch(
-                        std::span<const std::byte>{ reinterpret_cast<const std::byte*>(push.c_str()), push.size() },
+                        std::span<const std::byte>{
+                            reinterpret_cast<const std::byte*>(push.c_str()),
+                            push.size()
+                        },
                         x, y, z
                     );
                 }, nb::keep_alive<0,2>(), //keep push bytes as long alive as the dispatch command
@@ -168,18 +189,23 @@ void registerProgramModule(nb::module_& m) {
                     return p.dispatchIndirect(tensor, offset);
                 },
             "tensor"_a, "offset"_a = 0,
-            "Dispatches a program execution using the amount of workgroups stored in the given tensor at the given offset")
+            "Dispatches a program execution using the amount of workgroups stored "
+            "in the given tensor at the given offset")
         .def("dispatchIndirectPush",
             [](const hp::Program& p, nb::bytes push, const hp::Tensor<std::byte>& tensor, uint64_t offset)
                 -> hp::DispatchIndirectCommand
                 {
                     return p.dispatchIndirect(
-                        std::span<const std::byte>{ reinterpret_cast<const std::byte*>(push.c_str()), push.size() },
+                        std::span<const std::byte>{
+                            reinterpret_cast<const std::byte*>(push.c_str()),
+                            push.size()
+                        },
                         tensor, offset
                     );
                 }, nb::keep_alive<0,2>(), //keep push bytes as long alive as the dispatch command
                 "push"_a, "tensor"_a, "offset"_a = 0,
-                "Dispatches a program execution with the given push data using the amount of workgroups stored in the given tensor at the given offset.")
+                "Dispatches a program execution with the given push data using the amount of "
+                "workgroups stored in the given tensor at the given offset.")
         .def("__repr__", [](const hp::Program& p) {
             std::ostringstream str;
             auto& ls = p.getLocalSize();
@@ -190,7 +216,11 @@ void registerProgramModule(nb::module_& m) {
         });
     
     nb::class_<hp::FlushMemoryCommand, hp::Command>(m, "FlushMemoryCommand")
-        .def("__init__", [](hp::FlushMemoryCommand* cmd) { new (cmd) hp::FlushMemoryCommand(getCurrentContext()); });
-    m.def("flushMemory", []() -> hp::FlushMemoryCommand { return hp::flushMemory(getCurrentContext()); },
+        .def("__init__",
+            [](hp::FlushMemoryCommand* cmd)
+                { new (cmd) hp::FlushMemoryCommand(getCurrentContext()); });
+    m.def("flushMemory",
+        []() -> hp::FlushMemoryCommand
+            { return hp::flushMemory(getCurrentContext()); },
         "Returns a command for flushing memory writes.");
 }

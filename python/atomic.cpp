@@ -109,5 +109,6 @@ void registerAtomicModule(nb::module_& m) {
         //add extension
         addExtension(hp::createAtomicsExtension(props), force);
     }, "flags"_a, "force"_a = false,
-    "Enables the atomic features contained in the given set by their name. Set force=True if an existing context should be destroyed.");
+    "Enables the atomic features contained in the given set by their name. "
+    "Set force=True if an existing context should be destroyed.");
 }
