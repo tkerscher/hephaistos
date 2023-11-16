@@ -20,3 +20,5 @@ x86/
 #Python stuff
 *.egg-info
 _skbuild
+__pycache__
+.pytest_cache
