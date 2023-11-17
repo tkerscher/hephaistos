@@ -1,0 +1,20 @@
+#version 460
+
+#extension GL_EXT_scalar_block_layout : require
+
+layout(local_size_x = 32) in;
+
+layout(scalar, binding = 0) writeonly buffer Output {
+    int y[];
+};
+
+layout(scalar, binding = 1) uniform Params {
+    int m;
+    int b;
+    int _dummy;
+};
+
+void main() {
+    uint x = gl_GlobalInvocationID.x;
+    y[x] = int(x) * m + b;
+}
