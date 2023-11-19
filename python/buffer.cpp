@@ -4,6 +4,7 @@
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
 
+#include <array>
 #include <cstdint>
 #include <sstream>
 #include <string>
@@ -16,6 +17,18 @@
 namespace hp = hephaistos;
 namespace nb = nanobind;
 using namespace nb::literals;
+
+namespace {
+
+constexpr auto units = std::to_array({" B", " KB", " MB", " GB"});
+
+void printSize(size_t size, std::ostream& str) {
+    int dim = 0;
+    for (; dim < units.size() - 1 && size > 9216; dim++, size >>= 10);
+    str << size << units[dim];
+}
+
+}
 
 class RawBuffer : public hp::Buffer<std::byte> {
 public:
@@ -59,8 +72,9 @@ void registerBuffer(nb::module_& m, const char* name) {
         .def("__repr__", [name = std::string(name)](const TypedBuffer<T>& t) {
             std::ostringstream str;
             str << name
-                << "[" << t.size() << "] ("
-                << t.size_bytes() << " bytes)\n";
+                << "[" << t.size() << "] (";
+            printSize(t.size_bytes(), str);
+            str << ")\n";
             return str.str();
         });
 }
@@ -114,9 +128,9 @@ void registerTensor(nb::module_& m, const char* name) {
         .def("__repr__", [name = std::string(name)](const TypedTensor<T>& t) {
             std::ostringstream str;
             str << name
-                << "[" << t.size() << "] ("
-                << t.size_bytes() << " bytes) at 0x"
-                << std::uppercase << std::hex << t.address();
+                << "[" << t.size() << "] (";
+            printSize(t.size_bytes(), str);
+            str << ") at 0x" << std::uppercase << std::hex << t.address();
             if (t.isMapped())
                 str << " (mapped)\n";
             else
@@ -139,7 +153,9 @@ void registerBufferModule(nb::module_& m) {
             "The size of the buffer in bytes.")
         .def("__repr__", [](const RawBuffer& b) {
             std::ostringstream str;
-            str << "RawBuffer: " << b.size_bytes() << " bytes\n";
+            str << "RawBuffer: ";
+            printSize(b.size_bytes(), str);
+            str << '\n';
             return str.str();
         });
 
