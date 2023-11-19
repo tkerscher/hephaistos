@@ -23,16 +23,67 @@ from hephaistos.util import StructureTensor
 from numpy import frombuffer, float32
 
 from numpy.typing import DTypeLike, NDArray
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    Type,
+    Union,
+)
 
 
 class PipelineStage(ABC):
-    """Base class for pipeline stages"""
+    """
+    Base class for pipeline stages.
+
+    Handles double buffering of configuration, allowing the CPU to update one
+    configuration while the other is still in use by the GPU, prevents the GPU
+    in the best case from waiting on the CPU, thus boosting throughput.
+
+    UBOs can be defined by passing a dictionary mapping binding names to a
+    ctypes structure describing it. It's field name are reflected, added to the
+    stages parameters and can be accessed via `getParam` / `setParam`. If they
+    start with an underscore, they are considered private and won't show up in
+    the `fields` property and output of `getParams` and print.
+
+    Additional properties that should be able to be set via `getParam` /
+    `setParam` can be passed by name in the `extras` set. They are most likely
+    implemented as properties.
+
+    During creation of a `Pipeline` the method `run(i)` will be called for both
+    buffers only once each. It must return a list of commands that define the
+    function of the stage and will be used to create a pipeline subroutine that
+    gets reused.
+
+    The current idle configuration get's updated via a call to `update(i)`,
+    which writes the current local state, i.e. the one defined by the Python
+    object, to device memory. Any private parameters can be updated by
+    overloading the `_finishParams(i)` method, which gets called during
+    `update(i)` before the actual write to the device.
+
+    Parameters
+    ----------
+    params: {str: Structure}, default={}
+        Dictionary of named ctype structure containing the stage's parameters.
+        Each structure will be allocated on the CPU side and twice on the GPU
+        for buffering. The latter can be bound in programs
+    extra: {str}, default={}
+        Set of extra parameter name, that can be set and retrieved using the
+        stage api. Take precedence over parameters defined by structs.Should
+        be be implemented in subclasses as properties.
+    """
 
     name = "stage"
     """default stage name. Should be changed in subclasses."""
 
-    def __init__(self, params: Dict[str, Type[Structure]]) -> None:
+    def __init__(
+        self, params: Dict[str, Type[Structure]] = {}, extra: Set[str] = set()
+    ) -> None:
         # create local configuration
         self._local = {name: param() for name, param in params.items()}
         # create double buffered device config
@@ -53,19 +104,41 @@ class PipelineStage(ABC):
             )
             for paramName, param in params.items()
             for fieldName, fieldType in param._fields_
-            if not fieldName.startswith("_")
+            # if not fieldName.startswith("_")
         }
+        self._extra = extra
+        # collect all fields without private one (starts with "_")
+        self._fields = frozenset(extra | self._params.keys())
+        self._public = frozenset(f for f in self._fields if not f.startswith("_"))
+
+    @property
+    def fields(self) -> Set[str]:
+        """Set of all public parameter names"""
+        return self._public
+
+    def getParam(self, name: str) -> Any:
+        """Returns the parameter specified by its name"""
+        if name in self._extra:
+            return self.name
+        elif name in self._params:
+            return self._params[name].value
+        else:
+            raise ValueError(f"No parameter with name {name}")
 
     def getParams(self) -> Dict[str, any]:
         """Creates a dictionary with all parameters that can be set"""
-        return {name: param.value for name, param in self._params.items()}
+        return {name: self.getParam(name) for name in self.fields}
 
     def setParam(self, name: str, value: Any) -> None:
         """
         If there is a parameter with the given name update its value using the
         provided one, else ignore it.
         """
-        if name in self._params:
+        if not name in self._fields:
+            return
+        if name in self._extra:
+            setattr(self, name, value)
+        elif name in self._params:
             self._params[name].value = value
 
     def setParams(self, **kwargs) -> None:
@@ -74,20 +147,13 @@ class PipelineStage(ABC):
         Ignores parameters it does not contain.
         """
         for name, value in kwargs.items():
-            if name in self._params:
-                self._params[name].value = value
-
-    def listParams(self) -> List[str]:
-        """Returns the list of all configurable parameters"""
-        return list(self._params.keys())
+            self.setParam(name, value)
 
     def __repr__(self) -> str:
         return (
             self.name
             + "\n"
-            + "\n".join(
-                [f"{param} : {value}" for param, value in self.getParams().items()]
-            )
+            + "\n".join(f"{param} : {self.getParam(param)}" for param in self.fields)
         )
 
     def _finishParams(self, i: int) -> None:
@@ -344,7 +410,8 @@ def runPipeline(
     case.
     """
     if update:
-        map(lambda stage: stage.update(i), stages)
+        for stage in stages:
+            stage.update(i)
     beginSequence().AndList(
         list(chain.from_iterable(stage.run(i) for stage in stages))
     ).Submit().wait()
