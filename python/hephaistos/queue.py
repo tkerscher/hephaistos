@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ctypes import Structure, c_uint32, sizeof
-from hephaistos import Buffer, ByteTensor, RawBuffer
+from hephaistos import Buffer, ByteTensor, Command, RawBuffer, Tensor, clearTensor
 from hephaistos.util import printSize
 from numpy import ndarray
 from numpy.ctypeslib import as_array
@@ -340,3 +340,11 @@ class QueueTensor(ByteTensor):
     def __repr__(self) -> str:
         name, cap = self.item.__name__, self.capacity
         return f"QueueBuffer: {name}[{cap}] ({printSize(self.size_bytes)})"
+
+
+def clearQueue(queue: Tensor) -> Command:
+    """
+    Returns a command to clear the queue, i.e. resets the count thus marking
+    any data inside it as garbage.
+    """
+    return clearTensor(queue, size=sizeof(QueueView.Header))
