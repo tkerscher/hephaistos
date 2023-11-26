@@ -82,6 +82,7 @@ public:
 
 private:
     std::reference_wrapper<const vulkan::Program> program;
+    std::vector<VkWriteDescriptorSet> params;
 };
 
 struct DispatchIndirect {
@@ -113,6 +114,7 @@ public:
 
 private:
     std::reference_wrapper<const vulkan::Program> program;
+    std::vector<VkWriteDescriptorSet> params;
 };
 
 struct LocalSize {

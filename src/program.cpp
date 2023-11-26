@@ -87,16 +87,6 @@ void DispatchCommand::record(vulkan::Command& cmd) const {
     auto& prog = program.get();
     auto& context = prog.context;
 
-    //sanity check: all params are bound
-    if (std::any_of(
-        prog.boundParams.begin(),
-        prog.boundParams.end(),
-        vulkan::isDescriptorSetEmpty)
-    ) {
-        throw std::logic_error(
-            "Cannot dispatch program! At least one parameter is not bound!");
-    }
-
     //we're working in the compute stage
     cmd.stage |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
 
@@ -110,8 +100,8 @@ void DispatchCommand::record(vulkan::Command& cmd) const {
         VK_PIPELINE_BIND_POINT_COMPUTE,
         prog.pipeLayout,
         prog.set,
-        static_cast<uint32_t>(prog.boundParams.size()),
-        prog.boundParams.data());
+        static_cast<uint32_t>(params.size()),
+        params.data());
 
     //push constant if there is any
     if (!pushData.empty()) {
@@ -144,23 +134,24 @@ DispatchCommand::DispatchCommand(
     , groupCountZ(z)
     , pushData(push)
     , program(std::cref(program))
-{}
+    , params(program.boundParams)
+{
+    //sanity check: all params are bound
+    if (std::any_of(
+        program.boundParams.begin(),
+        program.boundParams.end(),
+        vulkan::isDescriptorSetEmpty)
+        ) {
+        throw std::logic_error(
+            "Cannot dispatch program! At least one parameter is not bound!");
+    }
+}
 DispatchCommand::~DispatchCommand() = default;
 
 void DispatchIndirectCommand::record(vulkan::Command& cmd) const {
     auto buffer = tensor.get().getBuffer().buffer;
     auto& prog = program.get();
     auto& context = prog.context;
-
-    //sanity check: all params are bound
-    if (std::any_of(
-        prog.boundParams.begin(),
-        prog.boundParams.end(),
-        vulkan::isDescriptorSetEmpty)
-        ) {
-        throw std::logic_error(
-            "Cannot dispatch program! At least one parameter is not bound!");
-    }
 
     //we're working in the compute stage
     cmd.stage |=
@@ -177,8 +168,8 @@ void DispatchIndirectCommand::record(vulkan::Command& cmd) const {
         VK_PIPELINE_BIND_POINT_COMPUTE,
         prog.pipeLayout,
         prog.set,
-        static_cast<uint32_t>(prog.boundParams.size()),
-        prog.boundParams.data());
+        static_cast<uint32_t>(params.size()),
+        params.data());
 
     //push constant if there is any
     if (!pushData.empty()) {
@@ -225,7 +216,18 @@ DispatchIndirectCommand::DispatchIndirectCommand(
     , offset(offset)
     , pushData(push)
     , program(std::cref(program))
-{}
+    , params(program.boundParams)
+{
+    //sanity check: all params are bound
+    if (std::any_of(
+        program.boundParams.begin(),
+        program.boundParams.end(),
+        vulkan::isDescriptorSetEmpty)
+        ) {
+        throw std::logic_error(
+            "Cannot dispatch program! At least one parameter is not bound!");
+    }
+}
 DispatchIndirectCommand::~DispatchIndirectCommand() = default;
 
 /*********************************** PROGRAM **********************************/
