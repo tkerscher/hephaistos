@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import numpy as np
+import warnings
+
 from ctypes import Structure, c_uint32, sizeof
 from hephaistos import Buffer, ByteTensor, Command, RawBuffer, Tensor, clearTensor
 from hephaistos.util import printSize
@@ -7,7 +10,7 @@ from numpy import ndarray
 from numpy.ctypeslib import as_array
 
 from numpy.typing import NDArray
-from typing import Any, Optional, Set, Type, Union
+from typing import Any, Dict, Optional, Set, Type, Union, overload
 
 
 class QueueView:
@@ -135,6 +138,90 @@ class QueueView:
         """Structure describing the items of the queue"""
         return self._item
 
+    @overload
+    def save(self, file: None, *, compressed: bool) -> Dict[str, NDArray]:
+        ...
+
+    @overload
+    def save(self, file: str, *, compressed: bool) -> None:
+        ...
+
+    def save(
+        self, file: Optional[str] = None, *, compressed: bool = True
+    ) -> Union[None, Dict[str, NDArray]]:
+        """
+        Serializes the complete queue and either returns it as a dictionary
+        containing independent copies of the fields as numpy arrays or saves
+        them to disk at the given path.
+
+        Parameters
+        ----------
+        file: str|None, default=None
+            Path to where the queue is to be saved. If None, returns a dict
+            instead.
+        compressed: bool, default=True
+            True, if the file should be compressed. Ignored if no path is given
+
+        Returns
+        -------
+        fields: { field: array } | None
+            If no path is given, returns a dictionary with numpy arrays
+            containing copies of each field, None otherwise.
+        """
+        if file is None:
+            return {field: self[field][: self.count].copy() for field in self.fields}
+        else:
+            d = {field: self[field][: self.count] for field in self.fields}
+            if compressed:
+                np.savez_compressed(file, **d)
+            else:
+                np.savez(file, **d)
+
+    def load(self, data: str | Dict[str, NDArray]) -> None:
+        """
+        Loads the given data into this queue and updates its count.
+        Data can either be the path to a file containing the data to be load, or
+        a dictionary containing a numpy arrays for each field.
+
+        Parameters
+        ----------
+        data: str|{ field: array }
+            Data either as path to file to load, or dictionary mapping field
+            names to arrays containing the data.
+        """
+        counts = []
+
+        # open file if provided
+        file = None
+        if type(data) is not dict:
+            file = np.load(data)
+            data = file
+
+        # load all fields
+        for field, arr in data.items():
+            # check if field exists
+            if field not in self.fields:
+                warnings.warn(f"Skipping unknown field {field}")
+                continue
+            # check field size
+            if len(arr) > self.capacity:
+                warnings.warn(f'Field "{field}" truncated to queue\'s capacity')
+            # store data
+            n = min(self.capacity, len(arr))
+            self[field][:n] = arr[:n]
+            counts.append(self.capacity if len(arr) > self.capacity else len(arr))
+
+        # close file
+        if file is not None:
+            file.close()
+
+        # check all have the same
+        if len(counts) > 0 and not all(c == counts[0] for c in counts):
+            warnings.warn("Not all fields have the same length!")
+        # set count if there is an header
+        if self.hasHeader:
+            self.count = min(counts)
+
     def __repr__(self) -> str:
         return f"QueueView: {self.item.__name__}[{self.capacity}]"
 
@@ -185,6 +272,87 @@ class QueueSubView:
     def item(self) -> Type[Structure]:
         """Structure describing the items of the queue"""
         return self._orig.item
+
+    @overload
+    def save(self, file: None, *, compressed: bool) -> Dict[str, NDArray]:
+        ...
+
+    @overload
+    def save(self, file: str, *, compressed: bool) -> None:
+        ...
+
+    def save(
+        self, file: Optional[str] = None, *, compressed: bool = True
+    ) -> Union[None, Dict[str, NDArray]]:
+        """
+        Serializes the complete queue and either returns it as a dictionary
+        containing independent copies of the fields as numpy arrays or saves
+        them to disk at the given path.
+
+        Parameters
+        ----------
+        file: str|None, default=None
+            Path to where the queue is to be saved. If None, returns a dict
+            instead.
+        compressed: bool, default=True
+            True, if the file should be compressed. Ignored if no path is given
+
+        Returns
+        -------
+        fields: { field: array } | None
+            If no path is given, returns a dictionary with numpy arrays
+            containing copies of each field, None otherwise.
+        """
+        if file is None:
+            return {field: self[field].copy() for field in self.fields}
+        else:
+            d = {field: self[field] for field in self.fields}
+            if compressed:
+                np.savez_compressed(file, **d)
+            else:
+                np.savez(file, **d)
+
+    def load(self, data: str | Dict[str, NDArray]) -> None:
+        """
+        Loads the given data into this queue and updates its count.
+        Data can either be the path to a file containing the data to be load, or
+        a dictionary containing a numpy arrays for each field.
+
+        Parameters
+        ----------
+        data: str|{ field: array }
+            Data either as path to file to load, or dictionary mapping field
+            names to arrays containing the data.
+        """
+        counts = []
+
+        # open file if provided
+        file = None
+        if type(data) is not dict:
+            file = np.load(data)
+            data = file
+
+        # load all fields
+        for field, arr in data.items():
+            # check if field exists
+            if field not in self.fields:
+                warnings.warn(f"Skipping unknown field {field}")
+                continue
+            # check field size
+            if len(arr) > len(self):
+                warnings.warn(f'Field "{field}" truncated to view\'s size')
+            # store data
+            n = min(len(self), len(arr))
+            self[field][:n] = arr[:n]
+            counts.append(len(self) if len(arr) > len(self) else len(arr))
+
+        # close file
+        if file is not None:
+            file.close()
+
+        # check all have the same
+        if len(counts) > 0 and not all(c == counts[0] for c in counts):
+            warnings.warn("Not all fields have the same length!")
 
     def __repr__(self) -> str:
         return f"QueueSubView: {self.item.__name__}[{self._count}]"
