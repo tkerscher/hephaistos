@@ -5,6 +5,7 @@ from ctypes import Structure, addressof, memmove, sizeof, c_uint8
 from itertools import chain
 from queue import Queue
 from threading import Event, Lock, Thread
+import warnings
 
 from hephaistos import (
     Command,
@@ -359,7 +360,7 @@ class Pipeline:
             if "__" in name:
                 stage, param = name.split("__", 1)
                 if not stage in self._stageDict:
-                    raise ValueError(f'There is no stage "{stage}" in this pipeline!')
+                    warnings.warn(f'There is no stage "{stage}" in this pipeline!')
                 self._stageDict[stage].setParam(param, value)
             else:
                 for _, stage in self._stageList:
@@ -686,8 +687,12 @@ class PipelineScheduler:
         if n >= 2:
             self._pipelineTimeline.wait(n - 1)
         # update config
-        i = n % 2
-        self._pipeline.update(i)
+        # eventually calls user provided functions
+        # -> treat as evil to prevent from deadlocking timeline
+        try:
+            self._pipeline.update(n % 2)
+        except Exception as ex:
+            warnings.warn(f"Exception raised while preparing task {n}:\n{ex}")
         # advance timeline
         self._updateTimeline.value = n + 1
 
@@ -696,6 +701,11 @@ class PipelineScheduler:
         # wait on task to finish
         self._pipelineTimeline.wait(n + 1)
         # process
-        self._processFn(n % 2, n)
+        # external provided function
+        # -> treat as evil to prevent from deadlocking timeline
+        try:
+            self._processFn(n % 2, n)
+        except Exception as ex:
+            warnings.warn(f"Exception raised while processing task {n}:\n{ex}")
         # advance timeline
         self._processTimeline.value = n + 1
