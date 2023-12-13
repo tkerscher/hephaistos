@@ -13,7 +13,8 @@ namespace nb = nanobind;
 using namespace nb::literals;
 
 void registerAtomicModule(nb::module_& m) {
-    nb::class_<hp::AtomicsProperties>(m, "AtomicsProperties")
+    nb::class_<hp::AtomicsProperties>(m, "AtomicsProperties",
+            "List of atomic functions a device supports or are enabled")
         .def_ro("bufferInt64Atomics", &hp::AtomicsProperties::bufferInt64Atomics)
         .def_ro("bufferFloat16Atomics", &hp::AtomicsProperties::bufferFloat16Atomics)
         .def_ro("bufferFloat16AtomicAdd", &hp::AtomicsProperties::bufferFloat16AtomicAdd)

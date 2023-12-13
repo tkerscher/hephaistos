@@ -60,9 +60,19 @@ public:
     virtual ~TypedBuffer() = default;
 };
 template<class T>
-void registerBuffer(nb::module_& m, const char* name) {
+void registerBuffer(nb::module_& m, const char* name, const char* type_name) {
+    //build doc string
+    std::ostringstream docStream;
+    docStream
+        << "Buffer representing memory allocated on the host holding an array of type "
+        << type_name
+        << " and given size which can be accessed as numpy array."
+        << "\n\nParameters\n----------\n"
+        << "size: int\n"
+        << "    Number of elements\n";
+
     nb::class_<TypedBuffer<T>, hp::Buffer<std::byte>>(m, name)
-        .def(nb::init<size_t>())
+        .def(nb::init<size_t>(), "size"_a)
         .def_prop_ro("size", [](const TypedBuffer<T>& b) { return b.size(); },
             "The number of elements in this buffer.")
         .def_prop_ro("size_bytes", [](const TypedBuffer<T>& b) { return b.size_bytes(); },
@@ -76,7 +86,8 @@ void registerBuffer(nb::module_& m, const char* name) {
             printSize(t.size_bytes(), str);
             str << ")\n";
             return str.str();
-        });
+        })
+        .doc() = docStream.str();
 }
 
 namespace {
@@ -102,14 +113,44 @@ public:
     ~TypedTensor() override = default;
 };
 template<class T>
-void registerTensor(nb::module_& m, const char* name) {
+void registerTensor(nb::module_& m, const char* name, const char* type_name) {
+    //build doc string
+    std::ostringstream docStream;
+    docStream
+        << "Tensor representing memory allocated on the device holding an array of type "
+        << type_name
+        << " and given size. If mapped can be accessed from the host using its memory "
+        << "address. Mapping can optionally be requested but will be ignored if the "
+        << "device does not support it. Query its support after creation via isMapped.\n";
+
     nb::class_<TypedTensor<T>, hp::Tensor<std::byte>>(m, name)
         .def(nb::init<size_t, bool>(),
-            "size"_a, "mapped"_a = false)
+            "size"_a, "mapped"_a = false,
+            "Creates a new tensor of given size."
+            "\n\nParameters\n----------\n"
+            "size: int\n"
+            "    Number of elements\n"
+            "mapped: bool, default=False\n"
+            "    If True, tries to map memory to host address space")
         .def(nb::init<uint64_t, size_t, bool>(),
-            "addr"_a, "n"_a, "mapped"_a = false)
+            "addr"_a, "n"_a, "mapped"_a = false,
+            "Creates a new tensor and fills it with the provided data"
+            "\n\nParameters\n----------\n"
+            "addr: int\n"
+            "    Address of the data used to fill the tensor\n"
+            "n: int\n"
+            "    Number of bytes to copy from addr\n"
+            "mapped: bool, default=False\n"
+            "    If True, tries to map memory to host address space")
         .def(nb::init<const typename TypedTensor<T>::array_type&, bool>(),
-            "array"_a, "mapped"_a = false)
+            "array"_a, "mapped"_a = false,
+            "Creates a new tensor and fills it with the provided data"
+            "\n\nParameters\n----------\n"
+            "array: NDArray\n"
+            "    Numpy array containing the data used to fill the tensor. "
+                "Its type must match the tensor's.\n"
+            "mapped: bool, default=False\n"
+            "    If True, tries to map memory to host address space")
         .def_prop_ro("address", [](const TypedTensor<T>& t) { return t.address(); },
             "The device address of this tensor.")
         .def_prop_ro("isMapped", [](const TypedTensor<T>& t) { return t.isMapped(); },
@@ -122,9 +163,11 @@ void registerTensor(nb::module_& m, const char* name) {
         .def_prop_ro("size_bytes", [](const TypedTensor<T>& t) { return t.size_bytes(); },
             "The size of the tensor in bytes.")
         .def("bindParameter", [](const TypedTensor<T>& t, hp::Program& p, uint32_t b)
-            {t.bindParameter(p.getBinding(b)); } )
+            { t.bindParameter(p.getBinding(b)); }, "program"_a, "binding"_a,
+            "Binds the tensor to the program at the given binding")
         .def("bindParameter", [](const TypedTensor<T>& t, hp::Program& p, std::string_view b)
-            { t.bindParameter(p.getBinding(b)); } )
+            { t.bindParameter(p.getBinding(b)); }, "program"_a, "binding"_a,
+            "Binds the tensor to the program at the given binding")
         .def("__repr__", [name = std::string(name)](const TypedTensor<T>& t) {
             std::ostringstream str;
             str << name
@@ -136,15 +179,24 @@ void registerTensor(nb::module_& m, const char* name) {
             else
                 str << '\n';
             return str.str();
-        });
+        })
+        .doc() = docStream.str();
 }
 
 void registerBufferModule(nb::module_& m) {
-    nb::class_<hp::Buffer<std::byte>>(m, "Buffer");
-    nb::class_<hp::Tensor<std::byte>>(m, "Tensor");
+    nb::class_<hp::Buffer<std::byte>>(m, "Buffer",
+        "Base class for all buffers managing memory allocation on the host");
+    nb::class_<hp::Tensor<std::byte>>(m, "Tensor",
+        "Base class for all tensors managing memory allocations on the device");
 
-    nb::class_<RawBuffer, hp::Buffer<std::byte>>(m, "RawBuffer")
-        .def(nb::init<uint64_t>())
+    nb::class_<RawBuffer, hp::Buffer<std::byte>>(m, "RawBuffer",
+            "Buffer for allocating a raw chunk of memory on the host "
+            "accessible via its memory address. "
+            "Useful as a base class providing more complex functionality."
+            "\n\nParameters\n----------\n"
+            "size: int\n"
+            "    size of the buffer in bytes")
+        .def(nb::init<uint64_t>(), "size"_a)
         .def_prop_ro("address", [](const RawBuffer& b) { return b.getAddress(); },
             "The memory address of the allocated buffer.")
         .def_prop_ro("size", [](const RawBuffer& b) { return b.size(); },
@@ -160,31 +212,32 @@ void registerBufferModule(nb::module_& m) {
         });
 
     //Register typed buffers
-    registerBuffer<float>(m, "FloatBuffer");
-    registerBuffer<double>(m, "DoubleBuffer");
-    registerBuffer<uint8_t>(m, "ByteBuffer");
-    registerBuffer<uint16_t>(m, "UnsignedShortBuffer");
-    registerBuffer<uint32_t>(m, "UnsignedIntBuffer");
-    registerBuffer<uint64_t>(m, "UnsignedLongBuffer");
-    registerBuffer<int8_t>(m, "CharBuffer");
-    registerBuffer<int16_t>(m, "ShortBuffer");
-    registerBuffer<int32_t>(m, "IntBuffer");
-    registerBuffer<int64_t>(m, "LongBuffer");
+    registerBuffer<float>(m, "FloatBuffer", "float");
+    registerBuffer<double>(m, "DoubleBuffer", "double");
+    registerBuffer<uint8_t>(m, "ByteBuffer", "uint8");
+    registerBuffer<uint16_t>(m, "UnsignedShortBuffer", "uint16");
+    registerBuffer<uint32_t>(m, "UnsignedIntBuffer", "uint32");
+    registerBuffer<uint64_t>(m, "UnsignedLongBuffer", "uint64");
+    registerBuffer<int8_t>(m, "CharBuffer", "int8");
+    registerBuffer<int16_t>(m, "ShortBuffer", "int16");
+    registerBuffer<int32_t>(m, "IntBuffer", "int32");
+    registerBuffer<int64_t>(m, "LongBuffer", "int64");
 
     //Register typed buffers
-    registerTensor<float>(m, "FloatTensor");
-    registerTensor<double>(m, "DoubleTensor");
-    registerTensor<uint8_t>(m, "ByteTensor");
-    registerTensor<uint16_t>(m, "UnsignedShortTensor");
-    registerTensor<uint32_t>(m, "UnsignedIntTensor");
-    registerTensor<uint64_t>(m, "UnsignedLongTensor");
-    registerTensor<int8_t>(m, "CharTensor");
-    registerTensor<int16_t>(m, "ShortTensor");
-    registerTensor<int32_t>(m, "IntTensor");
-    registerTensor<int64_t>(m, "LongTensor");
+    registerTensor<float>(m, "FloatTensor", "float");
+    registerTensor<double>(m, "DoubleTensor", "double");
+    registerTensor<uint8_t>(m, "ByteTensor", "uint8");
+    registerTensor<uint16_t>(m, "UnsignedShortTensor", "uint16");
+    registerTensor<uint32_t>(m, "UnsignedIntTensor", "uint32");
+    registerTensor<uint64_t>(m, "UnsignedLongTensor", "uint64");
+    registerTensor<int8_t>(m, "CharTensor", "int8");
+    registerTensor<int16_t>(m, "ShortTensor", "int16");
+    registerTensor<int32_t>(m, "IntTensor", "int32");
+    registerTensor<int64_t>(m, "LongTensor", "int64");
 
     //retrieve tensor command
-    nb::class_<hp::RetrieveTensorCommand, hp::Command>(m, "RetrieveTensorCommand")
+    nb::class_<hp::RetrieveTensorCommand, hp::Command>(m, "RetrieveTensorCommand",
+            "Command for copying the src tensor back to the destination buffer")
         .def("__init__", [](
             hp::RetrieveTensorCommand* cmd,
             const hp::Tensor<std::byte>& src,
@@ -216,9 +269,21 @@ void registerBufferModule(nb::module_& m) {
         "bufferOffset"_a.none() = nb::none(),
         "tensorOffset"_a.none() = nb::none(),
         "size"_a.none() = nb::none(),
-        "Creates a command for copying the src tensor back to the destination buffer");
+        "Creates a command for copying the src tensor back to the destination buffer"
+        "\n\nParameters\n----------\n"
+        "src: Tensor\n"
+        "    Source tensor\n"
+        "dst: Buffer\n"
+        "    Destination buffer\n"
+        "bufferOffset: None|int, default=None\n"
+        "    Optional offset into the buffer in bytes\n"
+        "tensorOffset: None|int, default=None\n"
+        "    Optional offset into the tensor in bytes\n"
+        "size: None|int, default=None\n"
+        "    Amount of data to copy in bytes. If None, equals to the complete buffer");
     //update tensor command
-    nb::class_<hp::UpdateTensorCommand, hp::Command>(m, "UpdateTensorCommand")
+    nb::class_<hp::UpdateTensorCommand, hp::Command>(m, "UpdateTensorCommand",
+            "Command for copying the src buffer into the destination tensor")
         .def("__init__", [](
             hp::UpdateTensorCommand* cmd,
             const hp::Buffer<std::byte>& src,
@@ -250,9 +315,21 @@ void registerBufferModule(nb::module_& m) {
         "bufferOffset"_a.none() = nb::none(),
         "tensorOffset"_a.none() = nb::none(),
         "size"_a.none() = nb::none(),
-        "Creates a command for copying the src buffer into the destination tensor");
+        "Creates a command for copying the src buffer into the destination tensor"
+        "\n\nParameters\n----------\n"
+        "src: Buffer\n"
+        "    Source Buffer\n"
+        "dst: Tensor\n"
+        "    Destination Tensor\n"
+        "bufferOffset: None|int, default=None\n"
+        "    Optional offset into the buffer in bytes\n"
+        "tensorOffset: None|int, default=None\n"
+        "    Optional offset into the tensor in bytes\n"
+        "size: None|int, default=None\n"
+        "    Amount of data to copy in bytes. If None, equals to the complete buffer");
     //clear tensor command
-    nb::class_<hp::ClearTensorCommand, hp::Command>(m, "ClearTensorCommand")
+    nb::class_<hp::ClearTensorCommand, hp::Command>(m, "ClearTensorCommand",
+            "Command for filling a tensor with constant data over a given range")
         .def("__init__", [](
             hp::ClearTensorCommand* cmd,
             const hp::Tensor<std::byte>& tensor,
@@ -287,5 +364,16 @@ void registerBufferModule(nb::module_& m) {
         "size"_a.none() = nb::none(),
         "data"_a.none() = nb::none(),
         "Creates a command for filling a tensor with constant data over a given range. "
-        "Defaults to zeroing the complete tensor");
+        "Defaults to zeroing the complete tensor"
+        "\n\nParameters\n----------\n"
+        "tensor: Tensor\n"
+        "    Tensor to be modified\n"
+        "offset: None|int, default=None\n"
+        "    Offset into the Tensor at which to start clearing it. "
+            "Defaults to the start of the Tensor.\n"
+        "size: None|int, default=None\n"
+        "    Amount of bytes to clear. If None, equals to the range starting "
+            "at offset until the end of the tensor\n"
+        "data: None|int, default=None\n"
+        "    32 bit integer used to fill the tensor. If None, uses all zeros.");
 }

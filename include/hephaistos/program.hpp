@@ -32,7 +32,7 @@ struct SubgroupProperties {
 [[nodiscard]] HEPHAISTOS_API SubgroupProperties
     getSubgroupProperties(const ContextHandle& context);
 
-enum class DescriptorType {
+enum class ParameterType {
     /*SAMPLER = 0,*/
     COMBINED_IMAGE_SAMPLER = 1,
     //SAMPLED_IMAGE = 2,
@@ -54,7 +54,7 @@ struct ImageBindingTraits {
 struct BindingTraits {
     std::string name;
     uint32_t binding;
-    DescriptorType type;
+    ParameterType type;
     std::optional<ImageBindingTraits> imageTraits;
     uint32_t count; //0 for runtime array
 };

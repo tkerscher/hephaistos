@@ -15,39 +15,65 @@ namespace nb = nanobind;
 using namespace nb::literals;
 
 void registerCommandModule(nb::module_& m) {
-    nb::class_<hp::Command>(m, "Command");
+    nb::class_<hp::Command>(m, "Command",
+        "Base class for commands running on the device. "
+        "Execution happens asynchronous after being submitted.");
 
-    nb::class_<hp::Subroutine>(m, "Subroutine")
+    nb::class_<hp::Subroutine>(m, "Subroutine",
+            "Subroutines are reusable sequences of commands that can be "
+            "submitted multiple times to the device. "
+            "Recording sequence of commands require non negligible CPU time "
+            "and may be amortized by reusing sequences via Subroutines.")
         .def_prop_ro("simultaneousUse",
             [](const hp::Subroutine& s) -> bool { return s.simultaneousUse(); },
             "True, if the subroutine can be used simultaneous");
-    m.def("createSubroutine", [](nb::list list, bool simultaneous) -> hp::Subroutine {
-        //try to minimize holding of GIL
-        // -> collect commands before recording
-        std::vector<const hp::Command*> commands(list.size());
-        auto i = 0u;
-        for (nb::handle h : list)
-            commands[i++] = nb::cast<const hp::Command*>(h);
+    m.def("createSubroutine",
+        [](nb::list list, bool simultaneous) -> hp::Subroutine {
+            //try to minimize holding of GIL
+            // -> collect commands before recording
+            std::vector<const hp::Command*> commands(list.size());
+            auto i = 0u;
+            for (nb::handle h : list)
+                commands[i++] = nb::cast<const hp::Command*>(h);
 
-        //release GIL
-        nb::gil_scoped_release;
-        //build subroutine
-        hp::SubroutineBuilder builder(getCurrentContext(), simultaneous);
-        for (auto c : commands)
-            builder.addCommand(*c);
-        return builder.finish();
-    }, "list"_a, "simultaneous"_a = false,
-    "creates a subroutine from the list of commands");
+            //release GIL
+            nb::gil_scoped_release;
+            //build subroutine
+            hp::SubroutineBuilder builder(getCurrentContext(), simultaneous);
+            for (auto c : commands)
+                builder.addCommand(*c);
+            return builder.finish();
+        }, "commands"_a, "simultaneous"_a = false,
+        "creates a subroutine from the list of commands"
+        "\n\nParameters\n----------\n"
+        "commands: Command[]\n"
+        "    Sequence of commands the Subroutine consists of\n"
+        "simultaneous: bool, default=False\n"
+        "    True, if the subroutine can be submitted while a previous submission\n"
+        "    has not yet finished. Disobeying this requirement results in undefined\n"
+        "    behavior.");
 
-    nb::class_<hp::Timeline>(m, "Timeline")
+    nb::class_<hp::Timeline>(m, "Timeline",
+            "Timeline managing the execution of code and commands using an "
+            "increasing internal counter. Both GPU and CPU can wait and/or "
+            "increase this counter thus creating a synchronization between "
+            "them or among themselves. "
+            "The current value of the counter can be queried allowing an "
+            "asynchronous method of reporting the progress."
+            "\n\nParameters\n----------\n"
+            "value: int, default=0\n"
+            "    Initial value of the internal counter\n")
         .def("__init__", [](hp::Timeline* t) { new (t) hp::Timeline(getCurrentContext()); })
         .def("__init__", [](hp::Timeline* t, uint64_t v)
             { new (t) hp::Timeline(getCurrentContext(), v); }, "initialValue"_a)
-        .def_prop_ro("id", [](const hp::Timeline& t) { return t.getId(); }, "Id of this timeline")
+        .def_prop_ro("id", [](const hp::Timeline& t) { return t.getId(); },
+            "Id of this timeline")
         .def_prop_rw("value",
             [](const hp::Timeline& t) { return t.getValue(); },
             [](hp::Timeline& t, uint64_t v) { t.setValue(v); },
-            "Returns or sets the current value of the timeline. Note that the value can only increase.")
+            "Returns or sets the current value of the timeline. "
+            "Note that the value can only increase. "
+            "Disobeying this requirement results in undefined behavior.")
         .def("wait", [](const hp::Timeline& t, uint64_t v) {
                 nb::gil_scoped_release release;
                 t.waitValue(v);
@@ -56,16 +82,24 @@ void registerCommandModule(nb::module_& m) {
         .def("waitTimeout", [](const hp::Timeline& t, uint64_t v, uint64_t d) {
                 nb::gil_scoped_release release;
                 return t.waitValue(v, d);
-            }, "value"_a, "ns"_a,
+            }, "value"_a, "timeout"_a,
             "Waits for the timeline to reach the given value for a certain amount. "
-            "Returns True if the value was reached and False if it timed out.")
+            "Returns True if the value was reached and False if it timed out."
+            "\n\nParameters\n----------\n"
+            "value: int\n"
+            "    Value to wait for\n"
+            "timeout: int\n"
+            "    Time in nanoseconds to wait. May be rounded to the closest "
+                "internal precision of the device clock.")
         .def("__repr__", [](const hp::Timeline& t) -> std::string {
             std::ostringstream str;
             str << "Timeline (ID: 0x" << std::hex << t.getId() << ")\n";
             return str.str();
         });
 
-    nb::class_<hp::Submission>(m, "Submission")
+    nb::class_<hp::Submission>(m, "Submission",
+            "Submissions are issued after work has been submitted to the device "
+            "and can be used to wait for its completion.")
         .def_prop_ro("timeline", [](const hp::Submission& s) -> const hp::Timeline& { return s.getTimeline(); },
             "The timeline this submission was issued with.")
         .def_prop_ro("finalStep", [](const hp::Submission& s) { return s.getFinalStep(); },
@@ -83,9 +117,29 @@ void registerCommandModule(nb::module_& m) {
             "Blocks the caller until the submission finished or the specified time elapsed. "
             "Returns True in the first, False in the second case.");
 
-    nb::class_<hp::SequenceBuilder>(m, "SequenceBuilder")
-        .def("__init__", [](hp::SequenceBuilder* sb, hp::Timeline& t) { new (sb) hp::SequenceBuilder(t); }, "timeline"_a)
-        .def("__init__", [](hp::SequenceBuilder* sb, hp::Timeline& t, uint64_t v) { new (sb) hp::SequenceBuilder(t, v); }, "timeline"_a, "startValue"_a)
+    nb::class_<hp::SequenceBuilder>(m, "SequenceBuilder",
+            "Builder class for recording a sequence of commands and subroutines "
+            "and submitting it to the device for execution, which happens "
+            "asynchronous, i.e. submit() returns before the recorded work "
+            "finishes.")
+        .def("__init__",
+            [](hp::SequenceBuilder* sb, hp::Timeline& t)
+                { new (sb) hp::SequenceBuilder(t); },
+            "timeline"_a,
+            "Creates a new SequenceBuilder."
+            "\n\nParameters\n----------\n"
+            "timeline: Timeline\n"
+            "    Timeline to use for orchestrating commands and subroutines")
+        .def("__init__",
+            [](hp::SequenceBuilder* sb, hp::Timeline& t, uint64_t v)
+                { new (sb) hp::SequenceBuilder(t, v); },
+            "timeline"_a, "startValue"_a,
+            "Creates a new SequenceBuilder."
+            "\n\nParameters\n----------\n"
+            "timeline: Timeline\n"
+            "    Timeline to use for orchestrating commands and subroutines\n"
+            "startValue: int\n"
+            "    Counter value to wait for on the timeline to start with")
         .def("And", [](hp::SequenceBuilder& sb, const hp::Command& h) -> hp::SequenceBuilder& {
                 nb::gil_scoped_release release;
                 return sb.And(h);

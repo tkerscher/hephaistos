@@ -122,9 +122,13 @@ void registerContextModule(nb::module_& m) {
     m.def("isVulkanAvailable", &hp::isVulkanAvailable,
         "Returns True if Vulkan is available on this system.");
 
-    nb::class_<hp::DeviceInfo>(m, "Device")
-        .def_ro("name", &hp::DeviceInfo::name)
-        .def_ro("isDiscrete", &hp::DeviceInfo::isDiscrete)
+    nb::class_<hp::DeviceInfo>(m, "Device",
+            "Handle for a physical device implementing the Vulkan API. "
+            "Contains basic properties of the device.")
+        .def_ro("name", &hp::DeviceInfo::name, "Name of the device")
+        .def_ro("isDiscrete", &hp::DeviceInfo::isDiscrete,
+            "True, if the device is a discrete GPU. "
+            "Can be useful to distinguish from integrated ones.")
         .def("__repr__", [](const hp::DeviceInfo& info){
             std::ostringstream str;
             str << info.name;

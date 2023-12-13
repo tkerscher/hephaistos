@@ -9,7 +9,11 @@ namespace nb = nanobind;
 using namespace nb::literals;
 
 void registerStopWatchModule(nb::module_& m) {
-    nb::class_<hp::StopWatch>(m, "StopWatch")
+    nb::class_<hp::StopWatch>(m, "StopWatch",
+            "Allows the measuring of elapsed time between commands execution"
+            "\n\nParameters\n----------\n"
+            "stops: int\n"
+            "    Number of stops to be recorded")
         .def("__init__",
             [](hp::StopWatch* w, uint32_t stops) {
                 nb::gil_scoped_release release;
@@ -28,6 +32,6 @@ void registerStopWatchModule(nb::module_& m) {
         .def("reset", &hp::StopWatch::reset, "Resets the stop watch.")
         .def("getTimeStamps", &hp::StopWatch::getTimeStamps, "wait"_a = false,
             "Retrieves the recorded timestamps from the device. If wait = True, "
-            "the caller is blocked until all timestamps are available, otherwise "
+            "blocks the caller until all timestamps are available, otherwise "
             "unavailable ones are denoted as NaN.");
 }

@@ -471,7 +471,7 @@ Program::Program(ContextHandle context, std::span<const uint32_t> code, std::spa
             bindingTraits[i] = {
                 .name = pBinding->name ? pBinding->name : "",
                 .binding = pBinding->binding,
-                .type = static_cast<DescriptorType>(pBinding->descriptor_type),
+                .type = static_cast<ParameterType>(pBinding->descriptor_type),
                 .count = pBinding->count
             };
 

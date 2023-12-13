@@ -11,9 +11,14 @@ namespace nb = nanobind;
 using namespace nb::literals;
 
 void registerCompilerModule(nb::module_& m) {
-    nb::bind_map<hp::Compiler::HeaderMap>(m, "HeaderMap");
+    nb::bind_map<hp::Compiler::HeaderMap>(m, "HeaderMap",
+        "Dict mapping filepaths to shader source code. "
+        "Consumed by Compiler to resolve include directives.");
 
-    nb::class_<hp::Compiler>(m, "Compiler")
+    nb::class_<hp::Compiler>(m, "Compiler",
+            "Compiler for generating SPIR-V byte code used by Programs from "
+            "shader code written in GLSL. Has additional methods to handle "
+            "includes.")
         .def(nb::init<>())
         .def("addIncludeDir", &hp::Compiler::addIncludeDir, "path"_a,
             "Adds a path to the list of include directories "
