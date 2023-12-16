@@ -1,0 +1,10 @@
+The following is a list of the dependencies with links to their project page:
+
+- [glslang](https://github.com/KhronosGroup/glslang)
+- [SPIRV-Reflect](https://github.com/KhronosGroup/SPIRV-Reflect)
+- [stb](https://github.com/nothings/stb)
+- [VulkanMemoryAllocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator)
+- [Volk](https://github.com/zeux/volk)
+- [Vulkan Headers](https://github.com/KhronosGroup/Vulkan-Headers)
+
+Their licenses can be found in the respective directory.
