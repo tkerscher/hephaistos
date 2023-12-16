@@ -13,11 +13,23 @@ namespace hephaistos {
 
 template<class T = std::byte> class Buffer;
 
+/**
+ * @brief Allocates memory on the host for copying to and from the device
+*/
 template<>
 class Buffer<std::byte> : public Resource {
 public:
+    /**
+     * @brief Memory range the Buffer manages
+    */
     [[nodiscard]] std::span<std::byte> getMemory() const;
+    /**
+     * @brief Size of the Buffer in bytes
+    */
     [[nodiscard]] uint64_t size_bytes() const noexcept;
+    /**
+     * @brief Number of elements
+    */
     [[nodiscard]] size_t size() const noexcept;
 
     Buffer(const Buffer<std::byte>&) = delete;
@@ -26,7 +38,19 @@ public:
     Buffer(Buffer<std::byte>&& other) noexcept;
     Buffer<std::byte>& operator=(Buffer<std::byte>&& other) noexcept;
 
+    /**
+     * @brief Allocates a new buffer
+     * 
+     * @param context Context onto which to create the buffer
+     * @param size Number of elements
+    */
     Buffer(ContextHandle context, uint64_t size);
+    /**
+     * @brief Allocates a new buffer
+     * 
+     * @param context Context onto which to create the buffer
+     * @param data Data to fill the Buffer with
+    */
     Buffer(ContextHandle context, std::span<const std::byte> data);
     ~Buffer() override;
 
@@ -39,6 +63,9 @@ private:
 };
 template class HEPHAISTOS_API Buffer<std::byte>;
 
+/**
+ * @brief Allocates memory on the host for copying to and from the device
+*/
 template<class T>
 class Buffer : public Buffer<std::byte> {
 public:
@@ -81,14 +108,38 @@ template<class Container> Buffer(ContextHandle, const Container&)
 
 template<class T = std::byte> class Tensor;
 
+/**
+ * @brief Allocates memory on the device
+*/
 template<>
 class Tensor<std::byte> : public Argument, public Resource {
 public:
+    /**
+     * @brief Returns device memory address
+    */
     [[nodiscard]] uint64_t address() const noexcept;
+    /**
+     * @brief Returns the tensor memory mapped to host memory space
+     * 
+     * @note Mapping memory may not supported by the device, in which case the
+     *       returned range is empty.
+    */
     [[nodiscard]] std::span<std::byte> getMemory() const;
 
+    /**
+     * @brief Wether the tensor is mapped to host memory space
+     * 
+     * @note Mapping memory may not supported by the device, in which case this
+     *       will be false even if requested.
+    */
     [[nodiscard]] bool isMapped() const noexcept;
+    /**
+     * @brief Size of the tensor in bytes
+    */
     [[nodiscard]] uint64_t size_bytes() const noexcept;
+    /**
+     * @brief Number of elements
+    */
     [[nodiscard]] size_t size() const noexcept;
 
     void bindParameter(VkWriteDescriptorSet& binding) const final override;
@@ -99,8 +150,37 @@ public:
     Tensor(Tensor<std::byte>&& other) noexcept;
     Tensor<std::byte>& operator=(Tensor<std::byte>&& other) noexcept;
 
+    /**
+     * @brief Allocates a new Tensor
+     * 
+     * @param context Context onto which to create the Tensor
+     * @param size Number of elements
+     * @param mapped If true, tries to map the allocated tensor to host memory space
+     * 
+     * @note Mapping may not supported by the device. Check for success via
+     *       isMapped().
+    */
     Tensor(ContextHandle context, uint64_t size, bool mapped = false);
+    /**
+     * @brief Allocates a new Tensor
+     * 
+     * @param source Source buffer to copy from
+     * @param mapped If true, tries to map the allocated tensor to host memory space
+     * 
+     * @note Mapping may not supported by the device. Check for success via
+     *       isMapped().
+    */
     explicit Tensor(const Buffer<std::byte>& source, bool mapped = false);
+    /**
+     * @brief Allocates a new Tensor
+     * 
+     * @param context Context onto which to create the Tensor
+     * @param data Data the tensor will be initialized with
+     * @param mapped If true, tries to map the allocated tensor to host memory space
+     * 
+     * @note Mapping may not supported by the device. Check for success via
+     *       isMapped().
+    */
     Tensor(ContextHandle context, std::span<const std::byte> data, bool mapped = false);
     ~Tensor() override;
 
@@ -162,20 +242,53 @@ public:
     ~Tensor() override = default;
 };
 
+/**
+ * @brief Magic number indicating complete memory size
+*/
 constexpr uint64_t whole_size = (~0ULL);
+/**
+ * @brief Description of memory region for copying
+*/
 struct CopyRegion {
+    /**
+     * @brief Offset into the Buffer
+    */
     uint64_t bufferOffset = 0;
+    /**
+     * @brief Offset into the Tensor
+    */
     uint64_t tensorOffset = 0;
+    /**
+     * @brief Number of bytes to copy
+    */
     uint64_t size = whole_size;
 };
 
+/**
+ * @brief Command for copying data from a Tensor to a Buffer
+*/
 class HEPHAISTOS_API RetrieveTensorCommand : public Command {
 public:
+    /**
+     * @brief Source Tensor to copy from
+    */
     std::reference_wrapper<const Tensor<std::byte>> source;
+    /**
+     * @brief Destination Buffer to copy to
+    */
     std::reference_wrapper<const Buffer<std::byte>> destination;
 
+    /**
+     * @brief Offset into the source Tensor in bytes
+    */
     uint64_t sourceOffset;
+    /**
+     * @brief Offset into the destination Buffer in bytes
+    */
     uint64_t destinationOffset;
+    /**
+     * @brief Number of bytes to copy
+    */
     uint64_t size;
 
     virtual void record(vulkan::Command& cmd) const override;
@@ -186,12 +299,26 @@ public:
     RetrieveTensorCommand(RetrieveTensorCommand&& other) noexcept;
     RetrieveTensorCommand& operator=(RetrieveTensorCommand&& other) noexcept;
     
+    /**
+     * @brief Creates a new RetrieveTensorCommand
+     * 
+     * @param src Source Tensor to copy from
+     * @param dst Destination Buffer to copy to
+     * @param region Region to copy
+    */
     RetrieveTensorCommand(
         const Tensor<std::byte>& src,
         const Buffer<std::byte>& dst,
         const CopyRegion& region = {});
     ~RetrieveTensorCommand() override;
 };
+/**
+ * @brief Creates a new RetrieveTensorCommand
+ * 
+ * @param src Source Tensor to copy from
+ * @param dst Destination Buffer to copy to
+ * @param region Region to copy
+*/
 [[nodiscard]] inline RetrieveTensorCommand retrieveTensor(
     const Tensor<std::byte>& src,
     const Buffer<std::byte>& dst,
@@ -200,13 +327,31 @@ public:
     return RetrieveTensorCommand(src, dst, region);
 }
 
+/**
+ * @brief Command for copying data from Buffer to Tensor
+*/
 class HEPHAISTOS_API UpdateTensorCommand : public Command {
 public:
+    /**
+     * @brief Source Buffer to copy from
+    */
     std::reference_wrapper<const Buffer<std::byte>> source;
+    /**
+     * @brief Destination Tensor to copy to
+    */
     std::reference_wrapper<const Tensor<std::byte>> destination;
 
+    /**
+     * @brief Offset into the source Buffer in bytes
+    */
     uint64_t sourceOffset;
+    /**
+     * @brief Offset into the destination Tensor in bytes
+    */
     uint64_t destinationOffset;
+    /**
+     * @brief Number of bytes to copy
+    */
     uint64_t size;
 
     virtual void record(vulkan::Command& cmd) const override;
@@ -217,12 +362,26 @@ public:
     UpdateTensorCommand(UpdateTensorCommand&& other) noexcept;
     UpdateTensorCommand& operator=(UpdateTensorCommand&& other) noexcept;
 
+    /**
+     * @brief Creates a new UpdateTensorCommand
+     * 
+     * @param src Source Buffer to copy from
+     * @param dst Destination Tensor to copy to
+     * @param region Region to copy
+    */
     UpdateTensorCommand(
         const Buffer<std::byte>& src,
         const Tensor<std::byte>& dst,
         const CopyRegion& region = {});
     ~UpdateTensorCommand() override;
 };
+/**
+ * @brief Creates a UpdateTensorCommand
+ * 
+ * @param src Source Buffer to copy from
+ * @param dst Destination Tensor to copy to
+ * @param region Region to copy
+*/
 [[nodiscard]] inline UpdateTensorCommand updateTensor(
     const Buffer<std::byte>& src,
     const Tensor<std::byte>& dst,
@@ -231,6 +390,14 @@ public:
     return UpdateTensorCommand(src, dst, region);
 }
 
+/**
+ * @brief Creates a ClearTensorCommand
+ * 
+ * Fills the given tensor with a constant 4 byte value. Amount and offset can
+ * be specified.
+ * 
+ * @note Offset and size must be multiple of 4
+*/
 class HEPHAISTOS_API ClearTensorCommand : public Command {
 public:
     struct Params {
@@ -240,9 +407,26 @@ public:
     };
 
 public:
+    /**
+     * @brief Target Tensor to clear
+    */
     std::reference_wrapper<const Tensor<std::byte>> tensor;
+    /**
+     * @brief Offset into the target Tensor in bytes
+     * 
+     * @note Must be a multiple of 4
+    */
     uint64_t offset;
+    /**
+     * @brief Size of the region to clear in bytes
+     * 
+     * @note Must be a multiple of 4. whole_size, however, is always truncated
+     *       to the remaining rest of the Tensor.
+    */
     uint64_t size;
+    /**
+     * @brief Value used to clear the Tensor
+    */
     uint32_t data;
 
     virtual void record(vulkan::Command& cmd) const override;
@@ -253,9 +437,25 @@ public:
     ClearTensorCommand(ClearTensorCommand&& other) noexcept;
     ClearTensorCommand& operator=(ClearTensorCommand&& other) noexcept;
 
+    /**
+     * @brief Creates a new ClearTensorCommand
+     * 
+     * @param tensor Target Tensor to clear
+     * @param params Parametrization of the clear command
+     * 
+     * @note Offset and size must be a multiple of 4
+    */
     ClearTensorCommand(const Tensor<std::byte>& tensor, const Params& params);
     ~ClearTensorCommand() override;
 };
+/**
+ * @brief Creates a ClearTensorCommand
+ * 
+ * @param tensor Target Tensor to clear
+ * @param params Parameterization of the clear command
+ * 
+ * @note Offset and size must be a multiple of 4
+*/
 [[nodiscard]] inline ClearTensorCommand clearTensor(
     const Tensor<std::byte>& tensor, const ClearTensorCommand::Params& params)
 {

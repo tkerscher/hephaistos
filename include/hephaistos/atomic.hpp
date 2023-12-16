@@ -4,6 +4,9 @@
 
 namespace hephaistos {
 
+/**
+ * @brief List of atomic operations
+*/
 struct AtomicsProperties {
     bool bufferInt64Atomics;
 
@@ -40,11 +43,24 @@ struct AtomicsProperties {
     bool imageFloat32AtomicMinMax;
 };
 
+/**
+ * @brief Returns the supported atomic operations on the given device
+ * 
+ * @param device Device to query
+*/
 [[nodiscard]]
 HEPHAISTOS_API AtomicsProperties getAtomicsProperties(const DeviceHandle& device);
+/**
+ * @brief Returns the enabled atomic operations in the given context
+ * 
+ * @param context Context to query
+*/
 [[nodiscard]]
 HEPHAISTOS_API const AtomicsProperties& getEnabledAtomics(const ContextHandle& context);
 
+/**
+ * @brief Creates an extension to enable the specified atomic operations
+*/
 [[nodiscard]]
 HEPHAISTOS_API ExtensionHandle createAtomicsExtension(const AtomicsProperties& properties);
 
