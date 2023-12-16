@@ -89,5 +89,6 @@ jobs:
       - name: collect artifacts
         run: |
           cp dist/**/*.whl dist/
+          cp dist/**/*.tar.gz dist/
           rm -rf dist/*/
       - uses: pypa/gh-action-pypi-publish@release/v1
