@@ -5,8 +5,6 @@
 #include <stdexcept>
 #include <variant>
 
-template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-
 #include <hephaistos/command.hpp>
 #include "context.hpp"
 
@@ -37,7 +35,7 @@ void registerCommandModule(nb::module_& m) {
                 commands[i++] = nb::cast<const hp::Command*>(h);
 
             //release GIL
-            nb::gil_scoped_release;
+            nb::gil_scoped_release release;
             //build subroutine
             hp::SubroutineBuilder builder(getCurrentContext(), simultaneous);
             for (auto c : commands)
@@ -172,10 +170,12 @@ void registerCommandModule(nb::module_& m) {
 
                 //release GIL
                 nb::gil_scoped_release release;
-                auto visitor = overloaded{
-                    [&sb](const hp::Command* c) { sb.And(*c); },
-                    [&sb](const hp::Subroutine* s) { sb.And(*s); }
-                };
+                struct Visitor{
+                    hp::SequenceBuilder& sb;
+
+                    void operator() (const hp::Command* c) { sb.And(*c); }
+                    void operator() (const hp::Subroutine* s) { sb.And(*s); }
+                } visitor{ sb };
                 for (auto& e : elements)
                     std::visit(visitor, e);
                 
@@ -184,7 +184,7 @@ void registerCommandModule(nb::module_& m) {
             }, "list"_a, nb::rv_policy::reference_internal,
             "Issues each element of the list to run parallel in the current step")
         .def("Then", [](hp::SequenceBuilder& sb, const hp::Command& c) -> hp::SequenceBuilder& {
-                nb::gil_scoped_release;
+                nb::gil_scoped_release release;
                 return sb.Then(c);
             }, "cmd"_a, nb::rv_policy::reference_internal,
             "Issues a new step to execute after waiting for the previous one to finish.")
