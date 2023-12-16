@@ -7,6 +7,39 @@ such as all modern AMD, Intel and NVIDIA GPUs.
 The library aims to reduce the amount of boiler plate code, albeit in doing so
 it might hide optimization possibility Vulkan provides.
 
+## Dependency
+
+To ease the building process, all external dependency are stored inside the
+`external` directory. Check there for more information.
+
+### Mac OS
+
+Mac OS does not support Vulkan on its own, but requires a translation layer
+called [MoltenVK](https://github.com/KhronosGroup/MoltenVK) and can be installed
+for example via Homebrew:
+
+```bash
+brew install molten-vk
+```
+
+Since future updates to MoltenVK may enable more features without rebuilding
+hephaistos, it is not included in the library itself.
+
+## Install
+
+There exist pre-built python packages on PyPI and may be easily installed via
+pip:
+
+```bash
+pip install hephaistos
+```
+
+For some rare platforms you might need to build from sources.
+
+There are also no pre-built libraries for C++, as the API depends on the STL
+and thus has no stable ABI (i.e. you would need to create a build for each
+compiler).
+
 ## Building
 
 ### C++
