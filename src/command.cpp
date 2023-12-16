@@ -575,8 +575,13 @@ Submission SequenceBuilder::Submit() {
     }
 
     //prepare submission
-    auto resource = std::make_unique<SubmissionResources>(
-        _pImp->pool, std::move(_pImp->recordedBuffers), std::move(_pImp->exclusiveTimeline));
+    auto resource = std::unique_ptr<SubmissionResources>(
+        new SubmissionResources{
+            _pImp->pool,
+            std::move(_pImp->recordedBuffers),
+            std::move(_pImp->exclusiveTimeline)
+        }
+    );
     auto& timeline = _pImp->timeline;
     auto finalStep = _pImp->currentValue;
     //free _pImp to prevent multiple submission
