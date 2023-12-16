@@ -77,7 +77,8 @@ void registerProgramModule(nb::module_& m) {
             "Support for GL_KHR_shader_subgroup_shuffle_relative")
         .def_ro("shuffleClusteredSupport", &hp::SubgroupProperties::shuffleClusteredSupport,
             "Support for GL_KHR_shader_subgroup_clustered")
-        .def_ro("quadSupport", &hp::SubgroupProperties::quadSupport)
+        .def_ro("quadSupport", &hp::SubgroupProperties::quadSupport,
+            "Support for GL_KHR_shader_subgroup_quad")
         .def("__repr__", [](const hp::SubgroupProperties& props) {
             std::ostringstream str;
             str << "subgroupSize:            " << props.subgroupSize << '\n';

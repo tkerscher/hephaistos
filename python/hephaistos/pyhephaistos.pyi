@@ -2084,23 +2084,19 @@ class ShortTensor:
 class StopWatch:
     """
     Allows the measuring of elapsed time between commands execution
-
-    Parameters
-    ----------
-    stops: int
-        Number of stops to be recorded
+    
     """
 
-    def __init__(self, stops: int = 1) -> None:
+    def __init__(self) -> None:
         """
         Creates a new stopwatch for measuring elapsed time between commands.
         """
         ...
-    def getTimeStamps(self, wait: bool = False) -> list[float]:
+    def getElapsedTime(self, wait: bool = False) -> list[float]:
         """
-        Retrieves the recorded timestamps from the device. If wait = True,
-        blocks the caller until all timestamps are available,
-        otherwise unavailable ones are denoted as NaN.
+        Retrieves the elapsed time between start() and stop() in nanoseconds.
+        If wait = True, blocks the caller until all timestamps are available,
+        otherwise returns NaN.
         """
         ...
     def reset(self) -> None:
@@ -2117,12 +2113,6 @@ class StopWatch:
         """
         Returns the command to stop the stop watch. Can be recorded multiple
         times to record up to stopCount stop times.
-        """
-        ...
-    @property
-    def stopCount(self) -> int:
-        """
-        The number of stops that can be recorded.
         """
         ...
 
@@ -2150,7 +2140,11 @@ class SubgroupProperties:
         """
         ...
     @property
-    def quadSupport(self) -> bool: ...
+    def quadSupport(self) -> bool:
+        """
+        Support for GL_KHR_shader_subgroup_quad
+        """
+        ...
     @property
     def shuffleClusteredSupport(self) -> bool:
         """

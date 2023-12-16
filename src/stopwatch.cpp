@@ -1,5 +1,6 @@
 #include "hephaistos/stopwatch.hpp"
 
+#include <array>
 #include <limits>
 
 #include "volk.h"
@@ -16,8 +17,7 @@ public:
     const vulkan::Context& context;
     VkPipelineStageFlagBits stage;
     VkQueryPool queryPool;
-    mutable uint32_t query; //TODO: looks nasty
-    bool incrementing = false;
+    uint32_t query;
 
     void record(vulkan::Command& cmd) const override {
         //TODO: really necessary?
@@ -25,9 +25,6 @@ public:
 
         context.fnTable.vkCmdWriteTimestamp(cmd.buffer,
             stage, queryPool, query);
-
-        if (incrementing)
-            query++;
     }
 
     TimeStampCommand(
@@ -52,14 +49,12 @@ struct StopWatch::pImp {
     uint32_t validBits;
     float period;
 
-    uint32_t count;
     TimeStampCommand startCommand;
     TimeStampCommand endCommand;
 
-    pImp(const vulkan::Context& context, uint32_t count)
+    pImp(const vulkan::Context& context)
         : context(context)
         , queryPool(nullptr)
-        , count(count)
         , startCommand(context, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, nullptr, 0)
         , endCommand(context, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, nullptr, 1)
     {
@@ -79,13 +74,13 @@ struct StopWatch::pImp {
         VkQueryPoolCreateInfo info{
             .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
             .queryType = VK_QUERY_TYPE_TIMESTAMP,
-            .queryCount = count
+            .queryCount = 2
         };
         vulkan::checkResult(context.fnTable.vkCreateQueryPool(
             context.device, &info, nullptr, &queryPool));
 
         //before use we have to reset it once
-        context.fnTable.vkResetQueryPool(context.device, queryPool, 0, count);
+        context.fnTable.vkResetQueryPool(context.device, queryPool, 0, 2);
 
         //register query pool in commands
         startCommand.queryPool = queryPool;
@@ -96,10 +91,6 @@ struct StopWatch::pImp {
             context.device, queryPool, nullptr);
     }
 };
-
-uint32_t StopWatch::getStopCount() const {
-    return _pImp->count;
-}
 
 const Command& StopWatch::start() {
     return _pImp->startCommand;
@@ -112,13 +103,13 @@ void StopWatch::reset() {
     _pImp->context.fnTable.vkResetQueryPool(
         _pImp->context.device,
         _pImp->queryPool,
-        0,
-        _pImp->count);
+        0, 2);
 
     //reset counter
     _pImp->endCommand.query = 1;
 }
-std::vector<double> StopWatch::getTimeStamps(bool wait) const {
+
+double StopWatch::getElapsedTime(bool wait) const {
     VkQueryResultFlags flags =
         VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT;
     if (wait)
@@ -128,40 +119,35 @@ std::vector<double> StopWatch::getTimeStamps(bool wait) const {
         uint64_t timestamp;
         uint64_t valid;
     };
-    std::vector<Result> queryResults(_pImp->count);
+    std::array<Result, 2> queries;
 
     auto result = _pImp->context.fnTable.vkGetQueryPoolResults(
         _pImp->context.device,
         _pImp->queryPool,
-        0, _pImp->count,
-        sizeof(Result) * _pImp->count,
-        queryResults.data(),
+        0, 2,
+        2 * sizeof(Result),
+        queries.data(),
         sizeof(Result),
         flags);
     if (result < 0)
         vulkan::checkResult(result); //will throw
-
-    std::vector<double> timestamps(_pImp->count);
-    for (auto i = 0u; i < _pImp->count; ++i) {
-        auto& result = queryResults[i];
-        if (result.valid) {
-            result.timestamp >>= (64 - _pImp->validBits);
-            timestamps[i] = result.timestamp * static_cast<double>(_pImp->period);
-        }
-        else {
-            timestamps[i] = std::numeric_limits<double>::quiet_NaN();
-        }
+    
+    if (queries[0].valid && queries[1].valid) {
+        auto delta = queries[1].timestamp - queries[0].timestamp;
+        delta >>= (64 - _pImp->validBits);
+        return delta * static_cast<double>(_pImp->period);
     }
-
-    return timestamps;
+    else {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
 }
 
 StopWatch::StopWatch(StopWatch&& other) noexcept = default;
 StopWatch& StopWatch::operator=(StopWatch&& other) noexcept = default;
 
-StopWatch::StopWatch(ContextHandle context, uint32_t stops)
+StopWatch::StopWatch(ContextHandle context)
     : Resource(std::move(context))
-    , _pImp(std::make_unique<pImp>(*getContext(), stops + 1))
+    , _pImp(std::make_unique<pImp>(*getContext()))
 {}
 StopWatch::~StopWatch() = default;
 
