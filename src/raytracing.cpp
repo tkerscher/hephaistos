@@ -277,7 +277,7 @@ GeometryStore::GeometryStore(
             .vertexStride = geometry.vertexStride,
             .maxVertex = vertex_count - 1,
             .indexType = hasIdx ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_NONE_KHR,
-            .indexData = hasIdx ? pIndex : 0
+            .indexData = { .deviceAddress = hasIdx ? pIndex : 0 }
         };
         geometries[i] = {
             .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
@@ -577,7 +577,7 @@ AccelerationStructure::AccelerationStructure(
     tlasGeometry.geometry.instances = VkAccelerationStructureGeometryInstancesDataKHR{
         .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
         .arrayOfPointers = VK_FALSE,
-        .data = instanceBufferAddress
+        .data = { .deviceAddress = instanceBufferAddress }
     };
 
     //get size info
