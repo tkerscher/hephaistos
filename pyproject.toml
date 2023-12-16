@@ -29,3 +29,4 @@ minimum-version = "0.6"
 wheel.license-files = ["LICENSE"]
 wheel.packages = ["python/hephaistos"]
 wheel.py-api = "cp312"
+sdist.exclude = [".github", "examples", "notebooks", "test"]
