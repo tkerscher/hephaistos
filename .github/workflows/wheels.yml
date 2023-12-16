@@ -16,8 +16,6 @@ jobs:
         buildplat:
           - [ubuntu-latest, manylinux_x86_64]
           - [ubuntu-latest, musllinux_x86_64]
-          - [macos-latest, macosx_x86_64]
-          - [macos-latest, macosx_arm64]
           - [windows-latest, win_amd64]
         python: ["cp39", "cp310", "cp311", "cp312"]
     
@@ -31,7 +29,26 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.python }}-${{ startsWith(matrix.buildplat[1], 'macosx') && 'macosx' || matrix.buildplat[1] }}
+          name: ${{ matrix.python }}-${{ matrix.buildplat[1] }}
+          path: ./wheelhouse/*.whl
+  
+  build_wheels_macos:
+    name: Build wheel for ${{ matrix.python }}-macos
+    runs-on: macos-12
+    strategy:
+      fail-fast: false
+      python: ["cp39", "cp310", "cp311", "cp312"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.16.2
+        env:
+          CIBW_ARCHS_MACOS: x86_64 arm64
+          CIBW_BUILD: ${{ matrix.python }}-*
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-wheels
           path: ./wheelhouse/*.whl
 
   build_sdist:
@@ -57,7 +74,7 @@ jobs:
           path: ./dist/*
   
   upload_pypi:
-    needs: [build_wheels, build_sdist]
+    needs: [build_wheels, build_wheels_macos, build_sdist]
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -65,9 +82,8 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
-          name: artifact
           path: dist
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
