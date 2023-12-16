@@ -59,9 +59,8 @@ int main(int argc, char* argv[]) {
     //the execution is paused until it's finished
 
     //check how long the rendering takes
-    auto stamps = watch.getTimeStamps();
     std::cout << std::setprecision(3);
-    std::cout << "Rendered in " << (stamps[1] - stamps[0]) * 1e-6 << " ms\n";
+    std::cout << "Rendered in " << watch.getElapsedTime() * 1e-6 << " ms\n";
 
     //write image to disk
     std::cout << "Saving...\n";
