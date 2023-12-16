@@ -60,4 +60,5 @@ target_include_directories(glslang
     PRIVATE ${CMAKE_CURRENT_LIST_DIR}
 )
 target_compile_features(glslang PUBLIC cxx_std_17)
+set_target_properties(glslang PROPERTIES POSITION_INDEPENDENT_CODE ON)
 set_target_properties(glslang PROPERTIES FOLDER "dependencies")

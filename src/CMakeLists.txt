@@ -48,6 +48,7 @@ target_include_directories(hephaistos
     PRIVATE ${PROJECT_SOURCE_DIR}/src
 )
 set_target_properties(hephaistos PROPERTIES PUBLIC_HEADER "${PUBLIC_HEADERS}")
+set_target_properties(hephaistos PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_features(hephaistos PUBLIC cxx_std_20)
 
 #link libraries

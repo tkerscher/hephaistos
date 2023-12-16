@@ -1,4 +1,5 @@
 add_library(volk STATIC volk.h volk.c)
 target_include_directories(volk PUBLIC ${CMAKE_CURRENT_LIST_DIR})
 target_link_libraries(volk PUBLIC Vulkan-Headers)
+set_target_properties(volk PROPERTIES POSITION_INDEPENDENT_CODE ON)
 set_target_properties(volk PROPERTIES FOLDER "dependencies")

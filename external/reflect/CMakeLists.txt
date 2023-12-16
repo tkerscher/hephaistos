@@ -1,3 +1,4 @@
 add_library(spirv-reflect STATIC ${CMAKE_CURRENT_LIST_DIR}/spirv_reflect.cpp)
 target_include_directories(spirv-reflect PUBLIC ${CMAKE_CURRENT_LIST_DIR})
+set_target_properties(spirv-reflect PROPERTIES POSITION_INDEPENDENT_CODE ON)
 set_target_properties(spirv-reflect PROPERTIES FOLDER "dependencies")
