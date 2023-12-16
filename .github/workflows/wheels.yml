@@ -1,0 +1,74 @@
+name: Wheel Builder
+
+on:
+  push:
+    tags:
+      - '**'
+  workflow_dispatch:
+
+jobs:
+  build_wheels:
+    name: Build wheel for ${{ matrix.python }}-${{ matrix.buildplat[1] }}
+    runs-on: ${{ matrix.buildplat[0] }}
+    strategy:
+      fail-fast: false
+      matrix:
+        buildplat:
+          - [ubuntu-latest, manylinux_x86_64]
+          - [ubuntu-latest, musllinux_x86_64]
+          - [macos-latest, macosx_x86_64]
+          - [macos-latest, macosx_arm64]
+          - [windows-latest, win_amd64]
+        python: ["cp39", "cp310", "cp311", "cp312"]
+    
+    steps:
+      - name: Checkout hephaistos
+        uses: actions/checkout@v4
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.16.2
+        env:
+          CIBW_BUILD: ${{ matrix.python }}-${{ matrix.buildplat[1] }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.python }}-${{ startsWith(matrix.buildplat[1], 'macosx') && 'macosx' || matrix.buildplat[1] }}
+          path: ./wheelhouse/*.whl
+
+  build_sdist:
+    name: Build sdist
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout hephaistos
+        uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+      - name: Build sdist
+        run: |
+          python -m pip install -U pip build
+          python -m build --sdist
+      - name: Check sdist
+        run: |
+          python -m pip install twine
+          twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: ./dist/*
+  
+  upload_pypi:
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/hephaistos
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v3
+        with:
+          name: artifact
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
