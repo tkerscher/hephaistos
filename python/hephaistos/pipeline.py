@@ -75,7 +75,7 @@ class PipelineStage(ABC):
         for buffering. The latter can be bound in programs
     extra: {str}, default={}
         Set of extra parameter name, that can be set and retrieved using the
-        stage api. Take precedence over parameters defined by structs.Should
+        stage api. Take precedence over parameters defined by structs. Should
         be be implemented in subclasses as properties.
     """
 
@@ -194,6 +194,52 @@ def runPipelineStage(stage: PipelineStage, i: int = 0, *, update: bool = True) -
     if update:
         stage.update(i)
     beginSequence().AndList(stage.run(i)).Submit().wait()
+
+
+class SourceCodeMixin(PipelineStage):
+    """
+    Base class for mixin that inject source code into other stages or programs
+    while providing an interface to configure the code in the same way as
+    regular pipeline stages.
+
+    Parameters
+    ----------
+    params: {str: Structure}, default={}
+        Dictionary of named ctype structure containing the stage's parameters.
+        Each structure will be allocated on the CPU side and twice on the GPU
+        for buffering. The latter can be bound in programs
+    extra: {str}, default={}
+        Set of extra parameter name, that can be set and retrieved using the
+        stage api. Take precedence over parameters defined by structs. Should
+        be be implemented in subclasses as properties.
+
+    See Also
+    --------
+    PipelineStage
+    """
+
+    def __init__(
+        self, params: Dict[str, type[Structure]] = {}, extra: Set[str] = set()
+    ) -> None:
+        super().__init__(params, extra)
+
+    @property
+    @abstractmethod
+    def sourceCode(self) -> str:
+        """Source code this mixin manages"""
+        pass
+
+    def bindParams(self, program: Program, i: int) -> None:
+        """
+        Binds params used by this mixin to the given program using the i-th
+        configuration.
+        """
+        self._bindParams(program, i)
+
+    def run(self, i: int) -> List[Command]:
+        # Most mixin won't add any logic besides the source code
+        # so an empty command list is a reasonable default
+        return []
 
 
 class RetrieveTensorStage(PipelineStage):
