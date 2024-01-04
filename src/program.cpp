@@ -524,18 +524,29 @@ Program::Program(ContextHandle context, std::span<const uint32_t> code, std::spa
         con->device, &layoutInfo, nullptr, &program->pipeLayout));
 
     //read specialization constants map
-    auto specSlots = std::min(
-        reflectModule.specialization_constant_count,
+    auto totalSpecSlots = reflectModule.specialization_constant_count;
+    auto specSlots = std::min(totalSpecSlots,
         static_cast<uint32_t>(specialization.size_bytes() / 4));
     std::vector<VkSpecializationMapEntry> specMap(specSlots);
-    for (auto i = 0u; i < specSlots; ++i) {
-        //all types allowed for specialization are 4 bytes long
-        //we assume the spec const to be tightly packed
-        specMap[i] = VkSpecializationMapEntry{
-            .constantID = reflectModule.specialization_constants[i].constant_id,
-            .offset = 4 * i,
-            .size = 4
-        };
+    if (specSlots > 0) {
+        //reflection might have ids out of order
+        // -> first fetch all ids, than sort them
+        std::vector<uint32_t> specIds(totalSpecSlots);
+        for (auto i = 0u; i < totalSpecSlots; ++i) {
+            specIds[i] = reflectModule.specialization_constants[i].constant_id;
+        }
+        std::sort(specIds.begin(), specIds.end());
+        //create map entries only up to certain amount to match provided data
+        //(remaining ones use default values)
+        for (auto i = 0u; i < specSlots; ++i) {
+            //all types allowed for specialization are 4 bytes long
+            //we assume the spec const to be tightly packed
+            specMap[i] = VkSpecializationMapEntry{
+                .constantID = specIds[i],
+                .offset = 4 * i,
+                .size = 4
+            };
+        }
     }
 
     //we're done reflecting
