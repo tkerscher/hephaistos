@@ -18,6 +18,7 @@ set(PUBLIC_HEADERS
     ${INCROOT}/program.hpp
     ${INCROOT}/raytracing.hpp
     ${INCROOT}/stopwatch.hpp
+    ${INCROOT}/types.hpp
     ${INCROOT}/version.hpp
 )
 #Source
@@ -31,6 +32,7 @@ set(SRC
     ${SRCROOT}/program.cpp
     ${SRCROOT}/raytracing.cpp
     ${SRCROOT}/stopwatch.cpp
+    ${SRCROOT}/types.cpp
     ${SRCROOT}/version.cpp
 #vulkan
     ${SRCROOT}/vk/result.hpp
