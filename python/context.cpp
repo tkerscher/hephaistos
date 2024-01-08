@@ -134,7 +134,6 @@ void registerContextModule(nb::module_& m) {
             str << info.name;
             if (info.isDiscrete)
                 str << " (discrete)";
-            str << '\n';
             return str.str();
         });
     m.def("enumerateDevices", &enumerateDevices,

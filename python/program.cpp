@@ -53,7 +53,7 @@ void printBinding(std::ostringstream& str, const hp::BindingTraits& b) {
     printBindingType(str, b.type);
     if (b.count > 1)
         str << '[' << b.count << ']';
-    str << ")\n";
+    str << ")";
 }
 
 }
