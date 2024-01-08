@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdlib>
+#include <sstream>
 #include <stdexcept>
 #include <unordered_set>
 
@@ -81,6 +82,26 @@ bool isDescriptorSetEmpty(const VkWriteDescriptorSet& set) {
         set.pTexelBufferView == nullptr;
 }
 
+void checkAllBound(const std::vector<VkWriteDescriptorSet> boundParams) {
+    if (std::any_of(
+        boundParams.begin(),
+        boundParams.end(),
+        vulkan::isDescriptorSetEmpty)
+    ) {
+        std::ostringstream stream;
+        stream << "Cannot dispatch program due to unbound bindings: ";
+        //collect all unbound bindings to make the error more usefull
+        auto i = 0u;
+        for (auto& param : boundParams) {
+            if (vulkan::isDescriptorSetEmpty(param))
+                stream << i << " ";
+            ++i;
+        }
+
+        throw std::logic_error(stream.str());
+    }
+}
+
 }
 
 void DispatchCommand::record(vulkan::Command& cmd) const {
@@ -136,15 +157,8 @@ DispatchCommand::DispatchCommand(
     , program(std::cref(program))
     , params(program.boundParams)
 {
-    //sanity check: all params are bound
-    if (std::any_of(
-        program.boundParams.begin(),
-        program.boundParams.end(),
-        vulkan::isDescriptorSetEmpty)
-        ) {
-        throw std::logic_error(
-            "Cannot dispatch program! At least one parameter is not bound!");
-    }
+    //sanity check: all params are bound (will throw if not)
+    vulkan::checkAllBound(program.boundParams);
 }
 DispatchCommand::~DispatchCommand() = default;
 
@@ -218,15 +232,8 @@ DispatchIndirectCommand::DispatchIndirectCommand(
     , program(std::cref(program))
     , params(program.boundParams)
 {
-    //sanity check: all params are bound
-    if (std::any_of(
-        program.boundParams.begin(),
-        program.boundParams.end(),
-        vulkan::isDescriptorSetEmpty)
-        ) {
-        throw std::logic_error(
-            "Cannot dispatch program! At least one parameter is not bound!");
-    }
+    //sanity check: all params are bound (will throw if not)
+    vulkan::checkAllBound(program.boundParams);
 }
 DispatchIndirectCommand::~DispatchIndirectCommand() = default;
 
@@ -343,6 +350,26 @@ const BindingTraits& Program::getBindingTraits(std::string_view name) const {
         throw std::runtime_error("There is no binding point at specified location!");
 
     return *it;
+}
+
+bool Program::isBindingBound(uint32_t i) const {
+    if (i >= bindingTraits.size())
+        throw std::runtime_error("There is no binding point at specified number!");
+
+    return !vulkan::isDescriptorSetEmpty(program->boundParams[i]);
+}
+
+bool Program::isBindingBound(std::string_view name) const {
+    const auto& b = bindingTraits;
+    auto it = std::find_if(b.begin(), b.end(), [name](const BindingTraits& t) -> bool {
+        return t.name == name;
+        });
+
+    if (it == b.end())
+        throw std::runtime_error("There is no binding point at specified location! Binding name: " + std::string(name));
+
+    auto i = std::distance(b.begin(), it);
+    return !vulkan::isDescriptorSetEmpty(program->boundParams[i]);
 }
 
 const std::vector<BindingTraits>& Program::listBindings() const noexcept {

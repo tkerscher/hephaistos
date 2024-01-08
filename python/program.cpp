@@ -200,6 +200,12 @@ void registerProgramModule(nb::module_& m) {
         .def_prop_ro("bindings",
             [](const hp::Program& p){ return p.listBindings(); },
             "Returns a list of all bindings.")
+        .def("isBindingBound", [](const hp::Program& p, uint32_t i){
+                return p.isBindingBound(i);
+            }, "i"_a, "Checks wether the i-th binding is bound")
+        .def("isBindingBound", [](const hp::Program& p, std::string_view name) {
+                return p.isBindingBound(name);
+            }, "name"_a, "Checks wether the binding specified by its name is bound")
         .def("dispatch",
             [](const hp::Program& p, uint32_t x, uint32_t y, uint32_t z)
                 -> hp::DispatchCommand

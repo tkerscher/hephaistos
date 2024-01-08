@@ -336,6 +336,24 @@ public:
     */
     [[nodiscard]] const BindingTraits& getBindingTraits(std::string_view name) const;
     /**
+     * @brief Checks whether the given binding is currently bound
+     * 
+     * @param i Binding number to be checked
+     * @return True, if the binding is currently bound, false otherwise
+     */
+    [[nodiscard]] bool isBindingBound(uint32_t i) const;
+    /**
+     * @brief Checks wether the given binding is currently bound
+     * 
+     * Checks the binding specified by its name as defined in the shader code.
+     * Throws if the given binding cannot be found.
+     * @note Shader compiler may strip away the binding names
+     * 
+     * @param name Name of the binding to be checked
+     * @return True, if the binding is currently bound, false otherwise
+     */
+    [[nodiscard]] bool isBindingBound(std::string_view name) const;
+    /**
      * @brief Returns a list of BindingTraits of all bindings
      * 
      * @return Vector of BindingTraits one for each binding
