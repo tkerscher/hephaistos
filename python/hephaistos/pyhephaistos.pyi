@@ -1767,6 +1767,17 @@ class Program:
             Number of groups to dispatch in Z dimension
         """
         ...
+    def isBindingBound(i: int,/) -> bool:
+        """
+        Checks wether the i-th binding is currently bound.
+        """
+        ...
+    @overload
+    def isBindingBound(name: str,/) -> bool:
+        """
+        Checks wether the binding specified by its name is currently bound
+        """
+        ...
     @property
     def localSize(self) -> hephaistos.pyhephaistos.LocalSize:
         """
@@ -2408,6 +2419,22 @@ class Timeline:
         """
         ...
 
+
+class TypeSupport:
+    """List of supported extended types, e.g. float64"""
+
+    @property
+    def float64(self) -> bool: ...
+    @property
+    def float16(self) -> bool: ...
+    @property
+    def int64(self) -> bool: ...
+    @property
+    def int16(self) -> bool: ...
+    @property
+    def int8(self) -> bool: ...
+
+
 class UnsignedIntBuffer:
     """
     Buffer representing memory allocated on the host holding an array of type
@@ -2960,6 +2987,18 @@ def getSubgroupProperties() -> hephaistos.pyhephaistos.SubgroupProperties:
     """
     ...
 
+def getSupportedTypes(id: Optional[int], /) -> hephaistos.pyhephaistos.TypeSupport:
+    """
+    Queries the supported extended types
+
+    Parameters
+    ----------
+    id: int | None, default=None
+        Id of the device to query. If None, uses the one the current context
+        was created on
+    """
+    ...
+
 def isDeviceSuitable(arg: int, /) -> bool:
     """
     Returns True if the device given by its id supports all enabled extensions
@@ -2983,6 +3022,13 @@ def isVulkanAvailable() -> bool:
     Returns True if Vulkan is available on this system.
     """
     ...
+
+def requireTypes(types: set, force: bool = False, /) -> None:
+    """
+    Forces the given types as specified by in the set by their names (f64, f16,
+    i64, i16, i8), effectively marking devices, which do not support them as
+    unsupported. Set force=True if an existing context should be destroyed.
+    """
 
 def retrieveImage(
     src: hephaistos.pyhephaistos.Image, dst: hephaistos.pyhephaistos.Buffer
