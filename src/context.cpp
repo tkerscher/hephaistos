@@ -263,17 +263,6 @@ bool isDeviceSuitable(const DeviceHandle& device, std::span<const ExtensionHandl
         //host query reset (stopwatch)
         if (!features12.hostQueryReset)
             return false;
-        //extended arithmetic types
-        if (!features.features.shaderFloat64)
-            return false;
-        if (!features.features.shaderInt64)
-            return false;
-        if (!features.features.shaderInt16)
-            return false;
-        if (!features12.shaderFloat16)
-            return false;
-        if (!features12.shaderInt8)
-            return false;
         //scalar block layout
         if (!features12.scalarBlockLayout)
             return false;
@@ -397,6 +386,18 @@ ContextHandle createContext(
 
     //Create logical device
     {
+        //Check for extended arithmetic type support (e.f. float64)
+        //and enable them by default
+        //(since we can't reasonable chain basic feature set)
+        VkPhysicalDeviceVulkan12Features features12{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
+        };
+        VkPhysicalDeviceFeatures2 features2{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+            .pNext = &features12
+        };
+        vkGetPhysicalDeviceFeatures2(device, &features2);
+
         //extensions are allowed to add device extensions, but
         //vulkan wants their names in contiguous memory
         // -> collect them in a vector
@@ -444,8 +445,8 @@ ContextHandle createContext(
         VkPhysicalDeviceShaderFloat16Int8Features float16Int8Features{
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES,
             .pNext = &hostQueryReset,
-            .shaderFloat16 = VK_TRUE,
-            .shaderInt8    = VK_TRUE
+            .shaderFloat16 = features12.shaderFloat16,
+            .shaderInt8    = features12.shaderInt8,
         };
         VkPhysicalDeviceScalarBlockLayoutFeatures scalarBlockFeatures{
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES,
@@ -458,9 +459,9 @@ ContextHandle createContext(
             .bufferDeviceAddress = VK_TRUE
         };
         VkPhysicalDeviceFeatures features{
-            .shaderFloat64 = VK_TRUE,
-            .shaderInt64   = VK_TRUE,
-            .shaderInt16   = VK_TRUE
+            .shaderFloat64 = features2.features.shaderFloat64,
+            .shaderInt64   = features2.features.shaderInt64,
+            .shaderInt16   = features2.features.shaderInt16
         };
         VkDeviceCreateInfo deviceInfo{
             .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
