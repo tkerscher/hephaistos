@@ -540,6 +540,7 @@ class ClearTensorCommand:
         offset: Optional[int] = None,
         size: Optional[int] = None,
         data: Optional[int] = None,
+        unsafe: bool = False,
     ) -> None:
         """
         Creates a command for filling a tensor with constant data over a given
@@ -2299,6 +2300,7 @@ class RetrieveTensorCommand:
         bufferOffset: Optional[int] = None,
         tensorOffset: Optional[int] = None,
         size: Optional[int] = None,
+        unsafe: bool = False
     ) -> None: ...
 
 class SequenceBuilder:
@@ -3554,6 +3556,7 @@ class UpdateTensorCommand:
         bufferOffset: Optional[int] = None,
         tensorOffset: Optional[int] = None,
         size: Optional[int] = None,
+        unsafe: bool = False,
     ) -> None: ...
 
 class UpdateTextureCommand:
@@ -3588,6 +3591,7 @@ def clearTensor(
     offset: Optional[int] = None,
     size: Optional[int] = None,
     data: Optional[int] = None,
+    unsafe: bool = False,
 ) -> hephaistos.pyhephaistos.ClearTensorCommand:
     """
     Creates a command for filling a tensor with constant data over a given range.
@@ -3605,6 +3609,8 @@ def clearTensor(
         offset until the end of the tensor
     data: None|int, default=None
         32 bit integer used to fill the tensor. If None, uses all zeros.
+    unsafe: bool, default=False
+        Wether to omit barrier ensuring read after write ordering.
     """
     ...
 
@@ -3771,6 +3777,7 @@ def retrieveTensor(
     bufferOffset: Optional[int] = None,
     tensorOffset: Optional[int] = None,
     size: Optional[int] = None,
+    unsafe: bool = False,
 ) -> hephaistos.pyhephaistos.RetrieveTensorCommand:
     """
     Creates a command for copying the src tensor back to the destination buffer
@@ -3787,6 +3794,8 @@ def retrieveTensor(
         Optional offset into the tensor in bytes
     size: None|int, default=None
         Amount of data to copy in bytes. If None, equals to the complete buffer
+    unsafe: bool, default=False
+        Wether to omit barrier ensuring read after write ordering
     """
     ...
 
@@ -3824,6 +3833,7 @@ def updateTensor(
     bufferOffset: Optional[int] = None,
     tensorOffset: Optional[int] = None,
     size: Optional[int] = None,
+    unsafe: bool = False,
 ) -> hephaistos.pyhephaistos.UpdateTensorCommand:
     """
     Creates a command for copying the src buffer into the destination tensor
@@ -3840,6 +3850,8 @@ def updateTensor(
         Optional offset into the tensor in bytes
     size: None|int, default=None
         Amount of data to copy in bytes. If None, equals to the complete buffer
+    unsafe: bool, default=False
+        Wether to omit barrier ensuring read after write ordering
     """
     ...
 
