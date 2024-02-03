@@ -162,6 +162,60 @@ void registerTensor(nb::module_& m, const char* name, const char* type_name) {
             "The number of elements in this tensor.")
         .def_prop_ro("size_bytes", [](const TypedTensor<T>& t) { return t.size_bytes(); },
             "The size of the tensor in bytes.")
+        .def_prop_ro("isNonCoherent", [](const TypedTensor<T>& t) { return t.isNonCoherent(); },
+            "Wether calls to flush() and invalidate() are necessary to make changes"
+            "in mapped memory between devices and host available")
+        .def("update",
+            [](TypedTensor<T>& t, uint64_t ptr, size_t n, uint64_t offset) {
+                t.update({ reinterpret_cast<const T*>(ptr), n }, offset);
+            }, "addr"_a, "n"_a, "offset"_a = 0,
+            "Updates the tensor at the given offset with n elements from addr"
+            "\n\nParameters\n----------\n"
+            "ptr: int\n"
+            "   Address of memory to copy from\n"
+            "n: int\n"
+            "   Amount of elements to copy\n"
+            "offset: int, default=0\n"
+            "   Offset into the tensor in number of elements where the copy starts")
+        .def("flush",
+            [](TypedTensor<T>& t, uint64_t offset, std::optional<uint64_t> size) {
+                uint64_t _size = hp::whole_size;
+                if (size) _size = *size;
+                t.flush(offset, _size);
+            }, "offset"_a = 0, "size"_a.none() = nb::none(),
+            "Makes writes in mapped memory from the host available to the device"
+            "\n\nParameters\n----------\n"
+            "offset: int, default=0\n"
+            "   Offset in amount of elements into mapped memory to flush\n"
+            "size: int | None, default=None\n"
+            "   Number of elements to flush starting at offset. If None, flushes all remaining elements")
+        .def("retrieve",
+            [](TypedTensor<T>& t, uint64_t ptr, size_t n, uint64_t offset) {
+                t.retrieve({ reinterpret_cast<T*>(ptr), n }, offset);
+            }, "addr"_a, "n"_a, "offset"_a = 0,
+            "Retrieves data from the tensor at the given offset and "
+            "stores it in dst. Only needed if isNonCoherent is True."
+            "\n\nParameters\n----------\n"
+            "ptr: int\n"
+            "   Address of memory to copy to\n"
+            "n: int\n"
+            "   Amount of elements to copy\n"
+            "offset: int, default=0\n"
+            "   Offset into the tensor in amount of elements where the copy starts")
+        .def("invalidate",
+            [](TypedTensor<T>& t, uint64_t offset, std::optional<uint64_t> size) {
+                uint64_t _size = hp::whole_size;
+                if (size) _size = *size;
+                t.invalidate(offset, _size);
+            }, "offset"_a = 0, "size"_a.none() = nb::none(),
+            "Makes writes in mapped memory from the device available to the host. "
+            "Only needed if isNonCoherent is True."
+            "\n\nParameters\n----------\n"
+            "offset: int, default=0\n"
+            "   Offset in amount of elements into mapped memory to invalidate\n"
+            "size: int | None, default=None\n"
+            "   Number of elements to invalidate starting at offset. "
+               "If None, invalidates all remaining bytes")
         .def("bindParameter", [](const TypedTensor<T>& t, hp::Program& p, uint32_t b)
             { t.bindParameter(p.getBinding(b)); }, "program"_a, "binding"_a,
             "Binds the tensor to the program at the given binding")
@@ -238,37 +292,47 @@ void registerBufferModule(nb::module_& m) {
     //retrieve tensor command
     nb::class_<hp::RetrieveTensorCommand, hp::Command>(m, "RetrieveTensorCommand",
             "Command for copying the src tensor back to the destination buffer")
-        .def("__init__", [](
-            hp::RetrieveTensorCommand* cmd,
-            const hp::Tensor<std::byte>& src,
-            const hp::Buffer<std::byte>& dst,
-            std::optional<uint64_t> bufferOffset,
-            std::optional<uint64_t> tensorOffset,
-            std::optional<uint64_t> size) {
+        .def("__init__",
+            [](
+                hp::RetrieveTensorCommand* cmd,
+                const hp::Tensor<std::byte>& src,
+                const hp::Buffer<std::byte>& dst,
+                std::optional<uint64_t> bufferOffset,
+                std::optional<uint64_t> tensorOffset,
+                std::optional<uint64_t> size,
+                bool unsafe
+            ) {
                 hp::CopyRegion region{};
                 if (bufferOffset) region.bufferOffset = *bufferOffset;
                 if (tensorOffset) region.tensorOffset = *tensorOffset;
                 if (size) region.size = *size;
+                region.unsafe = unsafe;
                 new (cmd) hp::RetrieveTensorCommand(src, dst, region);
             }, "src"_a, "dst"_a,
             "bufferOffset"_a.none() = nb::none(),
             "tensorOffset"_a.none() = nb::none(),
-            "size"_a.none() = nb::none());
-    m.def("retrieveTensor", [](
-        const hp::Tensor<std::byte>& src,
-        const hp::Buffer<std::byte>& dst,
-        std::optional<uint64_t> bufferOffset,
-        std::optional<uint64_t> tensorOffset,
-        std::optional<uint64_t> size) {
+            "size"_a.none() = nb::none(),
+            "unsafe"_a = false);
+    m.def("retrieveTensor",
+        [](
+            const hp::Tensor<std::byte>& src,
+            const hp::Buffer<std::byte>& dst,
+            std::optional<uint64_t> bufferOffset,
+            std::optional<uint64_t> tensorOffset,
+            std::optional<uint64_t> size,
+            bool unsafe
+        ) {
             hp::CopyRegion region{};
             if (bufferOffset) region.bufferOffset = *bufferOffset;
             if (tensorOffset) region.tensorOffset = *tensorOffset;
             if (size) region.size = *size;
+            region.unsafe = unsafe;
             return hp::retrieveTensor(src, dst, region);
         }, "src"_a, "dst"_a,
         "bufferOffset"_a.none() = nb::none(),
         "tensorOffset"_a.none() = nb::none(),
         "size"_a.none() = nb::none(),
+        "unsafe"_a = false,
         "Creates a command for copying the src tensor back to the destination buffer"
         "\n\nParameters\n----------\n"
         "src: Tensor\n"
@@ -280,41 +344,53 @@ void registerBufferModule(nb::module_& m) {
         "tensorOffset: None|int, default=None\n"
         "    Optional offset into the tensor in bytes\n"
         "size: None|int, default=None\n"
-        "    Amount of data to copy in bytes. If None, equals to the complete buffer");
+        "    Amount of data to copy in bytes. If None, equals to the complete buffer\n"
+        "unsafe: bool, default=False\n"
+        "   Wether to omit barriers ensuring read after write ordering");
     //update tensor command
     nb::class_<hp::UpdateTensorCommand, hp::Command>(m, "UpdateTensorCommand",
             "Command for copying the src buffer into the destination tensor")
-        .def("__init__", [](
-            hp::UpdateTensorCommand* cmd,
-            const hp::Buffer<std::byte>& src,
-            const hp::Tensor<std::byte>& dst,
-            std::optional<uint64_t> bufferOffset,
-            std::optional<uint64_t> tensorOffset,
-            std::optional<uint64_t> size) {
+        .def("__init__",
+            [](
+                hp::UpdateTensorCommand* cmd,
+                const hp::Buffer<std::byte>& src,
+                const hp::Tensor<std::byte>& dst,
+                std::optional<uint64_t> bufferOffset,
+                std::optional<uint64_t> tensorOffset,
+                std::optional<uint64_t> size,
+                bool unsafe
+            ) {
                 hp::CopyRegion region{};
                 if (bufferOffset) region.bufferOffset = *bufferOffset;
                 if (tensorOffset) region.tensorOffset = *tensorOffset;
                 if (size) region.size = *size;
+                region.unsafe = unsafe;
                 new (cmd) hp::UpdateTensorCommand(src, dst, region);
             }, "src"_a, "dst"_a,
             "bufferOffset"_a.none() = nb::none(),
             "tensorOffset"_a.none() = nb::none(),
-            "size"_a.none() = nb::none());
-    m.def("updateTensor", [](
-        const hp::Buffer<std::byte>& src,
-        const hp::Tensor<std::byte>& dst,
-        std::optional<uint64_t> bufferOffset,
-        std::optional<uint64_t> tensorOffset,
-        std::optional<uint64_t> size) {
+            "size"_a.none() = nb::none(),
+            "unsafe"_a = false);
+    m.def("updateTensor",
+        [](
+            const hp::Buffer<std::byte>& src,
+            const hp::Tensor<std::byte>& dst,
+            std::optional<uint64_t> bufferOffset,
+            std::optional<uint64_t> tensorOffset,
+            std::optional<uint64_t> size,
+            bool unsafe
+        ) {
             hp::CopyRegion region{};
             if (bufferOffset) region.bufferOffset = *bufferOffset;
             if (tensorOffset) region.tensorOffset = *tensorOffset;
             if (size) region.size = *size;
+            region.unsafe = unsafe;
             return hp::updateTensor(src, dst, region);
         }, "src"_a, "dst"_a,
         "bufferOffset"_a.none() = nb::none(),
         "tensorOffset"_a.none() = nb::none(),
         "size"_a.none() = nb::none(),
+        "unsafe"_a = false,
         "Creates a command for copying the src buffer into the destination tensor"
         "\n\nParameters\n----------\n"
         "src: Buffer\n"
@@ -326,33 +402,43 @@ void registerBufferModule(nb::module_& m) {
         "tensorOffset: None|int, default=None\n"
         "    Optional offset into the tensor in bytes\n"
         "size: None|int, default=None\n"
-        "    Amount of data to copy in bytes. If None, equals to the complete buffer");
+        "    Amount of data to copy in bytes. If None, equals to the complete buffer\n"
+        "unsafe: bool, default=False\n"
+        "   Wether to omit barriers ensuring read after write ordering");
     //clear tensor command
     nb::class_<hp::ClearTensorCommand, hp::Command>(m, "ClearTensorCommand",
             "Command for filling a tensor with constant data over a given range")
-        .def("__init__", [](
-            hp::ClearTensorCommand* cmd,
-            const hp::Tensor<std::byte>& tensor,
-            std::optional<uint64_t> offset,
-            std::optional<uint64_t> size,
-            std::optional<uint32_t> data) {
+        .def("__init__",
+            [](
+                hp::ClearTensorCommand* cmd,
+                const hp::Tensor<std::byte>& tensor,
+                std::optional<uint64_t> offset,
+                std::optional<uint64_t> size,
+                std::optional<uint32_t> data,
+                bool unsafe
+            ) {
                 hp::ClearTensorCommand::Params params{};
                 if (offset) params.offset = *offset;
                 if (size) params.size = *size;
                 if (data) params.data = *data;
+                params.unsafe = unsafe;
                 new (cmd) hp::ClearTensorCommand(tensor, params);
             },
             "tensor"_a,
             "offset"_a.none() = nb::none(),
             "size"_a.none() = nb::none(),
             "data"_a.none() = nb::none(),
+            "unsafe"_a = false,
             "Creates a command for filling a tensor with constant data over a given range. "
             "Defaults to zeroing the complete tensor");
-    m.def("clearTensor", [](
-        const hp::Tensor<std::byte>& tensor,
-        std::optional<uint64_t> offset,
-        std::optional<uint64_t> size,
-        std::optional<uint32_t> data) {
+    m.def("clearTensor",
+        [](
+            const hp::Tensor<std::byte>& tensor,
+            std::optional<uint64_t> offset,
+            std::optional<uint64_t> size,
+            std::optional<uint32_t> data,
+            bool unsafe
+        ) {
             hp::ClearTensorCommand::Params params{};
             if (offset) params.offset = *offset;
             if (size) params.size = *size;
@@ -363,6 +449,7 @@ void registerBufferModule(nb::module_& m) {
         "offset"_a.none() = nb::none(),
         "size"_a.none() = nb::none(),
         "data"_a.none() = nb::none(),
+        "unsafe"_a = false,
         "Creates a command for filling a tensor with constant data over a given range. "
         "Defaults to zeroing the complete tensor"
         "\n\nParameters\n----------\n"
@@ -375,5 +462,7 @@ void registerBufferModule(nb::module_& m) {
         "    Amount of bytes to clear. If None, equals to the range starting "
             "at offset until the end of the tensor\n"
         "data: None|int, default=None\n"
-        "    32 bit integer used to fill the tensor. If None, uses all zeros.");
+        "    32 bit integer used to fill the tensor. If None, uses all zeros.\n"
+        "unsafe: bool, default=false\n"
+        "   Wether to omit barriers ensuring read after write ordering.");
 }

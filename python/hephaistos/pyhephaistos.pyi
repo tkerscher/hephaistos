@@ -235,6 +235,34 @@ class ByteTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+    def flush(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the host available to the device.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to flush
+        size: int|None, default=None
+            Number of elements to flush starting at offset.
+            If None, flushes all remaining elements.
+        """
+        ...
+    def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the device available to the host.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to invalidate
+        size: int | None, default=None
+            Number of elements to invalidate starting at offset.
+            If None, invalidates all remaining elements.
+        """
+        ...
     @property
     def isMapped(self) -> bool:
         """
@@ -242,9 +270,35 @@ class ByteTensor:
         """
         ...
     @property
+    def isNonCoherent(self) -> bool:
+        """
+        Wether calls to flush() and invalidate() are necessary to make changes
+        in mapped memory between devices and host available
+        """
+        ...
+    @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
+        """
+        ...
+    def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Retrieves n elements from the tensor at the given offset and stores it
+        in dst.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy to
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
     @property
@@ -257,6 +311,24 @@ class ByteTensor:
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
+        """
+        ...
+    def update(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Updates the tensor at the given offset with n elements stored at addr.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy from
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
 
@@ -360,6 +432,34 @@ class CharTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+    def flush(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the host available to the device.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to flush
+        size: int|None, default=None
+            Number of elements to flush starting at offset.
+            If None, flushes all remaining elements.
+        """
+        ...
+    def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the device available to the host.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to invalidate
+        size: int | None, default=None
+            Number of elements to invalidate starting at offset.
+            If None, invalidates all remaining elements.
+        """
+        ...
     @property
     def isMapped(self) -> bool:
         """
@@ -367,9 +467,35 @@ class CharTensor:
         """
         ...
     @property
+    def isNonCoherent(self) -> bool:
+        """
+        Wether calls to flush() and invalidate() are necessary to make changes
+        in mapped memory between devices and host available
+        """
+        ...
+    @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
+        """
+        ...
+    def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Retrieves n elements from the tensor at the given offset and stores it
+        in dst.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy to
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
     @property
@@ -382,6 +508,24 @@ class CharTensor:
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
+        """
+        ...
+    def update(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Updates the tensor at the given offset with n elements stored at addr.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy from
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
 
@@ -637,6 +781,34 @@ class DoubleTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+    def flush(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the host available to the device.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to flush
+        size: int|None, default=None
+            Number of elements to flush starting at offset.
+            If None, flushes all remaining elements.
+        """
+        ...
+    def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the device available to the host.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to invalidate
+        size: int | None, default=None
+            Number of elements to invalidate starting at offset.
+            If None, invalidates all remaining elements.
+        """
+        ...
     @property
     def isMapped(self) -> bool:
         """
@@ -644,9 +816,35 @@ class DoubleTensor:
         """
         ...
     @property
+    def isNonCoherent(self) -> bool:
+        """
+        Wether calls to flush() and invalidate() are necessary to make changes
+        in mapped memory between devices and host available
+        """
+        ...
+    @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
+        """
+        ...
+    def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Retrieves n elements from the tensor at the given offset and stores it
+        in dst.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy to
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
     @property
@@ -659,6 +857,24 @@ class DoubleTensor:
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
+        """
+        ...
+    def update(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Updates the tensor at the given offset with n elements stored at addr.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy from
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
 
@@ -762,6 +978,34 @@ class FloatTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+    def flush(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the host available to the device.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to flush
+        size: int|None, default=None
+            Number of elements to flush starting at offset.
+            If None, flushes all remaining elements.
+        """
+        ...
+    def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the device available to the host.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to invalidate
+        size: int | None, default=None
+            Number of elements to invalidate starting at offset.
+            If None, invalidates all remaining elements.
+        """
+        ...
     @property
     def isMapped(self) -> bool:
         """
@@ -769,9 +1013,35 @@ class FloatTensor:
         """
         ...
     @property
+    def isNonCoherent(self) -> bool:
+        """
+        Wether calls to flush() and invalidate() are necessary to make changes
+        in mapped memory between devices and host available
+        """
+        ...
+    @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
+        """
+        ...
+    def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Retrieves n elements from the tensor at the given offset and stores it
+        in dst.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy to
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
     @property
@@ -784,6 +1054,24 @@ class FloatTensor:
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
+        """
+        ...
+    def update(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Updates the tensor at the given offset with n elements stored at addr.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy from
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
 
@@ -1362,6 +1650,34 @@ class IntTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+    def flush(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the host available to the device.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to flush
+        size: int|None, default=None
+            Number of elements to flush starting at offset.
+            If None, flushes all remaining elements.
+        """
+        ...
+    def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the device available to the host.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to invalidate
+        size: int | None, default=None
+            Number of elements to invalidate starting at offset.
+            If None, invalidates all remaining elements.
+        """
+        ...
     @property
     def isMapped(self) -> bool:
         """
@@ -1369,9 +1685,35 @@ class IntTensor:
         """
         ...
     @property
+    def isNonCoherent(self) -> bool:
+        """
+        Wether calls to flush() and invalidate() are necessary to make changes
+        in mapped memory between devices and host available
+        """
+        ...
+    @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
+        """
+        ...
+    def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Retrieves n elements from the tensor at the given offset and stores it
+        in dst.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy to
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
     @property
@@ -1384,6 +1726,24 @@ class IntTensor:
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
+        """
+        ...
+    def update(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Updates the tensor at the given offset with n elements stored at addr.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy from
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
 
@@ -1531,6 +1891,34 @@ class LongTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+    def flush(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the host available to the device.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to flush
+        size: int|None, default=None
+            Number of elements to flush starting at offset.
+            If None, flushes all remaining elements.
+        """
+        ...
+    def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the device available to the host.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to invalidate
+        size: int | None, default=None
+            Number of elements to invalidate starting at offset.
+            If None, invalidates all remaining elements.
+        """
+        ...
     @property
     def isMapped(self) -> bool:
         """
@@ -1538,9 +1926,35 @@ class LongTensor:
         """
         ...
     @property
+    def isNonCoherent(self) -> bool:
+        """
+        Wether calls to flush() and invalidate() are necessary to make changes
+        in mapped memory between devices and host available
+        """
+        ...
+    @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
+        """
+        ...
+    def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Retrieves n elements from the tensor at the given offset and stores it
+        in dst.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy to
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
     @property
@@ -1553,6 +1967,24 @@ class LongTensor:
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
+        """
+        ...
+    def update(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Updates the tensor at the given offset with n elements stored at addr.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy from
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
 
@@ -2067,6 +2499,34 @@ class ShortTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+    def flush(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the host available to the device.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to flush
+        size: int|None, default=None
+            Number of elements to flush starting at offset.
+            If None, flushes all remaining elements.
+        """
+        ...
+    def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the device available to the host.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to invalidate
+        size: int | None, default=None
+            Number of elements to invalidate starting at offset.
+            If None, invalidates all remaining elements.
+        """
+        ...
     @property
     def isMapped(self) -> bool:
         """
@@ -2074,9 +2534,35 @@ class ShortTensor:
         """
         ...
     @property
+    def isNonCoherent(self) -> bool:
+        """
+        Wether calls to flush() and invalidate() are necessary to make changes
+        in mapped memory between devices and host available
+        """
+        ...
+    @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
+        """
+        ...
+    def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Retrieves n elements from the tensor at the given offset and stores it
+        in dst.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy to
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
     @property
@@ -2089,6 +2575,24 @@ class ShortTensor:
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
+        """
+        ...
+    def update(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Updates the tensor at the given offset with n elements stored at addr.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy from
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
 
@@ -2535,6 +3039,34 @@ class UnsignedIntTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+    def flush(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the host available to the device.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to flush
+        size: int|None, default=None
+            Number of elements to flush starting at offset.
+            If None, flushes all remaining elements.
+        """
+        ...
+    def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the device available to the host.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to invalidate
+        size: int | None, default=None
+            Number of elements to invalidate starting at offset.
+            If None, invalidates all remaining elements.
+        """
+        ...
     @property
     def isMapped(self) -> bool:
         """
@@ -2542,9 +3074,35 @@ class UnsignedIntTensor:
         """
         ...
     @property
+    def isNonCoherent(self) -> bool:
+        """
+        Wether calls to flush() and invalidate() are necessary to make changes
+        in mapped memory between devices and host available
+        """
+        ...
+    @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
+        """
+        ...
+    def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Retrieves n elements from the tensor at the given offset and stores it
+        in dst.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy to
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
     @property
@@ -2557,6 +3115,24 @@ class UnsignedIntTensor:
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
+        """
+        ...
+    def update(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Updates the tensor at the given offset with n elements stored at addr.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy from
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
 
@@ -2660,6 +3236,34 @@ class UnsignedLongTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+    def flush(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the host available to the device.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to flush
+        size: int|None, default=None
+            Number of elements to flush starting at offset.
+            If None, flushes all remaining elements.
+        """
+        ...
+    def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the device available to the host.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to invalidate
+        size: int | None, default=None
+            Number of elements to invalidate starting at offset.
+            If None, invalidates all remaining elements.
+        """
+        ...
     @property
     def isMapped(self) -> bool:
         """
@@ -2667,9 +3271,35 @@ class UnsignedLongTensor:
         """
         ...
     @property
+    def isNonCoherent(self) -> bool:
+        """
+        Wether calls to flush() and invalidate() are necessary to make changes
+        in mapped memory between devices and host available
+        """
+        ...
+    @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
+        """
+        ...
+    def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Retrieves n elements from the tensor at the given offset and stores it
+        in dst.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy to
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
     @property
@@ -2682,6 +3312,24 @@ class UnsignedLongTensor:
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
+        """
+        ...
+    def update(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Updates the tensor at the given offset with n elements stored at addr.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy from
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
 
@@ -2785,6 +3433,34 @@ class UnsignedShortTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+    def flush(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the host available to the device.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to flush
+        size: int|None, default=None
+            Number of elements to flush starting at offset.
+            If None, flushes all remaining elements.
+        """
+        ...
+    def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
+        """
+        Makes writes in mapped memory from the device available to the host.
+        Only needed if isNonCoherent is True.
+
+        Parameters
+        ----------
+        offset: int, default=0
+            Offset in amount of elements into mapped memory to invalidate
+        size: int | None, default=None
+            Number of elements to invalidate starting at offset.
+            If None, invalidates all remaining elements.
+        """
+        ...
     @property
     def isMapped(self) -> bool:
         """
@@ -2792,9 +3468,35 @@ class UnsignedShortTensor:
         """
         ...
     @property
+    def isNonCoherent(self) -> bool:
+        """
+        Wether calls to flush() and invalidate() are necessary to make changes
+        in mapped memory between devices and host available
+        """
+        ...
+    @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
+        """
+        ...
+    def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Retrieves n elements from the tensor at the given offset and stores it
+        in dst.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy to
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
     @property
@@ -2807,6 +3509,24 @@ class UnsignedShortTensor:
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
+        """
+        ...
+    def update(self, addr: int, n: int, offset: int = 0, /) -> None:
+        """
+        Updates the tensor at the given offset with n elements stored at addr.
+
+        Parameters
+        ----------
+        addr: int
+            Address of memory to copy from
+        n: int
+            Amount of elements to copy
+        offset: int, default=0
+            Offset into the tensor in amount of elements where the copy starts
+        
+        Note
+        ----
+        This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
 
