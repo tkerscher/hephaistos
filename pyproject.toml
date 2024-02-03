@@ -7,7 +7,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "hephaistos"
-version = "0.5.1"
+version = "0.6.0"
 description = "GPU computing framework using the Vulkan API"
 readme = "README.md"
 requires-python = ">=3.8"
