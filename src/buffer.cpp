@@ -75,6 +75,46 @@ std::span<std::byte> Tensor<std::byte>::getMemory() const {
 bool Tensor<std::byte>::isMapped() const noexcept {
     return buffer->allocInfo.pMappedData != nullptr;
 }
+bool Tensor<std::byte>::isNonCoherent() const noexcept {
+    VkMemoryPropertyFlags flags;
+    vmaGetAllocationMemoryProperties(
+        getContext()->allocator,
+        buffer->allocation,
+        &flags);
+    return (flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0;
+}
+void Tensor<std::byte>::update(std::span<const std::byte> src, uint64_t offset) {
+    vulkan::checkResult(vmaCopyMemoryToAllocation(
+        getContext()->allocator,
+        static_cast<const void*>(src.data()),
+        buffer->allocation,
+        offset,
+        src.size_bytes()
+    ));
+}
+void Tensor<std::byte>::flush(uint64_t offset, uint64_t size) {
+    vulkan::checkResult(vmaFlushAllocation(
+        getContext()->allocator,
+        buffer->allocation,
+        offset, size
+    ));
+}
+void Tensor<std::byte>::retrieve(std::span<std::byte> dst, uint64_t offset) {
+    vulkan::checkResult(vmaCopyAllocationToMemory(
+        getContext()->allocator,
+        buffer->allocation,
+        offset,
+        static_cast<void*>(dst.data()),
+        dst.size_bytes()
+    ));
+}
+void Tensor<std::byte>::invalidate(uint64_t offset, uint64_t size) {
+    vulkan::checkResult(vmaInvalidateAllocation(
+        getContext()->allocator,
+        buffer->allocation,
+        offset, size
+    ));
+}
 
 uint64_t Tensor<std::byte>::size_bytes() const noexcept {
     return _size;
@@ -201,21 +241,23 @@ void RetrieveTensorCommand::record(vulkan::Command& cmd) const {
     cmd.stage |= VK_PIPELINE_STAGE_TRANSFER_BIT;
 
     //ensure writing to tensor is finished
-    VkBufferMemoryBarrier barrier{
-        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-        .buffer = src.getBuffer().buffer,
-        .offset = sourceOffset,
-        .size = size
-    };
-    context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_DEPENDENCY_BY_REGION_BIT,
-        0, nullptr,
-        1, &barrier,
-        0, nullptr);
+    if (!unsafe) {
+        VkBufferMemoryBarrier barrier{
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+            .buffer = src.getBuffer().buffer,
+            .offset = sourceOffset,
+            .size = size
+        };
+        context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_DEPENDENCY_BY_REGION_BIT,
+            0, nullptr,
+            1, &barrier,
+            0, nullptr);
+    }
 
     //actually copy the buffer
     VkBufferCopy copyRegion{
@@ -229,21 +271,23 @@ void RetrieveTensorCommand::record(vulkan::Command& cmd) const {
         1, &copyRegion);
 
     //barrier to ensure transfer finished
-    barrier = VkBufferMemoryBarrier{
-        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
-        .buffer = dst.getBuffer().buffer,
-        .offset = destinationOffset,
-        .size = size
-    };
-    context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_PIPELINE_STAGE_HOST_BIT,
-        VK_DEPENDENCY_BY_REGION_BIT,
-        0, nullptr,
-        1, &barrier,
-        0, nullptr);
+    if (!unsafe) {
+        VkBufferMemoryBarrier barrier{
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+            .buffer = dst.getBuffer().buffer,
+            .offset = destinationOffset,
+            .size = size
+        };
+        context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_HOST_BIT,
+            VK_DEPENDENCY_BY_REGION_BIT,
+            0, nullptr,
+            1, &barrier,
+            0, nullptr);
+    }
 }
 
 RetrieveTensorCommand::RetrieveTensorCommand(const RetrieveTensorCommand& other) = default;
@@ -262,6 +306,7 @@ RetrieveTensorCommand::RetrieveTensorCommand(
     , sourceOffset(region.tensorOffset)
     , destinationOffset(region.bufferOffset)
     , size(region.size)
+    , unsafe(region.unsafe)
 {}
 RetrieveTensorCommand::~RetrieveTensorCommand() = default;
 
@@ -290,21 +335,23 @@ void UpdateTensorCommand::record(vulkan::Command& cmd) const {
     cmd.stage |= VK_PIPELINE_STAGE_TRANSFER_BIT;
 
     //ensure tensor is safe to update
-    VkBufferMemoryBarrier barrier{
-        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .buffer = dst.getBuffer().buffer,
-        .offset = destinationOffset,
-        .size = size
-    };
-    context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_DEPENDENCY_BY_REGION_BIT,
-        0, nullptr,
-        1, &barrier,
-        0, nullptr);
+    if (!unsafe) {
+        VkBufferMemoryBarrier barrier{
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .buffer = dst.getBuffer().buffer,
+            .offset = destinationOffset,
+            .size = size
+        };
+        context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_DEPENDENCY_BY_REGION_BIT,
+            0, nullptr,
+            1, &barrier,
+            0, nullptr);
+    }
 
     //actually copy the buffer
     VkBufferCopy copyRegion{
@@ -318,21 +365,23 @@ void UpdateTensorCommand::record(vulkan::Command& cmd) const {
         1, &copyRegion);
 
     //barrier to ensure transfer finished
-    barrier = VkBufferMemoryBarrier{
-        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-        .buffer = dst.getBuffer().buffer,
-        .offset = destinationOffset,
-        .size = size
-    };
-    context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_DEPENDENCY_BY_REGION_BIT,
-        0, nullptr,
-        1, &barrier,
-        0, nullptr);
+    if (!unsafe) {
+        VkBufferMemoryBarrier barrier{
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            .buffer = dst.getBuffer().buffer,
+            .offset = destinationOffset,
+            .size = size
+        };
+        context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_DEPENDENCY_BY_REGION_BIT,
+            0, nullptr,
+            1, &barrier,
+            0, nullptr);
+    }
 }
 
 UpdateTensorCommand::UpdateTensorCommand(const UpdateTensorCommand& other) = default;
@@ -351,6 +400,7 @@ UpdateTensorCommand::UpdateTensorCommand(
     , sourceOffset(region.bufferOffset)
     , destinationOffset(region.tensorOffset)
     , size(region.size)
+    , unsafe(region.unsafe)
 {}
 UpdateTensorCommand::~UpdateTensorCommand() = default;
 
@@ -364,40 +414,44 @@ void ClearTensorCommand::record(vulkan::Command& cmd) const {
     cmd.stage |= VK_PIPELINE_STAGE_TRANSFER_BIT;
 
     //ensure tensor is safe to update
-    VkBufferMemoryBarrier barrier{
-        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .buffer = buffer,
-        .size = VK_WHOLE_SIZE
-    };
-    context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_DEPENDENCY_BY_REGION_BIT,
-        0, nullptr,
-        1, &barrier,
-        0, nullptr);
+    if (!unsafe) {
+        VkBufferMemoryBarrier barrier{
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .buffer = buffer,
+            .size = VK_WHOLE_SIZE
+        };
+        context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_DEPENDENCY_BY_REGION_BIT,
+            0, nullptr,
+            1, &barrier,
+            0, nullptr);
+    }
 
     //fill buffer
     context->fnTable.vkCmdFillBuffer(cmd.buffer,
         buffer, offset, size, data);
 
     //barrier to ensure transfer finished
-    barrier = VkBufferMemoryBarrier{
-        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-        .buffer = buffer,
-        .size = VK_WHOLE_SIZE
-    };
-    context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_DEPENDENCY_BY_REGION_BIT,
-        0, nullptr,
-        1, &barrier,
-        0, nullptr);
+    if (!unsafe) {
+        VkBufferMemoryBarrier barrier{
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            .buffer = buffer,
+            .size = VK_WHOLE_SIZE
+        };
+        context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_DEPENDENCY_BY_REGION_BIT,
+            0, nullptr,
+            1, &barrier,
+            0, nullptr);
+    }
 }
 
 ClearTensorCommand::ClearTensorCommand(const ClearTensorCommand& other) = default;
@@ -412,6 +466,7 @@ ClearTensorCommand::ClearTensorCommand(const Tensor<std::byte>& tensor, const Pa
     , offset(params.offset)
     , size(params.size)
     , data(params.data)
+    , unsafe(params.unsafe)
 {}
 ClearTensorCommand::~ClearTensorCommand() = default;
 

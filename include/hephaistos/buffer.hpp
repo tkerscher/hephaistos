@@ -11,6 +11,11 @@
 
 namespace hephaistos {
 
+/**
+ * @brief Magic number indicating complete memory size
+*/
+constexpr uint64_t whole_size = (~0ULL);
+
 template<class T = std::byte> class Buffer;
 
 /**
@@ -142,6 +147,53 @@ public:
     */
     [[nodiscard]] size_t size() const noexcept;
 
+    /**
+     * @brief If true, calling flush() and invalidate() are necessary to make
+     * changes in mapped memory between device and host available.
+    */
+    [[nodiscard]] bool isNonCoherent() const noexcept;
+
+    /**
+     * @brief Updates the tensor at the given offset in bytes with data from src
+     * 
+     * Copies data from src to the tensor at the given offset in bytes and
+     * calls flush() if necessary.
+     * 
+     * @param src Source data to copy from
+     * @param offset Offset into tensor where copying starts
+    */
+    void update(std::span<const std::byte> src, uint64_t offset = 0);
+    /**
+     * @brief Makes writes in mapped memory from the host available to the device
+     * 
+     * @param offset Offset in bytes into mapped memory to flush
+     * @param size Number of bytes to flush starting at offset
+     * 
+     * @note Only needed if isNonCoherent() is true.
+    */
+    void flush(uint64_t offset = 0, uint64_t size = whole_size);
+
+    /**
+     * @brief Retrieves data from the tensor at the given offset in bytes and
+     * stores it in dst.
+     * 
+     * Copies data from the device at the given offset in bytes to the memory
+     * range provided by dst and calls invalidate() beforehand if needed.
+     * 
+     * @param dst Destination to which the data is copied
+     * @param offset Offset into tensor where the copy starts
+    */
+    void retrieve(std::span<std::byte> dst, uint64_t offset = 0);
+    /**
+     * @brief Makes writes in mapped memory from the device available to the host
+     * 
+     * @param offset Offset into the tensor to invalidate
+     * @param size Number of bytes to invalidate starting at offset
+     * 
+     * @note Only needed if isNonCoherent() is true.
+    */
+    void invalidate(uint64_t offset = 0, uint64_t size = whole_size);
+
     void bindParameter(VkWriteDescriptorSet& binding) const final override;
 
     Tensor(const Tensor<std::byte>&) = delete;
@@ -213,6 +265,20 @@ public:
         return Tensor<std::byte>::size_bytes() / sizeof(T);
     }
 
+    void update(std::span<const T> src, uint64_t offset = 0) {
+        Tensor<std::byte>::update(std::as_bytes(src), sizeof(T) * offset);
+    }
+    void flush(uint64_t offset = 0, uint64_t size = whole_size) {
+        Tensor<std::byte>::flush(sizeof(T) * offset, size);
+    }
+
+    void retrieve(std::span<T> dst, uint64_t offset = 0) {
+        Tensor<std::byte>::retrieve(std::as_writable_bytes(dst), sizeof(T) * offset);
+    }
+    void invalidate(uint64_t offset = 0, uint64_t size = whole_size) {
+        Tensor<std::byte>::invalidate(sizeof(T) * offset, size);
+    }
+
     Tensor(const Tensor&) = delete;
     Tensor& operator=(const Tensor&) = delete;
 
@@ -243,10 +309,6 @@ public:
 };
 
 /**
- * @brief Magic number indicating complete memory size
-*/
-constexpr uint64_t whole_size = (~0ULL);
-/**
  * @brief Description of memory region for copying
 */
 struct CopyRegion {
@@ -262,6 +324,10 @@ struct CopyRegion {
      * @brief Number of bytes to copy
     */
     uint64_t size = whole_size;
+    /**
+     * @brief If true, omits barriers ensuring read after write ordering.
+    */
+    bool unsafe;
 };
 
 /**
@@ -290,6 +356,10 @@ public:
      * @brief Number of bytes to copy
     */
     uint64_t size;
+    /**
+     * @brief If true, omits barriers ensuring read after write ordering.
+    */
+    bool unsafe;
 
     virtual void record(vulkan::Command& cmd) const override;
 
@@ -353,6 +423,10 @@ public:
      * @brief Number of bytes to copy
     */
     uint64_t size;
+    /**
+     * @brief If true, omits barriers ensuring read after write ordering.
+    */
+    bool unsafe;
 
     virtual void record(vulkan::Command& cmd) const override;
 
@@ -404,6 +478,7 @@ public:
         uint64_t offset = 0;
         uint64_t size   = whole_size;
         uint32_t data   = 0;
+        bool unsafe     = false;
     };
 
 public:
@@ -428,6 +503,10 @@ public:
      * @brief Value used to clear the Tensor
     */
     uint32_t data;
+    /**
+     * @brief If true, omits barriers ensuring read after write ordering.
+    */
+    bool unsafe;
 
     virtual void record(vulkan::Command& cmd) const override;
 

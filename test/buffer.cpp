@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <tuple>
 
 #include <hephaistos/buffer.hpp>
 #include <hephaistos/command.hpp>
@@ -83,6 +84,28 @@ TEST_CASE("tensors can be mapped", "[buffer]") {
     REQUIRE(!hasValidationErrorOccurred());
 }
 
+TEST_CASE("mapped tensors can be copied to and from", "[buffer]") {
+    std::array<int, 10> dst;
+
+    Tensor<int> tensor(getContext(), 10, true);
+
+    //We dont know at what hardware we're running
+    //and what decision the allocator will make
+    //but let's call this function anyway to see
+    //if it at least does not crash
+    std::ignore = tensor.isNonCoherent();
+
+    tensor.update(data);
+    tensor.flush(); //superficial, but let's call it somewhere
+
+    tensor.invalidate(); //superficial, but let's call it somewhere
+    tensor.retrieve(dst);
+       
+    REQUIRE(std::equal(data.begin(), data.end(), dst.begin()));
+
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
 TEST_CASE("buffers and tensors can be copied into each other", "[buffer]") {
     Buffer<int> bufferIn(getContext(), 10);
     Buffer<int> bufferOut(getContext(), 10);
@@ -95,6 +118,27 @@ TEST_CASE("buffers and tensors can be copied into each other", "[buffer]") {
         .Then(retrieveTensor(tensor, bufferOut))
         .Submit();
     
+    REQUIRE(std::equal(data.begin(), data.end(), bufferOut.getMemory().begin()));
+
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
+TEST_CASE("unsafe copies are supported", "[buffer]") {
+    //we cant test undefined behaviour. However, by putting each copy command
+    //in separate steps, i.e. different submission, one can ensure updating
+    //finished before retrieve starts
+
+    Buffer<int> bufferIn(getContext(), 10);
+    Buffer<int> bufferOut(getContext(), 10);
+    Tensor<int> tensor(getContext(), 10);
+
+    std::copy(data.begin(), data.end(), bufferIn.getMemory().data());
+    Timeline timeline(getContext());
+    beginSequence(timeline)
+        .And(updateTensor(bufferIn, tensor, { .unsafe = true }))
+        .Then(retrieveTensor(tensor, bufferOut, { .unsafe = true }))
+        .Submit();
+
     REQUIRE(std::equal(data.begin(), data.end(), bufferOut.getMemory().begin()));
 
     REQUIRE(!hasValidationErrorOccurred());
