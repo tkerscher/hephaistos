@@ -2,15 +2,17 @@ from __future__ import annotations
 
 import numpy as np
 import warnings
+from contextlib import ExitStack
 
-from ctypes import Structure, c_uint32, sizeof
+from ctypes import Structure, c_uint32, pointer, sizeof
 from hephaistos import Buffer, ByteTensor, Command, RawBuffer, Tensor, clearTensor
 from hephaistos.util import printSize
 from numpy import ndarray
 from numpy.ctypeslib import as_array
 
 from numpy.typing import NDArray
-from typing import Any, Dict, Optional, Set, Type, Union, overload
+from os import PathLike
+from typing import Any, BinaryIO, Dict, Optional, Set, Type, Union
 
 
 class QueueView:
@@ -36,36 +38,51 @@ class QueueView:
         structure of arrays.
     capacity: int
         Maximum number of items the queue can hold
-    skipHeader: bool, default=False
-        True, if data does not contain a queue header
+    skipCounter: bool, default=False
+        Whether the queue should omit its counter
+    header: Structure | None, default=None
+        Optional header prefixing the queue
+    
+    Note
+    ----
+    Manipulating data in the queue does not update the counter, which is zero
+    right after initialization.
     """
 
-    class Header(Structure):
-        """Structure describing the queue header"""
-
-        _fields_ = [
-            ("count", c_uint32),
-        ]
+    Counter = c_uint32
+    """Type of the queue counter"""
 
     def __init__(
-        self, data: int, item: Type[Structure], capacity: int, *, skipHeader: int
+        self,
+        data: int,
+        item: Type[Structure],
+        capacity: int,
+        *,
+        skipCounter: bool = False,
+        header: Optional[Type[Structure]] = None,
     ) -> None:
         # store item type
         self._item = item
         self._capacity = capacity
-        # read header
-        if not skipHeader:
-            self._header = self.Header.from_address(data)
-            data += sizeof(self.Header)
-        else:
-            self._header = None
+        self._counter = None
+        self._header = None
+        # check if we have header
+        if header is not None:
+            self._header = header.from_address(data)
+            data += sizeof(header)
+        # check if we need counter
+        if not skipCounter:
+            self._counter = self.Counter.from_address(data)
+            data += sizeof(self.Counter)
 
         # create SoA and use it to create data access
         class SoA(Structure):
             _fields_ = [
-                (name, t._type_ * capacity * t._length_)  # handle arrays
-                if hasattr(t, "_length_")  # check if array
-                else (name, t * capacity)  # handle scalar
+                (
+                    (name, t._type_ * capacity * t._length_)  # handle arrays
+                    if hasattr(t, "_length_")  # check if array
+                    else (name, t * capacity)
+                )  # handle scalar
                 for name, t in item._fields_  # iterate over all fields
             ]
 
@@ -114,113 +131,34 @@ class QueueView:
         return self._field_names
 
     @property
-    def hasHeader(self) -> bool:
-        """True, if queue has a header"""
-        return self._header is not None
+    def header(self) -> Optional[Structure]:
+        """Optional header. None if no header is present"""
+        return self._header
+
+    @property
+    def hasCounter(self) -> bool:
+        """True, if queue has a counter"""
+        return self._counter is not None
 
     @property
     def count(self) -> int:
-        """Number of items in queue. Equal to capacity if header was skipped"""
-        if self._header is not None:
-            return self._header.count
+        """Number of items in queue. Equal to capacity if counter was skipped"""
+        if self._counter is not None:
+            return self._counter.value
         else:
             return self.capacity
 
     @count.setter
     def count(self, value: int) -> None:
-        if self._header is not None:
-            self._header.count = value
+        if self._counter is not None:
+            self._counter.value = value
         else:
-            raise ValueError("The queue has no header and thus no count can be set!")
+            raise ValueError("The queue has no counter!")
 
     @property
     def item(self) -> Type[Structure]:
         """Structure describing the items of the queue"""
         return self._item
-
-    @overload
-    def save(self, file: None, *, compressed: bool) -> Dict[str, NDArray]:
-        ...
-
-    @overload
-    def save(self, file: str, *, compressed: bool) -> None:
-        ...
-
-    def save(
-        self, file: Optional[str] = None, *, compressed: bool = True
-    ) -> Union[None, Dict[str, NDArray]]:
-        """
-        Serializes the complete queue and either returns it as a dictionary
-        containing independent copies of the fields as numpy arrays or saves
-        them to disk at the given path.
-
-        Parameters
-        ----------
-        file: str|None, default=None
-            Path to where the queue is to be saved. If None, returns a dict
-            instead.
-        compressed: bool, default=True
-            True, if the file should be compressed. Ignored if no path is given
-
-        Returns
-        -------
-        fields: { field: array } | None
-            If no path is given, returns a dictionary with numpy arrays
-            containing copies of each field, None otherwise.
-        """
-        if file is None:
-            return {field: self[field][: self.count].copy() for field in self.fields}
-        else:
-            d = {field: self[field][: self.count] for field in self.fields}
-            if compressed:
-                np.savez_compressed(file, **d)
-            else:
-                np.savez(file, **d)
-
-    def load(self, data: str | Dict[str, NDArray]) -> None:
-        """
-        Loads the given data into this queue and updates its count.
-        Data can either be the path to a file containing the data to be load, or
-        a dictionary containing a numpy arrays for each field.
-
-        Parameters
-        ----------
-        data: str|{ field: array }
-            Data either as path to file to load, or dictionary mapping field
-            names to arrays containing the data.
-        """
-        counts = []
-
-        # open file if provided
-        file = None
-        if type(data) is not dict:
-            file = np.load(data)
-            data = file
-
-        # load all fields
-        for field, arr in data.items():
-            # check if field exists
-            if field not in self.fields:
-                warnings.warn(f"Skipping unknown field {field}")
-                continue
-            # check field size
-            if len(arr) > self.capacity:
-                warnings.warn(f'Field "{field}" truncated to queue\'s capacity')
-            # store data
-            n = min(self.capacity, len(arr))
-            self[field][:n] = arr[:n]
-            counts.append(self.capacity if len(arr) > self.capacity else len(arr))
-
-        # close file
-        if file is not None:
-            file.close()
-
-        # check all have the same
-        if len(counts) > 0 and not all(c == counts[0] for c in counts):
-            warnings.warn("Not all fields have the same length!")
-        # set count if there is an header
-        if self.hasHeader:
-            self.count = min(counts)
 
     def __repr__(self) -> str:
         return f"QueueView: {self.item.__name__}[{self.capacity}]"
@@ -269,97 +207,78 @@ class QueueSubView:
         return self._orig.fields
 
     @property
+    def header(self) -> Optional[Structure]:
+        """Optional header. None if no header is present"""
+        return self._orig.header
+
+    @property
     def item(self) -> Type[Structure]:
         """Structure describing the items of the queue"""
         return self._orig.item
-
-    @overload
-    def save(self, file: None, *, compressed: bool) -> Dict[str, NDArray]:
-        ...
-
-    @overload
-    def save(self, file: str, *, compressed: bool) -> None:
-        ...
-
-    def save(
-        self, file: Optional[str] = None, *, compressed: bool = True
-    ) -> Union[None, Dict[str, NDArray]]:
-        """
-        Serializes the complete queue and either returns it as a dictionary
-        containing independent copies of the fields as numpy arrays or saves
-        them to disk at the given path.
-
-        Parameters
-        ----------
-        file: str|None, default=None
-            Path to where the queue is to be saved. If None, returns a dict
-            instead.
-        compressed: bool, default=True
-            True, if the file should be compressed. Ignored if no path is given
-
-        Returns
-        -------
-        fields: { field: array } | None
-            If no path is given, returns a dictionary with numpy arrays
-            containing copies of each field, None otherwise.
-        """
-        if file is None:
-            return {field: self[field].copy() for field in self.fields}
-        else:
-            d = {field: self[field] for field in self.fields}
-            if compressed:
-                np.savez_compressed(file, **d)
-            else:
-                np.savez(file, **d)
-
-    def load(self, data: str | Dict[str, NDArray]) -> None:
-        """
-        Loads the given data into this queue and updates its count.
-        Data can either be the path to a file containing the data to be load, or
-        a dictionary containing a numpy arrays for each field.
-
-        Parameters
-        ----------
-        data: str|{ field: array }
-            Data either as path to file to load, or dictionary mapping field
-            names to arrays containing the data.
-        """
-        counts = []
-
-        # open file if provided
-        file = None
-        if type(data) is not dict:
-            file = np.load(data)
-            data = file
-
-        # load all fields
-        for field, arr in data.items():
-            # check if field exists
-            if field not in self.fields:
-                warnings.warn(f"Skipping unknown field {field}")
-                continue
-            # check field size
-            if len(arr) > len(self):
-                warnings.warn(f'Field "{field}" truncated to view\'s size')
-            # store data
-            n = min(len(self), len(arr))
-            self[field][:n] = arr[:n]
-            counts.append(len(self) if len(arr) > len(self) else len(arr))
-
-        # close file
-        if file is not None:
-            file.close()
-
-        # check all have the same
-        if len(counts) > 0 and not all(c == counts[0] for c in counts):
-            warnings.warn("Not all fields have the same length!")
 
     def __repr__(self) -> str:
         return f"QueueSubView: {self.item.__name__}[{self._count}]"
 
 
+def dumpQueue(queue: Union[QueueView, QueueSubView]) -> Dict[str, NDArray]:
+    """
+    Creates a dictionary containing an entry for each field of the queue mapped
+    to a copy of the corresponding data.
+    """
+    return {field: queue[field][: queue.count].copy() for field in queue.fields}
+
+
+def updateQueue(
+    queue: Union[QueueView, QueueSubView],
+    data: Dict[str, NDArray],
+    *,
+    updateCount: bool = True,
+) -> None:
+    """
+    Updates the given queue using data from the provided dictionary by matching
+    keys with field names.
+
+    Parameters
+    ----------
+    queue: QueueView | QueueSubView
+        queue to update
+    data: { field: NDArray }
+        data used to update the queue
+    updateCount: bool = True
+        Whether to update the queue's count. Ignored if queue has no counter.
+
+    Note
+    ----
+    If data contains arrays of varying length, warnings are produced and the
+    counter will be updated to the smallest length capped to the queue's
+    capacity.
+    """
+    counts = []
+    for field, arr in data.items():
+        # safety check
+        if field not in queue.fields:
+            warnings.warn(f'Skipping unknown field "{field}"')
+            continue  # skip unknown field
+        if len(arr) > queue.capacity:
+            warnings.warn(f'Field "{field}" truncated to queue\'s capacity')
+        # store data
+        n = min(queue.capacity, len(arr))
+        queue[field][:n] = arr[:n]
+        counts.append(n)
+    # check all fields had the same size
+    if len(counts) > 0 and not all(c == counts[0] for c in counts):
+        warnings.warn("Not all fields have the same length!")
+    # update counter if necessary
+    if queue.hasCounter and updateCount:
+        queue.count = min(counts)
+
+
 def queueSize(
-    item: Union[Type[Structure], int], capacity: int, *, skipHeader: bool = False
+    item: Union[Type[Structure], int],
+    capacity: int,
+    *,
+    header: Optional[Type[Structure]] = None,
+    skipCounter: bool = False,
 ) -> int:
     """
     Calculates the required size to store a queue of given size and item type
@@ -370,14 +289,19 @@ def queueSize(
         Either a Structure describing a single item or the size of it
     capacity: int
         Maximum number of items the queue can hold
-    skipHeader: bool, default=False
-        True, if the queue should not contain a header
+    header: Structure | None, default = None
+        Optional header prefixing the queue
+    skipCounter: bool, default=False
+        True, if the queue should not contain a counter
     """
     itemSize = item if isinstance(item, int) else sizeof(item)
-    if skipHeader:
-        return itemSize * capacity
-    else:
-        return sizeof(QueueView.Header) + itemSize * capacity
+    size = itemSize * capacity
+    if header is not None:
+        size += sizeof(header)
+    if not skipCounter:
+        size += sizeof(QueueView.Counter)
+
+    return size
 
 
 def as_queue(
@@ -386,7 +310,8 @@ def as_queue(
     *,
     offset: int = 0,
     size: Optional[int] = None,
-    skipHeader: bool = False,
+    header: Optional[Type[Structure]] = None,
+    skipCounter: bool = False,
 ) -> QueueView:
     """
     Helper function returning a QueueView pointing at the given buffer.
@@ -402,8 +327,10 @@ def as_queue(
     size: int | None, default=None
         Size in bytes of the buffer the view should start.
         If None, the whole buffer minus offset is used.
-    skipHeader: bool, default=False
-        True, if data does not contain a queue header
+    header: Structure | None, default=None
+        Optional header prefixing the queue
+    skipCounter: bool, default=False
+        True, if data does not contain a counter
 
     Returns
     -------
@@ -413,14 +340,18 @@ def as_queue(
     if size is None:
         size = buffer.size_bytes - offset
     # calculate capacity
-    if not skipHeader:
+    if header is not None:
+        size -= sizeof(header)
+    if not skipCounter:
         size -= sizeof(QueueView.Header)
     item_size = sizeof(item)
     if size < 0 or size % item_size:
         raise ValueError("The size of the buffer does not match any queue size!")
     capacity = size // item_size
     # create view
-    return QueueView(buffer.address + offset, item, capacity, skipHeader=skipHeader)
+    return QueueView(
+        buffer.address + offset, item, capacity, skipCounter=skipCounter, header=header
+    )
 
 
 class QueueBuffer(RawBuffer):
@@ -433,15 +364,26 @@ class QueueBuffer(RawBuffer):
         Structure describing a single item
     capacity: int
         Maximum number of items the queue can hold
-    skipHeader: bool, default=False
-        True, if the queue should not contain a header
+    header: Structure | None, default=None
+        Optional header prefixing the queue
+    skipCounter: bool, default=False
+        True, if data does not contain a counter
     """
 
     def __init__(
-        self, item: Type[Structure], capacity: int, *, skipHeader: bool = False
+        self,
+        item: Type[Structure],
+        capacity: int,
+        *,
+        header: Optional[Type[Structure]] = None,
+        skipCounter: bool = False,
     ) -> None:
-        super().__init__(queueSize(item, capacity, skipHeader=skipHeader))
-        self._view = QueueView(self.address, item, capacity, skipHeader=skipHeader)
+        super().__init__(
+            queueSize(item, capacity, header=header, skipCounter=skipCounter)
+        )
+        self._view = QueueView(
+            self.address, item, capacity, header=header, skipCounter=skipCounter
+        )
 
     @property
     def capacity(self) -> int:
@@ -478,22 +420,37 @@ class QueueTensor(ByteTensor):
         Structure describing a single item
     capacity: int
         Maximum number of items the queue can hold
-    skipHeader: bool, default=False
-        True, if the queue should not contain a header
+    header: Structure | None, default=None
+        Optional header prefixing the queue
+    skipCounter: bool, default=False
+        True, if data does not contain a counter
     """
 
     def __init__(
-        self, item: Type[Structure], capacity: int, *, skipHeader: bool = False
+        self,
+        item: Type[Structure],
+        capacity: int,
+        *,
+        header: Optional[Type[Structure]] = None,
+        skipCounter: bool = False,
     ) -> None:
-        super().__init__(queueSize(item, capacity, skipHeader=skipHeader))
+        super().__init__(
+            queueSize(item, capacity, header=header, skipCounter=skipCounter)
+        )
         self._item = item
         self._capacity = capacity
-        self._skipHeader = skipHeader
+        self._header = header
+        self._hasCounter = not skipCounter
 
     @property
-    def hasHeader(self) -> bool:
-        """True if the queue has a header"""
-        return not self._skipHeader
+    def header(self) -> Optional[Structure]:
+        """Optional header. None if no header is present"""
+        return self._header
+
+    @property
+    def hasCounter(self) -> bool:
+        """True, if queue has a counter"""
+        return self._hasCounter
 
     @property
     def capacity(self) -> int:
@@ -510,9 +467,105 @@ class QueueTensor(ByteTensor):
         return f"QueueBuffer: {name}[{cap}] ({printSize(self.size_bytes)})"
 
 
-def clearQueue(queue: Tensor) -> Command:
+def clearQueue(
+    queue: Union[Tensor, QueueTensor],
+    *,
+    offset: int = 0,
+    header: Optional[Type[Structure]] = None,
+) -> Command:
     """
     Returns a command to clear the queue, i.e. resets the count thus marking
     any data inside it as garbage.
     """
-    return clearTensor(queue, size=sizeof(QueueView.Header))
+    if isinstance(queue, QueueTensor):
+        if not queue.hasCounter:
+            raise ValueError("queue has not counter!")
+        header = queue.header
+    if header is not None:
+        offset += sizeof(header)
+    return clearTensor(queue, size=sizeof(QueueView.Counter), offset=offset)
+
+
+def saveQueue(
+    file: Union[str, bytes, PathLike, BinaryIO],
+    queue: Union[QueueView, QueueSubView, QueueBuffer],
+    *,
+    compressed: bool = True,
+    skipHeader: bool = False,
+) -> None:
+    """
+    Saves the given queue under the given path or into the given stream.
+
+    Parameters
+    ----------
+    file: str | bytes | PathLike | BinaryIO
+        Either a path-like object specifying the path to the file the result
+        is written into or a binary stream the result is written into.
+    queue: QueueView | QueueSubView | QueueBuffer
+        Buffer to save
+    compressed: bool = True
+        Whether to compress the data.
+    skipHeader: bool = False
+        Whether to skip the header during serialization.
+        Ignored if there is no header.
+    """
+    if isinstance(queue, QueueBuffer):
+        queue = queue.view
+    # save guard for open files
+    with ExitStack() as stack:
+        # checking for IO is a bit weird so we check for path like and just
+        # treat it like a file otherwise
+        if isinstance(file, (str, bytes, PathLike)):
+            file = stack.enter_context(open(file, "wb"))
+
+        # write header if necessary
+        if queue.header is not None and not skipHeader:
+            file.write(bytes(queue.header))
+
+        # collect field and save them
+        data = {field: queue[field] for field in queue.fields}
+        if compressed:
+            np.savez_compressed(file, **data)
+        else:
+            np.savez(file, **data)
+
+
+def loadQueue(
+    file: Union[str, bytes, PathLike, BinaryIO],
+    queue: Union[QueueView, QueueSubView, QueueBuffer],
+    *,
+    skipHeader: bool = False,
+    updateCount: bool = True,
+) -> None:
+    """
+    Updates the given queue with the data from the given file or path.
+
+    Parameters
+    ----------
+    file: str | bytes | PathLike | BinaryIO
+        Either a path-like object specifying the path to the file or the file
+        itself containing the data to be loaded.
+    queue: QueueView | QueueSubview | QueueBuffer
+        Queue the data will be loaded into
+    compressed: bool = True
+        Whether to compress the data.
+    updateCount: bool = True
+        Whether to update the queue's count. Ignored if queue has no counter.
+    """
+    if isinstance(queue, QueueBuffer):
+        queue = queue.view
+    # save guard for open files
+    with ExitStack() as stack:
+        # checking for IO is a bit weird so we check for path like and just
+        # treat it like a file otherwise
+        if isinstance(file, (str, bytes, PathLike)):
+            file = stack.enter_context(open(file, "rb"))
+
+        # read header if necessary
+        if queue.header is not None and not skipHeader:
+            data = file.read(sizeof(queue.header))
+            # looks quirky, but essentially just a copying new data into header
+            pointer(queue.header)[0] = type(queue.header).from_buffer_copy(data)
+
+        # load all fields
+        updateQueue(queue, np.load(file), updateCount=updateCount)
