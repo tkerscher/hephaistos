@@ -100,7 +100,7 @@ enum class ImageFormat {
  * 
  * @param format ImageFormat to query
 */
-[[nodiscard]] uint64_t getElementSize(ImageFormat format);
+[[nodiscard]] HEPHAISTOS_API uint64_t getElementSize(ImageFormat format);
 
 /**
  * @brief Image format trait storing element type of a single pixel
