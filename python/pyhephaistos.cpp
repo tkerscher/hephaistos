@@ -25,4 +25,8 @@ NB_MODULE(pyhephaistos, m) {
     registerRaytracing(m);
     registerAtomicModule(m);
     registerTypeModule(m);
+
+#ifdef WARN_LEAKS
+    nb::set_leak_warnings(false);
+#endif
 }

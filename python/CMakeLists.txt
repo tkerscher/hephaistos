@@ -46,12 +46,17 @@ find_package(nanobind CONFIG REQUIRED)
 # We are now ready to compile the actual extension module
 nanobind_add_module(
     pyhephaistos
+    NB_DOMAIN hephaistos
     STABLE_ABI
     NB_STATIC
+    LTO
     ${SRC}
 )  
 target_link_libraries(pyhephaistos PRIVATE hephaistos)
 target_include_directories(pyhephaistos PRIVATE ${PYROOT})
+if(WARN_LEAKS)
+    target_compile_definitions(pyhephaistos PRIVATE WARN_LEAKS)
+endif()
 
 # install
 install(TARGETS pyhephaistos LIBRARY DESTINATION hephaistos)
