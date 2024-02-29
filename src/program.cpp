@@ -551,7 +551,7 @@ Program::Program(ContextHandle context, std::span<const uint32_t> code, std::spa
         con->device, &layoutInfo, nullptr, &program->pipeLayout));
 
     //read specialization constants map
-    auto totalSpecSlots = reflectModule.specialization_constant_count;
+    auto totalSpecSlots = reflectModule.spec_constant_count;
     auto specSlots = std::min(totalSpecSlots,
         static_cast<uint32_t>(specialization.size_bytes() / 4));
     std::vector<VkSpecializationMapEntry> specMap(specSlots);
@@ -560,7 +560,7 @@ Program::Program(ContextHandle context, std::span<const uint32_t> code, std::spa
         // -> first fetch all ids, than sort them
         std::vector<uint32_t> specIds(totalSpecSlots);
         for (auto i = 0u; i < totalSpecSlots; ++i) {
-            specIds[i] = reflectModule.specialization_constants[i].constant_id;
+            specIds[i] = reflectModule.spec_constants[i].constant_id;
         }
         std::sort(specIds.begin(), specIds.end());
         //create map entries only up to certain amount to match provided data
