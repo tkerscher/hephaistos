@@ -1,6 +1,7 @@
 #include "hephaistos/buffer.hpp"
 
 #include <algorithm>
+#include <array>
 
 #include "vk/util.hpp"
 #include "vk/types.hpp"
@@ -242,20 +243,30 @@ void RetrieveTensorCommand::record(vulkan::Command& cmd) const {
 
     //ensure writing to tensor is finished
     if (!unsafe) {
-        VkBufferMemoryBarrier barrier{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-            .buffer = src.getBuffer().buffer,
-            .offset = sourceOffset,
-            .size = size
+        std::array<VkBufferMemoryBarrier, 2> barriers{
+            VkBufferMemoryBarrier{
+                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+                .srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                .buffer = src.getBuffer().buffer,
+                .offset = sourceOffset,
+                .size = size
+            },
+            VkBufferMemoryBarrier{
+                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+                .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                .buffer = dst.getBuffer().buffer,
+                .offset = destinationOffset,
+                .size = size
+            }
         };
         context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_DEPENDENCY_BY_REGION_BIT,
             0, nullptr,
-            1, &barrier,
+            static_cast<uint32_t>(barriers.size()), barriers.data(),
             0, nullptr);
     }
 
@@ -338,14 +349,29 @@ void UpdateTensorCommand::record(vulkan::Command& cmd) const {
     if (!unsafe) {
         VkBufferMemoryBarrier barrier{
             .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            .srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
             .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
             .buffer = dst.getBuffer().buffer,
             .offset = destinationOffset,
             .size = size
         };
         context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_DEPENDENCY_BY_REGION_BIT,
+            0, nullptr,
+            1, &barrier,
+            0, nullptr);
+        barrier = VkBufferMemoryBarrier{
+                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+                .srcAccessMask = VK_ACCESS_HOST_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                .buffer = src.getBuffer().buffer,
+                .offset = sourceOffset,
+                .size = size
+        };
+        context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
+            VK_PIPELINE_STAGE_HOST_BIT,
             VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_DEPENDENCY_BY_REGION_BIT,
             0, nullptr,
@@ -369,14 +395,14 @@ void UpdateTensorCommand::record(vulkan::Command& cmd) const {
         VkBufferMemoryBarrier barrier{
             .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
             .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
             .buffer = dst.getBuffer().buffer,
             .offset = destinationOffset,
             .size = size
         };
         context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
             VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_DEPENDENCY_BY_REGION_BIT,
             0, nullptr,
             1, &barrier,
@@ -417,13 +443,13 @@ void ClearTensorCommand::record(vulkan::Command& cmd) const {
     if (!unsafe) {
         VkBufferMemoryBarrier barrier{
             .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            .srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
             .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
             .buffer = buffer,
             .size = VK_WHOLE_SIZE
         };
         context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_DEPENDENCY_BY_REGION_BIT,
             0, nullptr,
@@ -440,13 +466,13 @@ void ClearTensorCommand::record(vulkan::Command& cmd) const {
         VkBufferMemoryBarrier barrier{
             .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
             .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
             .buffer = buffer,
             .size = VK_WHOLE_SIZE
         };
         context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
             VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_DEPENDENCY_BY_REGION_BIT,
             0, nullptr,
             1, &barrier,
