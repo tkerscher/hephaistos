@@ -343,7 +343,7 @@ def as_queue(
     if header is not None:
         size -= sizeof(header)
     if not skipCounter:
-        size -= sizeof(QueueView.Header)
+        size -= sizeof(QueueView.Counter)
     item_size = sizeof(item)
     if size < 0 or size % item_size:
         raise ValueError("The size of the buffer does not match any queue size!")
