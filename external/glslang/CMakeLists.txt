@@ -32,7 +32,6 @@ set(GLSLANG_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/glslang/MachineIndependent/Versions.cpp
     ${CMAKE_CURRENT_LIST_DIR}/glslang/ResourceLimits/resource_limits_c.cpp
     ${CMAKE_CURRENT_LIST_DIR}/glslang/ResourceLimits/ResourceLimits.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/OGLCompilersDLL/InitializeDll.cpp
     ${CMAKE_CURRENT_LIST_DIR}/SPIRV/CInterface/spirv_c_interface.cpp
     ${CMAKE_CURRENT_LIST_DIR}/SPIRV/disassemble.cpp
     ${CMAKE_CURRENT_LIST_DIR}/SPIRV/doc.cpp
