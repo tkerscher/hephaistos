@@ -386,11 +386,20 @@ ContextHandle createContext(
 
     //Create logical device
     {
+        //check for certain shader subgroup features
+        VkPhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR controlFlow{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_FEATURES_KHR
+        };
+        VkPhysicalDeviceShaderMaximalReconvergenceFeaturesKHR reconvergence{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_MAXIMAL_RECONVERGENCE_FEATURES_KHR,
+            .pNext = &controlFlow
+        };
         //Check for extended arithmetic type support (e.f. float64)
         //and enable them by default
         //(since we can't reasonable chain basic feature set)
         VkPhysicalDeviceVulkan12Features features12{
-            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+            .pNext = &reconvergence
         };
         VkPhysicalDeviceFeatures2 features2{
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
@@ -426,6 +435,20 @@ ContextHandle createContext(
             context->extensions.emplace_back(std::move(ext));
         }
 
+        //chain optional features if available
+        if (controlFlow.shaderSubgroupUniformControlFlow) {
+            controlFlow.pNext = pNext;
+            pNext = static_cast<void*>(&controlFlow);
+            allDeviceExtensions.push_back(
+                VK_KHR_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_EXTENSION_NAME);
+        }
+        if (reconvergence.shaderMaximalReconvergence) {
+            reconvergence.pNext = pNext;
+            pNext = static_cast<void*>(&reconvergence);
+            allDeviceExtensions.push_back(
+                VK_KHR_SHADER_MAXIMAL_RECONVERGENCE_EXTENSION_NAME);
+        }
+        //obligatory features
         VkDeviceQueueCreateInfo queueInfo{
             .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
             .queueFamilyIndex = family,
@@ -434,7 +457,7 @@ ContextHandle createContext(
         };
         VkPhysicalDeviceTimelineSemaphoreFeatures timeline{
             .sType             = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
-            .pNext               = pNext, //chain external extensions
+            .pNext             = pNext, //chain external extensions
             .timelineSemaphore = VK_TRUE
         };
         VkPhysicalDeviceHostQueryResetFeatures hostQueryReset{

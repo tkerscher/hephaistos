@@ -21,8 +21,20 @@ namespace {
 
 SubgroupProperties getSubgroupProperties(VkPhysicalDevice device) {
     //fetch subgroup properties
+    VkPhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR controlFlow{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_FEATURES_KHR
+    };
+    VkPhysicalDeviceShaderMaximalReconvergenceFeaturesKHR reconvergence{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_MAXIMAL_RECONVERGENCE_FEATURES_KHR,
+        .pNext = &controlFlow
+    };
+    VkPhysicalDeviceFeatures2 features{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext = &reconvergence
+    };
+    vkGetPhysicalDeviceFeatures2(device, &features);
     VkPhysicalDeviceSubgroupProperties subgroupProps{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES,
     };
     VkPhysicalDeviceProperties2 props{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
@@ -40,7 +52,9 @@ SubgroupProperties getSubgroupProperties(VkPhysicalDevice device) {
         .shuffleSupport          = !!(subgroupProps.supportedOperations & VK_SUBGROUP_FEATURE_SHUFFLE_BIT),
         .shuffleRelativeSupport  = !!(subgroupProps.supportedOperations & VK_SUBGROUP_FEATURE_SHUFFLE_RELATIVE_BIT),
         .shuffleClusteredSupport = !!(subgroupProps.supportedOperations & VK_SUBGROUP_FEATURE_CLUSTERED_BIT),
-        .quadSupport             = !!(subgroupProps.supportedOperations & VK_SUBGROUP_FEATURE_QUAD_BIT)
+        .quadSupport             = !!(subgroupProps.supportedOperations & VK_SUBGROUP_FEATURE_QUAD_BIT),
+        .uniformControlFlowSupport   = controlFlow.shaderSubgroupUniformControlFlow == VK_TRUE,
+        .maximalReconvergenceSupport = reconvergence.shaderMaximalReconvergence == VK_TRUE
     };
 }
 

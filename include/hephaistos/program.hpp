@@ -56,6 +56,14 @@ struct SubgroupProperties {
      * @brief Support for GL_KHR_shader_subgroup_quad
     */
     bool quadSupport;
+    /**
+     * @brief Support for GL_EXT_subgroup_uniform_control_flow
+     */
+    bool uniformControlFlowSupport;
+    /**
+     * @brief Support for GL_EXT_maximal_reconvergence
+     */
+    bool maximalReconvergenceSupport;
 };
 /**
  * @brief Returns the subgroup properties of the given device

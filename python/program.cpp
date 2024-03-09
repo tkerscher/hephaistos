@@ -79,6 +79,10 @@ void registerProgramModule(nb::module_& m) {
             "Support for GL_KHR_shader_subgroup_clustered")
         .def_ro("quadSupport", &hp::SubgroupProperties::quadSupport,
             "Support for GL_KHR_shader_subgroup_quad")
+        .def_ro("uniformControlFlowSupport", &hp::SubgroupProperties::uniformControlFlowSupport,
+            "Support for GL_EXT_subgroup_uniform_control_flow")
+        .def_ro("maximalReconvergenceSupport", &hp::SubgroupProperties::maximalReconvergenceSupport,
+            "Support for GL_EXT_maximal_reconvergence")
         .def("__repr__", [](const hp::SubgroupProperties& props) {
             std::ostringstream str;
             str << "subgroupSize:            " << props.subgroupSize << '\n';
@@ -89,7 +93,10 @@ void registerProgramModule(nb::module_& m) {
             str << "shuffleSupport:          " << props.shuffleSupport << '\n';
             str << "shuffleRelativeSupport:  " << props.shuffleRelativeSupport << '\n';
             str << "shuffleClusteredSupport: " << props.shuffleClusteredSupport << '\n';
-            str << "quadSupport:             " << props.quadSupport;
+            str << "quadSupport:             " << props.quadSupport << '\n';
+            str << "uniformControlFlow:      " << props.uniformControlFlowSupport << '\n';
+            str << "maximalReconvergence:    " << props.maximalReconvergenceSupport;
+            
             return str.str();
         });
     m.def("getSubgroupProperties",
