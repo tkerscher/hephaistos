@@ -67,13 +67,6 @@ struct Image {
     const Context& context;
 };
 
-struct Instance {
-    VkInstance instance;
-#ifdef HEPHAISTOS_DEBUG
-    VkDebugUtilsMessengerEXT messenger;
-#endif
-};
-
 struct Timeline {
     VkSemaphore semaphore;
 };

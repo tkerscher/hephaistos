@@ -6,176 +6,11 @@
 #include <string>
 
 #include "hephaistos/handles.hpp"
-#include "hephaistos/version.hpp"
+#include "vk/instance.hpp"
 #include "vk/result.hpp"
 #include "vk/types.hpp"
 
-#ifdef HEPHAISTOS_DEBUG
-#include <iostream>
-#include <sstream>
-
-/************************************ DEBUG **********************************/
-
-namespace {
-
-bool validationError = false;
-
-static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-    VkDebugUtilsMessageTypeFlagsEXT messageType,
-    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-    void* pUserData)
-{
-
-    //Create prefix
-    std::string prefix("");
-    if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) prefix = "[VERB]";
-    if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) prefix = "[INFO]";
-    if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) prefix = "[WARN]";
-    if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) prefix = "[ERR]";
-
-    //Create message
-    std::stringstream message;
-    message << prefix << "(" << pCallbackData->messageIdNumber << ": " << pCallbackData->pMessageIdName << ") " << pCallbackData->pMessage;
-
-    //Output
-    if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-        std::cerr << message.str() << std::endl;
-        validationError = true;
-    }
-    else {
-        std::cout << message.str() << std::endl;
-    }
-    fflush(stdout);
-
-    //By returning false, the program will continue
-    return VK_FALSE;
-}
-
-constexpr auto DebugMessageSeverity =
-    VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-    VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-    VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-    VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-constexpr auto DebugMessageType =
-    VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-    VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-    VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
-    VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT;
-constexpr auto EnabledValidationFeatures = std::to_array({
-    VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT,
-    VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT,
-    VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT
-    });
-
-constexpr auto InstanceLayers = std::to_array({
-    "VK_LAYER_KHRONOS_validation"
-});
-constexpr auto InstanceExtensions = std::to_array({
-    VK_EXT_DEBUG_UTILS_EXTENSION_NAME
-});
-
-}
-
-bool hephaistos::hasValidationErrorOccurred(bool reset) {
-    if (validationError && reset) {
-        validationError = false;
-        return true;
-    }
-    return validationError;
-}
-#else
-namespace {
-
-constexpr std::array<const char*, 0> InstanceLayers{};
-constexpr std::array<const char*, 0> InstanceExtensions{};
-
-}
-#endif
-
 namespace hephaistos {
-
-/*********************************** INSTANCE ********************************/
-
-namespace {
-
-//shared_ptr seems a bit heavy and since we only need the instance handle here
-//we'll do the counting ourselves. Note that this is not thread safe, but I
-//can't imagine why it'd be a good idea to create multiple contexts in parallel
-uint32_t instanceReferenceCount = 0;
-VkInstance instance;
-#ifdef HEPHAISTOS_DEBUG
-VkDebugUtilsMessengerEXT messenger;
-#endif
-
-VkInstance getInstance() {
-    //singleton check
-    if (instanceReferenceCount++ > 0)
-        return instance;
-
-    //Init volk if necessary
-    if (volkGetInstanceVersion() == 0 && volkInitialize() != VK_SUCCESS)
-        throw std::runtime_error("Vulkan is not supported in this system!");
-
-    auto version = VK_MAKE_VERSION(VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
-
-    //configure instance
-    VkApplicationInfo appInfo{
-        .sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-        .pApplicationName   = "hephaistos",
-        .applicationVersion = version,
-        .pEngineName        = "hephaistos",
-        .engineVersion      = version,
-        .apiVersion         = VK_API_VERSION_1_2
-    };
-    VkInstanceCreateInfo instInfo{
-        .sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-        .pApplicationInfo        = &appInfo,
-        .enabledLayerCount       = static_cast<uint32_t>(InstanceLayers.size()),
-        .ppEnabledLayerNames     = InstanceLayers.data(),
-        .enabledExtensionCount   = static_cast<uint32_t>(InstanceExtensions.size()),
-        .ppEnabledExtensionNames = InstanceExtensions.data()
-    };
-#ifdef HEPHAISTOS_DEBUG
-    VkValidationFeaturesEXT validation{
-        .sType                         = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT,
-        .enabledValidationFeatureCount = static_cast<uint32_t>(EnabledValidationFeatures.size()),
-        .pEnabledValidationFeatures    = EnabledValidationFeatures.data()
-    };
-    instInfo.pNext = &validation;
-#endif
-
-    //create instance
-    vulkan::checkResult(vkCreateInstance(&instInfo, nullptr, &instance));
-    volkLoadInstanceOnly(instance);
-
-    //debug messenger
-#ifdef HEPHAISTOS_DEBUG
-    VkDebugUtilsMessengerCreateInfoEXT debugInfo{
-        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-        .messageSeverity = DebugMessageSeverity,
-        .messageType = DebugMessageType,
-        .pfnUserCallback = debugCallback
-    };
-    vulkan::checkResult(vkCreateDebugUtilsMessengerEXT(
-        instance, &debugInfo, nullptr, &messenger));
-#endif
-
-    //done
-    return instance;
-}
-
-void returnInstance() {
-    //destroy instance if ref counter reaches 0
-    if (--instanceReferenceCount == 0) {
-#ifdef HEPHAISTOS_DEBUG
-        vkDestroyDebugUtilsMessengerEXT(instance, messenger, nullptr);
-#endif
-        vkDestroyInstance(instance, nullptr);
-    }
-}
-
-}
 
 bool isVulkanAvailable() {
     //Check if volk is initialized or try to do so
@@ -190,17 +25,19 @@ constexpr VkQueueFlags QueueFlags = VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT
 constexpr float QueuePriority = 1.0f;
 
 constexpr auto DeviceExtensions = std::to_array({
-    VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME
+    VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
+    //only needed for gpu printf, but widely supported
+    VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME
 });
 
 void destroyDevice(vulkan::Device* device) {
     delete device;
-    returnInstance();
+    vulkan::returnInstance();
 }
 
 DeviceHandle createDevice(VkPhysicalDevice device) {
     //increment instance ref count
-    getInstance();
+    vulkan::getInstance();
 
     //query extensions
     uint32_t count;
@@ -307,7 +144,7 @@ bool isDeviceSuitable(const DeviceHandle& device, std::span<const ExtensionHandl
 
 std::vector<DeviceHandle> enumerateDevices() {
     //get instance
-    auto instance = getInstance();
+    auto instance = vulkan::getInstance();
 
     //get all devices
     uint32_t count;
@@ -323,7 +160,7 @@ std::vector<DeviceHandle> enumerateDevices() {
 
     //we only needed the instance for the enumerate command
     //device handles have their own refs so return it
-    returnInstance();
+    vulkan::returnInstance();
 
     //done
     return result;
@@ -358,7 +195,7 @@ void destroyContext(vulkan::Context* context) {
         context->sequencePool.pop();
     }
     context->fnTable.vkDestroyDevice(context->device, nullptr);
-    returnInstance();
+    vulkan::returnInstance();
 }
 
 ContextHandle createContext(
@@ -599,7 +436,7 @@ ContextHandle createContext(
 
 ContextHandle createContext(std::span<ExtensionHandle> extensions) {
     //new handle -> refs to instance
-    auto instance = getInstance();
+    auto instance = vulkan::getInstance();
 
     //enumerate devices
     uint32_t count;
@@ -637,7 +474,7 @@ ContextHandle createContext(
         throw std::runtime_error("Device is not suitable!");
 
     //new ref
-    return createContext(getInstance(), device->device, extensions);
+    return createContext(vulkan::getInstance(), device->device, extensions);
 }
 
 /*********************************** RESOURCE ********************************/

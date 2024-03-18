@@ -24,8 +24,8 @@ set_target_properties(Catch2 PROPERTIES FOLDER "dependencies")
 set_target_properties(Catch2WithMain PROPERTIES FOLDER "dependencies")
 
 #create test executable
-add_executable(tests ${TEST_FILES})
+add_executable(tests ${TEST_FILES} ${TESTROOT}/main.cpp)
 target_link_libraries(tests PRIVATE hephaistos)
-target_link_libraries(tests PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(tests PRIVATE Catch2::Catch2)
 
 # skip install. There's no point to it

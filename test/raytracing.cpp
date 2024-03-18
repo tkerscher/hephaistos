@@ -8,6 +8,8 @@
 #include <hephaistos/hephaistos.hpp>
 #include <hephaistos/raytracing.hpp>
 
+#include "validation.hpp"
+
 //code
 #include "shader/raytracing.h"
 

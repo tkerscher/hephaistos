@@ -9,6 +9,8 @@
 #include <hephaistos/image.hpp>
 #include <hephaistos/program.hpp>
 
+#include "validation.hpp"
+
 //shader code
 #include "shader/sampler.h"
 

@@ -11,6 +11,7 @@ set(PUBLIC_HEADERS
     ${INCROOT}/compiler.hpp
     ${INCROOT}/config.hpp
     ${INCROOT}/context.hpp
+    ${INCROOT}/debug.hpp
     ${INCROOT}/handles.hpp
     ${INCROOT}/hephaistos.hpp
     ${INCROOT}/image.hpp
@@ -27,7 +28,8 @@ set(SRC
     ${SRCROOT}/buffer.cpp
     ${SRCROOT}/command.cpp
     ${SRCROOT}/compiler.cpp
-    ${SRCROOT}/context.cpp    
+    ${SRCROOT}/context.cpp
+    ${SRCROOT}/debug.cpp     
     ${SRCROOT}/image.cpp
     ${SRCROOT}/program.cpp
     ${SRCROOT}/raytracing.cpp
@@ -36,6 +38,8 @@ set(SRC
     ${SRCROOT}/version.cpp
 #vulkan
     ${SRCROOT}/vk/result.hpp
+    ${SRCROOT}/vk/instance.cpp
+    ${SRCROOT}/vk/instance.hpp
     ${SRCROOT}/vk/types.cpp
     ${SRCROOT}/vk/types.hpp
     ${SRCROOT}/vk/util.hpp

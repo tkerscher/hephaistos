@@ -6,6 +6,8 @@
 #include <hephaistos/buffer.hpp>
 #include <hephaistos/command.hpp>
 
+#include "validation.hpp"
+
 using namespace hephaistos;
 
 namespace {

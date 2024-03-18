@@ -10,6 +10,8 @@
 #include <hephaistos/compiler.hpp>
 #include <hephaistos/program.hpp>
 
+#include "validation.hpp"
+
 using namespace hephaistos;
 
 namespace {

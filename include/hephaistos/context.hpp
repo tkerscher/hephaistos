@@ -145,8 +145,4 @@ private:
     return ContextHandle{ nullptr, [](vulkan::Context*) {} };
 }
 
-#ifdef HEPHAISTOS_DEBUG
-[[nodiscard]] HEPHAISTOS_API bool hasValidationErrorOccurred(bool reset = true);
-#endif
-
 }
