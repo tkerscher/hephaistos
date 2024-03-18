@@ -1,4 +1,4 @@
-from typing import Iterable, Literal, Optional, overload
+from typing import Callable, Iterable, Literal, Optional, overload
 
 import hephaistos.pyhephaistos
 import numpy.typing
@@ -589,6 +589,43 @@ class Compiler:
         Removes the last added include dir from the internal list
         """
         ...
+
+class DebugMessage:
+    """
+    Structure describing a debug message including text and some meta information
+    """
+
+    @property
+    def idName(self) -> str:
+        """
+        Name of the message type
+        """
+        ...
+    @property
+    def idNumber(self) -> int:
+        """
+        Id of the message type
+        """
+        ...
+    @property
+    def message(self) -> str:
+        """
+        The actual message text
+        """
+        ...
+
+class DebugMessageSeverityFlagBits:
+    """
+    Flags indicating debug message severity
+    """
+
+    INFO: DebugMessageSeverityFlagBits
+
+    ERROR: DebugMessageSeverityFlagBits
+
+    VERBOSE: DebugMessageSeverityFlagBits
+
+    WARNING: DebugMessageSeverityFlagBits
 
 class Device:
     """
@@ -3614,6 +3651,39 @@ def clearTensor(
     """
     ...
 
+def configureDebug(
+    enablePrint: bool = False,
+    enableGPUValidation: bool = False,
+    enableSynchronizationValidation: bool = False,
+    enableThreadSafetyValidation: bool = False,
+    enableAPIValidation: bool = False,
+    callback: Callable[[hephaistos.pyhephaistos.DebugMessage], None] = lambda msg: None,
+) -> None:
+    """
+    Configures the current debug state. Must be called before any other library
+    calls except isVulkanAvailable() and isDebugAvailable().
+
+    Parameters
+    ----------
+    enablePrint: bool, default=False
+        Enables the usage of GL_EXT_debug_printf
+    enableGPUValidation: bool, default=False
+        Enable GPU assisted validation
+    enableSynchronizationValidation: bool, default=False
+        Enable synchronization validation between resources
+    enableThreadSafetyValidation: bool, default=False
+        Enable thread safety validation
+    enableAPIValidation: bool, default=False
+        Enables validation of the Vulkan API usage
+    callback: (DebugMessage) -> None, default=print(message)
+        Callback called for each message. Prints the message by default.
+
+    Note
+    ----
+    Debugging requires the Vulkan Validation Layers to be installed.
+    """
+    ...
+
 def createSubroutine(
     commands: list, simultaneous: bool = False
 ) -> hephaistos.pyhephaistos.Subroutine:
@@ -3722,6 +3792,13 @@ def getSupportedTypes(id: Optional[int], /) -> hephaistos.pyhephaistos.TypeSuppo
     id: int | None, default=None
         Id of the device to query. If None, uses the one the current context
         was created on
+    """
+    ...
+
+def isDebugAvailable() -> bool:
+    """
+    Returns True if debugging is supported on this system.
+    This requires the Vulkan Validation Layers to be installed.
     """
     ...
 

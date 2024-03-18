@@ -8,6 +8,7 @@ set(SRC
     ${PYROOT}/command.cpp
     ${PYROOT}/compiler.cpp
     ${PYROOT}/context.cpp
+    ${PYROOT}/debug.cpp
     ${PYROOT}/image.cpp
     ${PYROOT}/program.cpp
     ${PYROOT}/pyhephaistos.cpp
