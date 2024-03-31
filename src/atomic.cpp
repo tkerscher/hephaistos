@@ -108,8 +108,8 @@ public:
         return extensions;
     }
     void* chain(void* pNext) override {
-        imageFeat.pNext = pNext;
-        return static_cast<void*>(&float2Feat);
+        int64Feat.pNext = pNext;
+        return this->pNext;
     }
 
     AtomicsExtension(const AtomicsProperties& props);
@@ -119,6 +119,7 @@ private:
     uint32_t flags;
 
     std::vector<const char*> extensions;
+    void* pNext;
 
     VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT imageFeat;
     VkPhysicalDeviceShaderAtomicInt64FeaturesKHR int64Feat;
@@ -204,28 +205,34 @@ AtomicsExtension::AtomicsExtension(const AtomicsProperties& props)
     , extensions({})
 {
     //check which extensions we need
-    if (flags & imageExtFlags)
+    bool imageExt = (flags & imageExtFlags) != 0;
+    bool floatExt = (flags & floatExt1Flags) != 0;
+    bool float2Ext = (flags & floatExt2Flags) != 0;
+    if (imageExt)
         extensions.push_back(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME);
-    if (flags & floatExt1Flags)
+    if (floatExt)
         extensions.push_back(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
-    if (flags & floatExt2Flags)
+    if (float2Ext)
         extensions.push_back(VK_EXT_SHADER_ATOMIC_FLOAT_2_EXTENSION_NAME);
     //VK_KHR_SHADER_ATOMIC_INT64 is part of Vulkan 1.2
 
     //fill feature structs
-    imageFeat = VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_IMAGE_ATOMIC_INT64_FEATURES_EXT,
-        .shaderImageInt64Atomics = props.imageInt64Atomics
-    };
     int64Feat = VkPhysicalDeviceShaderAtomicInt64FeaturesKHR{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES_KHR,
-        .pNext = &imageFeat,
         .shaderBufferInt64Atomics = props.bufferInt64Atomics,
         .shaderSharedInt64Atomics = props.sharedInt64Atomics
     };
+    pNext = &int64Feat;
+    imageFeat = VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_IMAGE_ATOMIC_INT64_FEATURES_EXT,
+        .pNext = pNext,
+        .shaderImageInt64Atomics = props.imageInt64Atomics
+    };
+    if (imageExt)
+        pNext = static_cast<void*>(&imageFeat);
     floatFeat = VkPhysicalDeviceShaderAtomicFloatFeaturesEXT{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_FEATURES_EXT,
-        .pNext = &int64Feat,
+        .pNext = pNext,
         .shaderBufferFloat32Atomics = props.bufferFloat32Atomics,
         .shaderBufferFloat32AtomicAdd = props.bufferFloat32AtomicAdd,
         .shaderBufferFloat64Atomics = props.bufferFloat64Atomics,
@@ -237,9 +244,11 @@ AtomicsExtension::AtomicsExtension(const AtomicsProperties& props)
         .shaderImageFloat32Atomics = props.imageFloat32Atomics,
         .shaderImageFloat32AtomicAdd = props.imageFloat32AtomicAdd
     };
+    if (floatExt)
+        pNext = static_cast<void*>(&floatFeat);
     float2Feat = VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_2_FEATURES_EXT,
-        .pNext = &floatFeat,
+        .pNext = pNext,
         .shaderBufferFloat16Atomics = props.bufferFloat16Atomics,
         .shaderBufferFloat16AtomicAdd = props.bufferFloat16AtomicAdd,
         .shaderBufferFloat16AtomicMinMax = props.bufferFloat16AtomicMinMax,
@@ -252,6 +261,8 @@ AtomicsExtension::AtomicsExtension(const AtomicsProperties& props)
         .shaderSharedFloat64AtomicMinMax = props.sharedFloat64AtomicMinMax,
         .shaderImageFloat32AtomicMinMax = props.imageFloat32AtomicMinMax
     };
+    if (float2Ext)
+        pNext = static_cast<void*>(&float2Feat);
 }
 ExtensionHandle createAtomicsExtension(const AtomicsProperties& properties) {
     return std::make_unique<AtomicsExtension>(properties);
