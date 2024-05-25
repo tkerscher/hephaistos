@@ -117,6 +117,9 @@ class PipelineStage(ABC):
         """Set of all public parameter names"""
         return self._public
 
+    def __dir__(self) -> Iterable[str]:
+        return chain(super().__dir__(), self._public)
+
     def getParam(self, name: str) -> Any:
         """Returns the parameter specified by its name"""
         if name in self._extra:
@@ -129,6 +132,13 @@ class PipelineStage(ABC):
     def getParams(self) -> Dict[str, any]:
         """Creates a dictionary with all parameters that can be set"""
         return {name: self.getParam(name) for name in self.fields}
+
+    def __getattr__(self, name: str):
+        # allow params to be accessed in the "classic" way
+        if "_params" in self.__dict__ and name in self._params:
+            return self._params[name].value
+        else:
+            raise AttributeError()
 
     def setParam(self, name: str, value: Any) -> None:
         """
@@ -149,6 +159,12 @@ class PipelineStage(ABC):
         """
         for name, value in kwargs.items():
             self.setParam(name, value)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        # allow params to be set using "classic" way, too
+        if "_params" in self.__dict__ and name in self._params:
+            self._params[name].value = value
+        return super().__setattr__(name, value)
 
     def __repr__(self) -> str:
         return (
