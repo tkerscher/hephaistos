@@ -123,7 +123,7 @@ class PipelineStage(ABC):
     def getParam(self, name: str) -> Any:
         """Returns the parameter specified by its name"""
         if name in self._extra:
-            return self.name
+            return getattr(self, name)
         elif name in self._params:
             return self._params[name].value
         else:
