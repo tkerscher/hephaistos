@@ -38,13 +38,13 @@ bool isRaytracingSupported(std::optional<uint32_t> id) {
 
 }
 
-using VertexArray = nb::ndarray<nb::numpy, float,
-    nb::shape<nb::any, nb::any>, nb::c_contig, nb::device::cpu>;
-using IndexArray = nb::ndarray<nb::numpy, uint32_t,
-    nb::shape<nb::any,3>, nb::c_contig, nb::device::cpu>;
+using VertexArray = nb::ndarray<float, nb::numpy,
+    nb::shape<-1, -1>, nb::c_contig, nb::device::cpu>;
+using IndexArray = nb::ndarray<uint32_t, nb::numpy,
+    nb::shape<-1, 3>, nb::c_contig, nb::device::cpu>;
 using TransformArray = nb::ndarray<float,
     nb::shape<3,4>, nb::c_contig, nb::device::cpu>;
-using TransformArrayOut = nb::ndarray<nb::numpy, float,
+using TransformArrayOut = nb::ndarray<float, nb::numpy,
     nb::shape<3,4>, nb::c_contig, nb::device::cpu>;
 size_t TransformShape[2] = { 3, 4 };
 

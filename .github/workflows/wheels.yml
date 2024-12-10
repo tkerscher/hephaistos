@@ -16,7 +16,7 @@ jobs:
         buildplat:
           - [ubuntu-latest, manylinux_x86_64]
           - [windows-latest, win_amd64]
-        python: ["cp39", "cp310", "cp311", "cp312"]
+        python: ["cp39", "cp310", "cp311", "cp312", "cp313"]
     
     steps:
       - name: Checkout hephaistos
@@ -31,26 +31,26 @@ jobs:
           name: ${{ matrix.python }}-${{ matrix.buildplat[1] }}
           path: ./wheelhouse/*.whl
   
-  build_wheels_macos:
-    name: Build wheel for ${{ matrix.python }}-macos
-    runs-on: macos-12
-    strategy:
-      fail-fast: false
-      matrix:
-        python: ["cp39", "cp310", "cp311", "cp312"]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build wheels
-        uses: pypa/cibuildwheel@v2.16.5
-        env:
-          CIBW_ARCHS_MACOS: x86_64 arm64
-          CIBW_BUILD: ${{ matrix.python }}-*
-          CIBW_ENVIRONMENT: MACOSX_DEPLOYMENT_TARGET='10.15'
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ matrix.python }}-macosx
-          path: ./wheelhouse/*.whl
+  # build_wheels_macos:
+  #   name: Build wheel for ${{ matrix.python }}-macos
+  #   runs-on: macos-12
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       python: ["cp39", "cp310", "cp311", "cp312"]
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Build wheels
+  #       uses: pypa/cibuildwheel@v2.16.5
+  #       env:
+  #         CIBW_ARCHS_MACOS: x86_64 arm64
+  #         CIBW_BUILD: ${{ matrix.python }}-*
+  #         CIBW_ENVIRONMENT: MACOSX_DEPLOYMENT_TARGET='10.15'
+  #     - name: Upload artifacts
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: ${{ matrix.python }}-macosx
+  #         path: ./wheelhouse/*.whl
 
   build_sdist:
     name: Build sdist

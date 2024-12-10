@@ -113,8 +113,8 @@ hp::Sampler buildSampler(const nb::kwargs& kwargs) {
 }
 
 //array shape of image buffer: [width, height, 4]
-using image_shape = nb::shape<nb::any, nb::any, 4>;
-using image_array = nb::ndarray<nb::numpy, uint8_t, image_shape>;
+using image_shape = nb::shape<-1, -1, 4>;
+using image_array = nb::ndarray<uint8_t, nb::numpy, image_shape>;
 
 void registerImageModule(nb::module_& m) {
     nb::enum_<hp::ImageFormat>(m, "ImageFormat",

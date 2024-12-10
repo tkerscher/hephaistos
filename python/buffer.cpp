@@ -45,7 +45,7 @@ public:
 template<class T>
 class TypedBuffer : public hp::Buffer<T> {
 public:
-    using array_type = nb::ndarray<nb::numpy, T, nb::shape<1, nb::any>>;
+    using array_type = nb::ndarray<T, nb::numpy, nb::shape<1, -1>>;
 
     array_type numpy() const {
         size_t shape = hp::Buffer<T>::size();
@@ -93,7 +93,7 @@ void registerBuffer(nb::module_& m, const char* name, const char* type_name) {
 namespace {
 
 template<class T>
-std::span<const T> span_cast(const nb::ndarray<T, nb::shape<nb::any>, nb::c_contig, nb::device::cpu>& array) {
+std::span<const T> span_cast(const nb::ndarray<T, nb::shape<-1>, nb::c_contig, nb::device::cpu>& array) {
     return { array.data(), array.size() };
 }
 
@@ -102,7 +102,7 @@ std::span<const T> span_cast(const nb::ndarray<T, nb::shape<nb::any>, nb::c_cont
 template<class T>
 class TypedTensor : public hp::Tensor<T> {
 public:
-    using array_type = nb::ndarray<T, nb::shape<nb::any>, nb::c_contig, nb::device::cpu>;
+    using array_type = nb::ndarray<T, nb::shape<-1>, nb::c_contig, nb::device::cpu>;
 
     TypedTensor(size_t count, bool mapped)
         : hp::Tensor<T>(getCurrentContext(), count, mapped) {}
