@@ -40,15 +40,19 @@ std::vector<hp::DeviceInfo> enumerateDevices() {
     return result;
 }
 
+void resetContext() {
+    //delete old context
+    //objects are now undefined
+    currentContext.reset();
+    //handles.clear();
+    //instance should have been deleted now (doesn't really matter)
+}
+
 void selectDevice(uint32_t id, bool force) {
     //check if we have to recreate context
     if (currentContext) {
         if (force) {
-            //delete old context
-            //objects are now undefined
-            currentContext.reset();
-            handles.clear();
-            //instance should have been deleted now (doesn't really matter)
+            resetContext();            
         }
         else {
             throw std::runtime_error(
@@ -100,11 +104,7 @@ void addExtension(hp::ExtensionHandle extension, bool force) {
     //check if we have to recreate context
     if (currentContext) {
         if (force) {
-            //delete old context
-            //objects are now undefined
-            currentContext.reset();
-            handles.clear();
-            //instance should have been deleted now (doesn't really matter)
+            resetContext();
         }
         else {
             throw std::runtime_error(

@@ -164,9 +164,13 @@ VkInstance getInstance() {
 }
 
 void returnInstance() {
-    //destroy instance if recount reaches zero
+    //destroy instance if reference count reaches zero
     if (--instanceReferenceCount == 0) {
-        vkDestroyDebugUtilsMessengerEXT(instance, messenger, nullptr);
+        //It is valid to call destroy with a nullptr messenger. However,
+        //if debug was not enabled, the loader may return a null function pointer
+        if (vkDestroyDebugUtilsMessengerEXT)
+            vkDestroyDebugUtilsMessengerEXT(instance, messenger, nullptr);
+        
         vkDestroyInstance(instance, nullptr);
     }
 }
