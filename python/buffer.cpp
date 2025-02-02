@@ -39,8 +39,12 @@ public:
 
     RawBuffer(uint64_t size)
         : hp::Buffer<std::byte>(getCurrentContext(), size)
-    {}
-    virtual ~RawBuffer() = default;
+    {
+        addResource(*this);
+    }
+    virtual ~RawBuffer() {
+        removeResource(*this);
+    }
 };
 template<class T>
 class TypedBuffer : public hp::Buffer<T> {
@@ -56,8 +60,12 @@ public:
 
     TypedBuffer(size_t size)
         : hp::Buffer<T>(getCurrentContext(), size)
-    {}
-    virtual ~TypedBuffer() = default;
+    {
+        addResource(*this);
+    }
+    virtual ~TypedBuffer() {
+        removeResource(*this);
+    }
 };
 template<class T>
 void registerBuffer(nb::module_& m, const char* name, const char* type_name) {
@@ -73,12 +81,17 @@ void registerBuffer(nb::module_& m, const char* name, const char* type_name) {
 
     nb::class_<TypedBuffer<T>, hp::Buffer<std::byte>>(m, name)
         .def(nb::init<size_t>(), "size"_a)
+        .def_prop_ro("destroyed", [](const TypedBuffer<T>& b) { return !b; },
+            "True, if the underlying resources have been destroyed.")
         .def_prop_ro("size", [](const TypedBuffer<T>& b) { return b.size(); },
             "The number of elements in this buffer.")
         .def_prop_ro("size_bytes", [](const TypedBuffer<T>& b) { return b.size_bytes(); },
             "The size of the buffer in bytes.")
+        .def("destroy", &TypedBuffer<T>::destroy,
+            "Frees the allocated resources")
         .def("numpy", &TypedBuffer<T>::numpy, nb::rv_policy::reference_internal,
             "Returns a numpy array using this buffer's memory.")
+        .def("__bool__", [](const TypedBuffer<T>& b) -> bool { return bool(b); })
         .def("__repr__", [name = std::string(name)](const TypedBuffer<T>& t) {
             std::ostringstream str;
             str << name
@@ -105,12 +118,23 @@ public:
     using array_type = nb::ndarray<T, nb::shape<-1>, nb::c_contig, nb::device::cpu>;
 
     TypedTensor(size_t count, bool mapped)
-        : hp::Tensor<T>(getCurrentContext(), count, mapped) {}
+        : hp::Tensor<T>(getCurrentContext(), count, mapped)
+    {
+        addResource(*this);    
+    }
     TypedTensor(uint64_t addr, size_t n, bool mapped)
-        : hp::Tensor<T>(getCurrentContext(), { reinterpret_cast<const T*>(addr), n }, mapped) {}
+        : hp::Tensor<T>(getCurrentContext(), { reinterpret_cast<const T*>(addr), n }, mapped)
+    {
+        addResource(*this);
+    }
     TypedTensor(const array_type& array, bool mapped)
-        : hp::Tensor<T>(getCurrentContext(), span_cast(array), mapped) {}
-    ~TypedTensor() override = default;
+        : hp::Tensor<T>(getCurrentContext(), span_cast(array), mapped)
+    {
+        addResource(*this);
+    }
+    ~TypedTensor() override {
+        removeResource(*this);
+    }
 };
 template<class T>
 void registerTensor(nb::module_& m, const char* name, const char* type_name) {
@@ -153,6 +177,8 @@ void registerTensor(nb::module_& m, const char* name, const char* type_name) {
             "    If True, tries to map memory to host address space")
         .def_prop_ro("address", [](const TypedTensor<T>& t) { return t.address(); },
             "The device address of this tensor.")
+        .def_prop_ro("destroyed", [](const TypedTensor<T>& t) { return !t; },
+            "True, if the underlying resources have been destroyed.")
         .def_prop_ro("isMapped", [](const TypedTensor<T>& t) { return t.isMapped(); },
             "True, if the underlying memory is writable by the CPU.")
         .def_prop_ro("memory", [](const TypedTensor<T>& t)
@@ -222,6 +248,9 @@ void registerTensor(nb::module_& m, const char* name, const char* type_name) {
         .def("bindParameter", [](const TypedTensor<T>& t, hp::Program& p, std::string_view b)
             { t.bindParameter(p.getBinding(b)); }, "program"_a, "binding"_a,
             "Binds the tensor to the program at the given binding")
+        .def("destroy", [](TypedTensor<T>& t){ t.destroy(); },
+            "Frees the allocated resources")
+        .def("__bool__", [](const TypedTensor<T>& t) -> bool { return bool(t); })
         .def("__repr__", [name = std::string(name)](const TypedTensor<T>& t) {
             std::ostringstream str;
             str << name
@@ -253,10 +282,15 @@ void registerBufferModule(nb::module_& m) {
         .def(nb::init<uint64_t>(), "size"_a)
         .def_prop_ro("address", [](const RawBuffer& b) { return b.getAddress(); },
             "The memory address of the allocated buffer.")
+        .def_prop_ro("destroyed", [](const RawBuffer& b) { return !b; },
+            "True, if the underlying resources have been destroyed.")
         .def_prop_ro("size", [](const RawBuffer& b) { return b.size(); },
             "The size of the buffer in bytes.")
         .def_prop_ro("size_bytes", [](const RawBuffer& b) { return b.size_bytes(); },
             "The size of the buffer in bytes.")
+        .def("destroy", &RawBuffer::destroy,
+            "Frees the allocated resources.")
+        .def("__bool__", [](const RawBuffer& b) { return bool(b); })
         .def("__repr__", [](const RawBuffer& b) {
             std::ostringstream str;
             str << "RawBuffer: ";

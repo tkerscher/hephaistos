@@ -22,9 +22,15 @@ void registerCommandModule(nb::module_& m) {
             "submitted multiple times to the device. "
             "Recording sequence of commands require non negligible CPU time "
             "and may be amortized by reusing sequences via Subroutines.")
+        .def("__del__", [](hp::Subroutine& s) { removeResource(s); })
+        .def_prop_ro("destroyed", [](const hp::Subroutine& s) { return !s; },
+            "True, if the underlying resources have been destroyed.")
         .def_prop_ro("simultaneousUse",
             [](const hp::Subroutine& s) -> bool { return s.simultaneousUse(); },
-            "True, if the subroutine can be used simultaneous");
+            "True, if the subroutine can be used simultaneous")
+        .def("destroy", &hp::Subroutine::destroy,
+            "Frees the allocated resources")
+        .def("__bool__", [](const hp::Subroutine& s) -> bool { return bool(s); });
     m.def("createSubroutine",
         [](nb::list list, bool simultaneous) -> hp::Subroutine {
             //try to minimize holding of GIL
@@ -40,7 +46,9 @@ void registerCommandModule(nb::module_& m) {
             hp::SubroutineBuilder builder(getCurrentContext(), simultaneous);
             for (auto c : commands)
                 builder.addCommand(*c);
-            return builder.finish();
+            auto sub = builder.finish();
+            addResource(sub);
+            return sub;
         }, "commands"_a, "simultaneous"_a = false,
         "creates a subroutine from the list of commands"
         "\n\nParameters\n----------\n"
@@ -61,9 +69,17 @@ void registerCommandModule(nb::module_& m) {
             "\n\nParameters\n----------\n"
             "value: int, default=0\n"
             "    Initial value of the internal counter\n")
-        .def("__init__", [](hp::Timeline* t) { new (t) hp::Timeline(getCurrentContext()); })
-        .def("__init__", [](hp::Timeline* t, uint64_t v)
-            { new (t) hp::Timeline(getCurrentContext(), v); }, "initialValue"_a)
+        .def("__init__", [](hp::Timeline* t) {
+                new (t) hp::Timeline(getCurrentContext());
+                addResource(*t);
+            })
+        .def("__init__", [](hp::Timeline* t, uint64_t v) {
+                new (t) hp::Timeline(getCurrentContext(), v);
+                addResource(*t);
+            }, "initialValue"_a)
+        .def("__del__", [](hp::Timeline& t) { removeResource(t); })
+        .def_prop_ro("destroyed", [](const hp::Timeline& t) { return !t; },
+            "True, if the underlying resources have been destroyed.")
         .def_prop_ro("id", [](const hp::Timeline& t) { return t.getId(); },
             "Id of this timeline")
         .def_prop_rw("value",
@@ -72,6 +88,8 @@ void registerCommandModule(nb::module_& m) {
             "Returns or sets the current value of the timeline. "
             "Note that the value can only increase. "
             "Disobeying this requirement results in undefined behavior.")
+        .def("destroy", &hp::Timeline::destroy,
+            "Frees the allocated resources")
         .def("wait", [](const hp::Timeline& t, uint64_t v) {
                 nb::gil_scoped_release release;
                 t.waitValue(v);
@@ -89,6 +107,7 @@ void registerCommandModule(nb::module_& m) {
             "timeout: int\n"
             "    Time in nanoseconds to wait. May be rounded to the closest "
                 "internal precision of the device clock.")
+        .def("__bool__", [](const hp::Timeline& t) -> bool { return bool(t); })
         .def("__repr__", [](const hp::Timeline& t) -> std::string {
             std::ostringstream str;
             str << "Timeline (ID: 0x" << std::hex << t.getId() << ")\n";

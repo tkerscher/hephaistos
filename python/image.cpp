@@ -156,7 +156,11 @@ void registerImageModule(nb::module_& m) {
                 uint32_t width, uint32_t height, uint32_t depth)
             {
                 new (image) hp::Image(getCurrentContext(), format, width, height, depth);
+                addResource(*image);
             }, "format"_a, "width"_a, "height"_a = 1, "depth"_a = 1)
+        .def("__del__", [](hp::Image& i) { removeResource(i); })
+        .def_prop_ro("destroyed", [](const Image& i) { return !i; },
+            "True, if the underlying resources have been destroyed.")
         .def_prop_ro("width",
             [](const hp::Image& img) -> uint32_t { return img.getWidth(); },
             "With of the image in pixels")
@@ -183,7 +187,10 @@ void registerImageModule(nb::module_& m) {
             [](const hp::Image& img, hp::Program& p, std::string_view b)
                 { img.bindParameter(p.getBinding(b)); },
             "program"_a, "binding"_a,
-            "Binds the image to the program at the given binding");
+            "Binds the image to the program at the given binding")
+        .def("destroy", &hp::Image::destroy,
+            "Frees the allocated resources")
+        .def("__bool__", [](const hp::Image& i) -> bool { return bool(i); });
     
     nb::class_<hp::Texture>(m, "Texture",
             "Allocates memory on the device using a memory layout it deems "
@@ -216,9 +223,13 @@ void registerImageModule(nb::module_& m) {
                     auto sampler = buildSampler(kwargs);
                     new (texture) hp::Texture(getCurrentContext(),
                         format, width, height, depth, sampler);
+                    addResource(*texture);
                 },
             "format"_a, "width"_a, "height"_a = 1, "depth"_a = 1,
             "kwargs"_a = nb::kwargs())
+        .def("__del__", [](hp::Texture& t) { removeResource(t); })
+        .def_prop_ro("destroyed", [](const hp::Texture& t) { return !t; },
+            "True, if the underlying resources have been destroyed.")
         .def_prop_ro("width",
             [](const hp::Texture& tex) -> uint32_t { return tex.getWidth(); },
             "Width of the texture in pixels")
@@ -245,7 +256,10 @@ void registerImageModule(nb::module_& m) {
             [](const hp::Texture& tex, hp::Program& p, std::string_view b)
                 { tex.bindParameter(p.getBinding(b)); },
             "program"_a, "binding"_a,
-            "Binds the texture to the program at the given binding");
+            "Binds the texture to the program at the given binding")
+        .def("destroy", &hp::Texture::destroy,
+            "Frees the allocated resources")
+        .def("__bool__", [](const hp::Texture& t) -> bool { return bool(t); });
 
     nb::class_<hp::ImageBuffer, hp::Buffer<std::byte>>(m, "ImageBuffer",
             "Utility class allocating memory on the host side in linear memory "
@@ -261,7 +275,11 @@ void registerImageModule(nb::module_& m) {
         .def("__init__",
             [](hp::ImageBuffer* ib, uint32_t width, uint32_t height) {
                 new (ib) hp::ImageBuffer(getCurrentContext(), width, height);
+                addResource(*ib);
             }, "width"_a, "height"_a)
+        .def("__del__", [](hp::ImageBuffer& ib) { removeResource(ib); })
+        .def_prop_ro("destroyed", [](const hp::ImageBuffer& ib) { return !ib;},
+            "True, if the underlying resources have been destroyed.")
         .def_prop_ro("width", [](const hp::ImageBuffer& ib) { return ib.getWidth(); },
             "Width of the image in pixels")
         .def_prop_ro("height", [](const hp::ImageBuffer& ib) { return ib.getHeight(); },
@@ -288,6 +306,8 @@ void registerImageModule(nb::module_& m) {
             "\nParameters\n----------\n"
             "data: bytes\n"
             "    Binary data containing the image data")
+        .def("destroy", &hp::ImageBuffer::destroy,
+            "Frees the allocated resources")
         .def("numpy",
             [](const hp::ImageBuffer& buffer) -> image_array {
                 size_t shape[3] = {
@@ -299,7 +319,8 @@ void registerImageModule(nb::module_& m) {
                     buffer.getMemory().data()), 3, shape);
             }, nb::rv_policy::reference_internal,
             "Returns a numpy array that allows to manipulate the data handled "
-            "by this ImageBuffer");
+            "by this ImageBuffer")
+        .def("__bool__", [](const hp::ImageBuffer& ib) -> bool { return bool(ib); });
     
     nb::class_<hp::RetrieveImageCommand, hp::Command>(m, "RetrieveImageCommand",
             "Command for copying the image back into the given buffer")

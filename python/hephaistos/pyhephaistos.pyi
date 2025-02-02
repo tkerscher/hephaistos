@@ -38,6 +38,17 @@ class AccelerationStructure:
         Binds the acceleration structure to the program at the given binding
         """
         ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
+        """
+        ...
 
 class AtomicsProperties:
     """
@@ -147,6 +158,17 @@ class ByteBuffer:
         Number of elements
     """
 
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
+        """
+        ...
     def numpy(self) -> numpy.typing.NDArray:
         """
         Returns a numpy array using this buffer's memory.
@@ -233,6 +255,17 @@ class ByteTensor:
     ) -> None:
         """
         Binds the tensor to the program at the given binding
+        """
+        ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
         """
         ...
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
@@ -349,6 +382,17 @@ class CharBuffer:
         Returns a numpy array using this buffer's memory.
         """
         ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
+        """
+        ...
     @property
     def size(self) -> int:
         """
@@ -430,6 +474,17 @@ class CharTensor:
     ) -> None:
         """
         Binds the tensor to the program at the given binding
+        """
+        ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
         """
         ...
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
@@ -731,6 +786,17 @@ class DoubleBuffer:
     """
 
     def __init__(self, size: int) -> None: ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
+        """
+        ...
     def numpy(self) -> numpy.typing.NDArray:
         """
         Returns a numpy array using this buffer's memory.
@@ -817,6 +883,17 @@ class DoubleTensor:
     ) -> None:
         """
         Binds the tensor to the program at the given binding
+        """
+        ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
         """
         ...
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
@@ -928,6 +1005,17 @@ class FloatBuffer:
     """
 
     def __init__(self, size: int) -> None: ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
+        """
+        ...
     def numpy(self) -> numpy.typing.NDArray:
         """
         Returns a numpy array using this buffer's memory.
@@ -1014,6 +1102,17 @@ class FloatTensor:
     ) -> None:
         """
         Binds the tensor to the program at the given binding
+        """
+        ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
         """
         ...
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
@@ -1293,6 +1392,17 @@ class GeometryStore:
         Creates a new instance of the specified geometry
         """
         ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
+        """
+        ...
     @property
     def geometries(self) -> hephaistos.pyhephaistos.GeometryVector:
         """
@@ -1453,6 +1563,17 @@ class Image:
         Depth of the image in pixels
         """
         ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
+        """
+        ...
     @property
     def format(self) -> hephaistos.pyhephaistos.ImageFormat:
         """
@@ -1514,6 +1635,17 @@ class ImageBuffer:
     """
 
     def __init__(self, width: int, height: int) -> None: ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
+        """
+        ...
     @property
     def height(self) -> int:
         """
@@ -1600,6 +1732,17 @@ class IntBuffer:
     """
 
     def __init__(self, size: int) -> None: ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
+        """
+        ...
     def numpy(self) -> numpy.typing.NDArray:
         """
         Returns a numpy array using this buffer's memory.
@@ -1686,6 +1829,17 @@ class IntTensor:
     ) -> None:
         """
         Binds the tensor to the program at the given binding
+        """
+        ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
         """
         ...
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
@@ -1841,6 +1995,17 @@ class LongBuffer:
     """
 
     def __init__(self, size: int) -> None: ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
+        """
+        ...
     def numpy(self) -> numpy.typing.NDArray:
         """
         Returns a numpy array using this buffer's memory.
@@ -1927,6 +2092,17 @@ class LongTensor:
     ) -> None:
         """
         Binds the tensor to the program at the given binding
+        """
+        ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
         """
         ...
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
@@ -2169,6 +2345,17 @@ class Program:
         Returns a list of all bindings.
         """
         ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
+        """
+        ...
     def dispatch(
         self, x: int = 1, y: int = 1, z: int = 1
     ) -> hephaistos.pyhephaistos.DispatchCommand:
@@ -2303,6 +2490,17 @@ class RawBuffer:
         The memory address of the allocated buffer.
         """
         ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
+        """
+        ...
     @property
     def size(self) -> int:
         """
@@ -2313,6 +2511,19 @@ class RawBuffer:
     def size_bytes(self) -> int:
         """
         The size of the buffer in bytes.
+        """
+        ...
+
+class ResourceContext:
+    """
+    Destroys all resources created during the lifetime of its context.
+    """
+    
+    def __init__(self) -> None: ...
+    @property
+    def count(self) -> int:
+        """
+        Number of resources created during the lifetime of its context.
         """
         ...
 
@@ -2450,6 +2661,17 @@ class ShortBuffer:
     """
 
     def __init__(self, size: int) -> None: ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
+        """
+        ...
     def numpy(self) -> numpy.typing.NDArray:
         """
         Returns a numpy array using this buffer's memory.
@@ -2536,6 +2758,17 @@ class ShortTensor:
     ) -> None:
         """
         Binds the tensor to the program at the given binding
+        """
+        ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
         """
         ...
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
@@ -2644,6 +2877,17 @@ class StopWatch:
     def __init__(self) -> None:
         """
         Creates a new stopwatch for measuring elapsed time between commands.
+        """
+        ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
         """
         ...
     def getElapsedTime(self, wait: bool = False) -> list[float]:
@@ -2773,6 +3017,17 @@ class Subroutine:
     negligible CPU time and may be amortized by reusing sequences via Subroutines.
     """
 
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
+        """
+        ...
     @property
     def simultaneousUse(self) -> bool:
         """
@@ -2870,6 +3125,17 @@ class Texture:
         Binds the texture to the program at the given binding
         """
         ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
+        """
+        ...
     @property
     def depth(self) -> int:
         """
@@ -2920,6 +3186,17 @@ class Timeline:
     def __init__(self, initialValue: int) -> None: ...
     @overload
     def __init__(self) -> None: ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
+        """
+        ...
     @property
     def id(self) -> int:
         """
@@ -2990,6 +3267,17 @@ class UnsignedIntBuffer:
     """
 
     def __init__(self, size: int) -> None: ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
+        """
+        ...
     def numpy(self) -> numpy.typing.NDArray:
         """
         Returns a numpy array using this buffer's memory.
@@ -3076,6 +3364,17 @@ class UnsignedIntTensor:
     ) -> None:
         """
         Binds the tensor to the program at the given binding
+        """
+        ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
         """
         ...
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
@@ -3187,6 +3486,17 @@ class UnsignedLongBuffer:
     """
 
     def __init__(self, size: int) -> None: ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
+        """
+        ...
     def numpy(self) -> numpy.typing.NDArray:
         """
         Returns a numpy array using this buffer's memory.
@@ -3273,6 +3583,17 @@ class UnsignedLongTensor:
     ) -> None:
         """
         Binds the tensor to the program at the given binding
+        """
+        ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
         """
         ...
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
@@ -3384,6 +3705,17 @@ class UnsignedShortBuffer:
     """
 
     def __init__(self, size: int) -> None: ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
+        """
+        ...
     def numpy(self) -> numpy.typing.NDArray:
         """
         Returns a numpy array using this buffer's memory.
@@ -3470,6 +3802,17 @@ class UnsignedShortTensor:
     ) -> None:
         """
         Binds the tensor to the program at the given binding
+        """
+        ...
+    def destroy(self) -> None:
+        """
+        Frees the allocated resources.
+        """
+        ...
+    @property
+    def destroyed(self) -> bool:
+        """
+        True, if the underlying resources have been destroyed.
         """
         ...
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
@@ -3701,6 +4044,12 @@ def createSubroutine(
     """
     ...
 
+def destroyResources() -> None:
+    """
+    Destroys all resources on the GPU and frees their allocated memory.
+    """
+    ...
+
 def enableAtomics(flags: set, force: bool = False) -> None:
     """
     Enables the atomic features contained in the given set by their name. Set
@@ -3767,6 +4116,12 @@ def getElementSize(format: hephaistos.pyhephaistos.ImageFormat) -> int:
 def getEnabledAtomics() -> hephaistos.pyhephaistos.AtomicsProperties:
     """
     Returns the in the current context enabled atomic features
+    """
+    ...
+
+def getResourceCount() -> int:
+    """
+    Counts the number of resources currently alive.
     """
     ...
 
