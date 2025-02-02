@@ -25,13 +25,20 @@ const vulkan::Buffer& Buffer<std::byte>::getBuffer() const noexcept {
     return *buffer;
 }
 
+void Buffer<std::byte>::onDestroy() {
+    buffer.reset();
+    memory = {};
+}
+
 Buffer<std::byte>::Buffer(Buffer<std::byte>&& other) noexcept
     : Resource(std::move(other))
     , buffer(std::move(other.buffer))
+    , memory(std::exchange(other.memory, std::span<std::byte>()))
 {}
 Buffer<std::byte>& Buffer<std::byte>::operator=(Buffer<std::byte>&& other) noexcept {
     Resource::operator=(std::move(other));
     buffer = std::move(other.buffer);
+    memory = std::exchange(other.memory, std::span<std::byte>());
     return *this;
 }
 
@@ -134,16 +141,22 @@ void Tensor<std::byte>::bindParameter(VkWriteDescriptorSet& binding) const {
     binding.pBufferInfo      = &parameter->buffer;
 }
 
+void Tensor<std::byte>::onDestroy() {
+    buffer.reset();
+    _size = 0;
+    parameter.reset();
+}
+
 Tensor<std::byte>::Tensor(Tensor<std::byte>&& other) noexcept
     : Resource(std::move(other))
     , buffer(std::move(other.buffer))
-    , _size(other._size)
+    , _size(std::exchange(other._size, 0))
     , parameter(std::move(other.parameter))
 {}
 Tensor<std::byte>& Tensor<std::byte>::operator=(Tensor<std::byte>&& other) noexcept {
     Resource::operator=(std::move(other));
     buffer = std::move(other.buffer);
-    _size = other._size;
+    _size = std::exchange(other._size, 0);
     parameter = std::move(other.parameter);
     return *this;
 }

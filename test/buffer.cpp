@@ -26,6 +26,40 @@ std::array<int, 10> data = { {
 
 }
 
+TEST_CASE("buffers can be moved and destroyed", "[buffer}") {
+    Buffer<int> buffer(getContext(), 10);
+    Buffer<int> buffer2(std::move(buffer));
+
+    REQUIRE(!buffer);
+    REQUIRE(buffer.size() == 0);
+    REQUIRE(buffer.size_bytes() == 0);
+    REQUIRE(!buffer.getContext());
+    REQUIRE(buffer2);
+    REQUIRE(buffer2.size() == 10);
+    REQUIRE(buffer2.size_bytes() == 40);
+    REQUIRE(buffer2.getContext());
+
+    buffer = std::move(buffer2);
+
+    REQUIRE(buffer);
+    REQUIRE(buffer.size() == 10);
+    REQUIRE(buffer.size_bytes() == 40);
+    REQUIRE(buffer.getContext());
+    REQUIRE(!buffer2);
+    REQUIRE(buffer2.size() == 0);
+    REQUIRE(buffer2.size_bytes() == 0);
+    REQUIRE(!buffer2.getContext());
+    
+    buffer.destroy();
+
+    REQUIRE(!buffer);
+    REQUIRE(buffer.size() == 0);
+    REQUIRE(buffer.size_bytes() == 0);
+    REQUIRE(!buffer.getContext());
+
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
 TEST_CASE("typed buffers handle appropriate memory", "[buffer]") {
     Buffer<int> buffer(getContext(), 10);
 

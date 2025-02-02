@@ -40,6 +40,45 @@ std::array<int32_t, 16> data2 = { {
 
 }
 
+TEST_CASE("images can be moved and destroyed") {
+    Image image(getContext(), ImageFormat::R32_SFLOAT, 128, 64);
+    Image image2(std::move(image));
+
+    REQUIRE(!image);
+    REQUIRE(!image.getContext());
+    REQUIRE(image.getWidth() == 0);
+    REQUIRE(image.getHeight() == 0);
+    REQUIRE(image.getDepth() == 0);
+    REQUIRE(image2);
+    REQUIRE(image2.getContext());
+    REQUIRE(image2.getWidth() == 128);
+    REQUIRE(image2.getHeight() == 64);
+    REQUIRE(image2.getDepth() == 1);
+
+    image = std::move(image2);
+
+    REQUIRE(!image2);
+    REQUIRE(!image2.getContext());
+    REQUIRE(image2.getWidth() == 0);
+    REQUIRE(image2.getHeight() == 0);
+    REQUIRE(image2.getDepth() == 0);
+    REQUIRE(image);
+    REQUIRE(image.getContext());
+    REQUIRE(image.getWidth() == 128);
+    REQUIRE(image.getHeight() == 64);
+    REQUIRE(image.getDepth() == 1);
+
+    image.destroy();
+
+    REQUIRE(!image);
+    REQUIRE(!image.getContext());
+    REQUIRE(image.getWidth() == 0);
+    REQUIRE(image.getHeight() == 0);
+    REQUIRE(image.getDepth() == 0);
+
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
 TEST_CASE("images know their size", "[image]") {
     auto format = GENERATE(as<ImageFormat>{},
         ImageFormat::R8G8B8A8_UNORM,

@@ -479,6 +479,19 @@ ContextHandle createContext(
 
 /*********************************** RESOURCE ********************************/
 
+Resource::operator bool() const noexcept {
+    return bool(context);
+}
+
+void Resource::destroy() {
+    if (!context) return;
+
+    //destroy resource
+    onDestroy();
+    //return context pointer
+    context.reset();
+}
+
 const ContextHandle& Resource::getContext() const noexcept {
     return context;
 }

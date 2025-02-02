@@ -510,6 +510,9 @@ public: //internal
     [[nodiscard]] VkWriteDescriptorSet& getBinding(uint32_t i);
     [[nodiscard]] VkWriteDescriptorSet& getBinding(std::string_view name);
 
+protected:
+    void onDestroy() override;
+
 private:
     std::unique_ptr<vulkan::Program> program;
     std::vector<BindingTraits> bindingTraits;

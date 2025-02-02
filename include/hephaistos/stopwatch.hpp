@@ -75,6 +75,9 @@ public:
     explicit StopWatch(ContextHandle context);
     ~StopWatch() override;
 
+protected:
+    void onDestroy() override;
+
 private:
     struct pImp;
     std::unique_ptr<pImp> _pImp;

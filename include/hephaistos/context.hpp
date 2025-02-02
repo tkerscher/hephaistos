@@ -59,9 +59,23 @@ public: //internal
 class HEPHAISTOS_API Resource {
 public:
     /**
-     * @brief Returns the context this was created on
+     * @brief Checks whether the Resource is still alive, that is has not
+     * been destroyed or moved.
+    */
+    operator bool() const noexcept;
+
+    /**
+     * @brief Returns the context this was created on. Null if destroyed.
     */
     const ContextHandle& getContext() const noexcept;
+
+    /**
+     * @brief Destroys the resource.
+     * 
+     * Destroys the resource without destroying the managing object.
+    */
+    void destroy();
+
 
     Resource(const Resource&) = delete;
     Resource& operator=(const Resource&) = delete;
@@ -69,6 +83,11 @@ public:
     virtual ~Resource();
 
 protected:
+    /**
+    * Destroy logic implemented by and specific to derived classes.
+    */
+    virtual void onDestroy() = 0;
+
     Resource(Resource&& other) noexcept;
     Resource& operator=(Resource&& other) noexcept;
 

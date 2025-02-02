@@ -142,6 +142,10 @@ double StopWatch::getElapsedTime(bool wait) const {
     }
 }
 
+void StopWatch::onDestroy() {
+    _pImp.reset();
+}
+
 StopWatch::StopWatch(StopWatch&& other) noexcept = default;
 StopWatch& StopWatch::operator=(StopWatch&& other) noexcept = default;
 

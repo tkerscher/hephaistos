@@ -229,6 +229,9 @@ public:
         bool keepMeshData = false);
     ~GeometryStore() override;
 
+protected:
+    void onDestroy() override;
+
 private:
     struct Imp;
     std::unique_ptr<Imp> pImp;
@@ -268,6 +271,9 @@ public:
     */
     AccelerationStructure(ContextHandle context, std::span<const GeometryInstance> instances);
     ~AccelerationStructure() override;
+
+protected:
+    void onDestroy() override;
 
 private:
     struct Parameter;

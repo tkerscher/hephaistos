@@ -44,6 +44,44 @@ std::array<int32_t, 3> dataIdx = { { 0, 1, 2 } };
 
 }
 
+TEST_CASE("program can be moved and destroyed", "[program]") {
+    Buffer<int32_t> buffer(getContext(), 3);
+    Tensor<int32_t> tensor(getContext(), 3);
+    Program program(getContext(), spec_code, dataStruct);
+    program.bindParameterList(tensor);
+
+    Program program2(std::move(program));
+
+    REQUIRE(!program);
+    REQUIRE(!program.getContext());
+    REQUIRE(program2);
+    REQUIRE(program2.getContext());
+
+    program = std::move(program2);
+
+    REQUIRE(!program2);
+    REQUIRE(!program2.getContext());
+    REQUIRE(program);
+    REQUIRE(program.getContext());
+
+    program2 = std::move(program);
+
+    Timeline timeline(getContext());
+    beginSequence(timeline)
+        .And(program2.dispatch(3))
+        .Then(retrieveTensor(tensor, buffer))
+        .Submit();
+
+    REQUIRE(std::equal(data.begin(), data.end(), buffer.getMemory().begin()));
+
+    program2.destroy();
+
+    REQUIRE(!program2);
+    REQUIRE(!program2.getContext());
+
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
 TEST_CASE("program can use specialization constants", "[program]") {
     Buffer<int32_t> buffer(getContext(), 3);
     Tensor<int32_t> tensor(getContext(), 3);

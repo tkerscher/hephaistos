@@ -425,6 +425,19 @@ DispatchIndirectCommand Program::dispatchIndirect(const Tensor<std::byte>& tenso
     return DispatchIndirectCommand(*program, tensor, offset, {});
 }
 
+void Program::onDestroy() {
+    if (program) {
+        auto& context = getContext();
+        context->fnTable.vkDestroyPipeline(context->device, program->pipeline, nullptr);
+        context->fnTable.vkDestroyShaderModule(context->device, program->shader, nullptr);
+        context->fnTable.vkDestroyPipelineLayout(context->device, program->pipeLayout, nullptr);
+        context->fnTable.vkDestroyDescriptorSetLayout(context->device, program->descriptorSetLayout, nullptr);
+
+        program.reset();
+        bindingTraits.clear();
+    }
+}
+
 Program::Program(Program&&) noexcept = default;
 Program& Program::operator=(Program&&) noexcept = default;
 
@@ -634,13 +647,7 @@ Program::Program(ContextHandle context, std::span<const uint32_t> code)
     : Program(std::move(context), code, {})
 {}
 Program::~Program() {
-    auto& context = getContext();
-    if (program) {
-        context->fnTable.vkDestroyPipeline(context->device, program->pipeline, nullptr);
-        context->fnTable.vkDestroyShaderModule(context->device, program->shader, nullptr);
-        context->fnTable.vkDestroyPipelineLayout(context->device, program->pipeLayout, nullptr);
-        context->fnTable.vkDestroyDescriptorSetLayout(context->device, program->descriptorSetLayout, nullptr);
-    }
+    onDestroy();
 }
 
 /********************************* FLUSH MEMORY *******************************/

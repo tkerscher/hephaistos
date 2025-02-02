@@ -148,6 +148,17 @@ GeometryInstance GeometryStore::createInstance(
     };
 }
 
+void GeometryStore::onDestroy() {
+    if (pImp) {
+        auto& context = *getContext();
+        for (auto acc : pImp->blas) {
+            context.fnTable.vkDestroyAccelerationStructureKHR(
+                context.device, acc, nullptr);
+        }
+        pImp.reset();
+    }
+}
+
 GeometryStore::GeometryStore(GeometryStore&&) noexcept = default;
 GeometryStore& GeometryStore::operator=(GeometryStore&&) noexcept = default;
 
@@ -493,13 +504,7 @@ GeometryStore::GeometryStore(
 }
 
 GeometryStore::~GeometryStore() {
-    if (pImp) {
-        auto& context = *getContext();
-        for (auto acc : pImp->blas) {
-            context.fnTable.vkDestroyAccelerationStructureKHR(
-                context.device, acc, nullptr);
-        }
-    }
+    onDestroy();
 }
 
 /*************************** ACCELERATION STRUCTURE ***************************/
@@ -516,6 +521,15 @@ void AccelerationStructure::bindParameter(VkWriteDescriptorSet& binding) const {
     binding.pBufferInfo = nullptr;
     binding.pImageInfo = nullptr;
     binding.pTexelBufferView = nullptr;
+}
+
+void AccelerationStructure::onDestroy() {
+    if (param) {
+        auto& context = *getContext();
+        context.fnTable.vkDestroyAccelerationStructureKHR(
+            context.device, param->tlas, nullptr);
+        param.reset();
+    }
 }
 
 AccelerationStructure::AccelerationStructure(AccelerationStructure&&) noexcept = default;
@@ -651,11 +665,7 @@ AccelerationStructure::AccelerationStructure(
 }
 
 AccelerationStructure::~AccelerationStructure() {
-    if (param) {
-        auto& context = *getContext();
-        context.fnTable.vkDestroyAccelerationStructureKHR(
-            context.device, param->tlas, nullptr);
-    }
+    onDestroy();
 }
 
 }

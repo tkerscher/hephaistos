@@ -164,6 +164,9 @@ public:
 public: //internal
     const vulkan::Image& getImage() const noexcept;
 
+protected:
+    void onDestroy() override;
+
 private:
     ImageHandle image;
     ImageFormat format;
@@ -260,6 +263,9 @@ public:
 
 public: //internal
     const vulkan::Image& getImage() const noexcept;
+
+protected:
+    void onDestroy() override;
 
 private:
     ImageHandle image;

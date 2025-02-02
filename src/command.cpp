@@ -23,6 +23,16 @@ const vulkan::Command& Subroutine::getCommandBuffer() const {
     return *cmdBuffer;
 }
 
+void Subroutine::onDestroy() {
+    if (cmdBuffer) {
+        auto& context = *getContext();
+        context.fnTable.vkFreeCommandBuffers(
+            context.device, context.subroutinePool,
+            1, &cmdBuffer->buffer);
+        cmdBuffer.reset();
+    }
+}
+
 Subroutine::Subroutine(Subroutine&&) noexcept = default;
 Subroutine& Subroutine::operator=(Subroutine&&) noexcept = default;
 
@@ -35,12 +45,7 @@ Subroutine::Subroutine(
     , simultaneous_use(simultaneous_use)
 {}
 Subroutine::~Subroutine() {
-    if (cmdBuffer) {
-        auto& context = *getContext();
-        context.fnTable.vkFreeCommandBuffers(
-            context.device, context.subroutinePool,
-            1, &cmdBuffer->buffer);
-    }
+    onDestroy();
 }
 
 SubroutineBuilder::operator bool() const {
@@ -153,6 +158,15 @@ vulkan::Timeline& Timeline::getTimeline() const {
     return *timeline;
 }
 
+void Timeline::onDestroy() {
+    if (timeline) {
+        auto& context = getContext();
+        context->fnTable.vkDestroySemaphore(
+            context->device, timeline->semaphore, nullptr);
+        timeline.reset();
+    }
+}
+
 Timeline::Timeline(Timeline&& other) noexcept
     : Resource(std::move(other))
     , timeline(std::move(other.timeline))
@@ -182,11 +196,7 @@ Timeline::Timeline(ContextHandle context, uint64_t initialValue)
         _context->device, &info, nullptr, &timeline->semaphore));
 }
 Timeline::~Timeline() {
-    if (timeline) {
-        auto& context = getContext();
-        context->fnTable.vkDestroySemaphore(
-            context->device, timeline->semaphore, nullptr);
-    }
+    onDestroy();
 }
 
 /******************************** SUBMISSION *********************************/

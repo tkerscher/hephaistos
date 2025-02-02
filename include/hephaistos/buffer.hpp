@@ -62,6 +62,9 @@ public:
 public: //internal
     const vulkan::Buffer& getBuffer() const noexcept;
 
+protected:
+    void onDestroy() override;
+
 private:
     BufferHandle buffer;
     std::span<std::byte> memory;
@@ -238,6 +241,9 @@ public:
 
 public: //internal
     [[nodiscard]] const vulkan::Buffer& getBuffer() const noexcept;
+
+protected:
+    void onDestroy() override;
 
 private:
     uint64_t _size;

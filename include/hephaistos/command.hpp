@@ -57,6 +57,9 @@ public:
 public: //internal
     const vulkan::Command& getCommandBuffer() const;
 
+protected:
+    void onDestroy() override;
+
 private:
     Subroutine(
         ContextHandle context,
@@ -212,6 +215,9 @@ public:
 
 public: //internal
     vulkan::Timeline& getTimeline() const;
+
+protected:
+    void onDestroy() override;
 
 private:
     std::unique_ptr<vulkan::Timeline> timeline;

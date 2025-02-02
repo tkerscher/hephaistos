@@ -66,23 +66,34 @@ void Image::bindParameter(VkWriteDescriptorSet& binding) const {
     binding.pBufferInfo      = nullptr;
 }
 
+void Image::onDestroy() {
+    if (image) {
+        image.reset();
+        parameter.reset();
+
+        width = 0;
+        height = 0;
+        depth = 0;
+    }
+}
+
 Image::Image(Image&& other) noexcept
     : Resource(std::move(other))
-    , image(std::move(image))
+    , image(std::move(other.image))
     , parameter(std::move(other.parameter))
     , format(other.format)
-    , width(other.width)
-    , height(other.height)
-    , depth(other.depth)
+    , width(std::exchange(other.width, 0))
+    , height(std::exchange(other.height, 0))
+    , depth(std::exchange(other.depth, 0))
 {}
 Image& Image::operator=(Image&& other) noexcept {
     Resource::operator=(std::move(other));
     image = std::move(other.image);
     parameter = std::move(other.parameter);
     format = other.format;
-    width = other.width;
-    height = other.height;
-    depth = other.depth;
+    width = std::exchange(other.width, 0);
+    height = std::exchange(other.height, 0);
+    depth = std::exchange(other.depth, 0);
     return *this;
 }
 
@@ -188,23 +199,37 @@ void Texture::bindParameter(VkWriteDescriptorSet& binding) const {
     binding.pBufferInfo = nullptr;
 }
 
+void Texture::onDestroy() {
+    if (image) {
+        auto& con = *getContext();
+        con.fnTable.vkDestroySampler(con.device, parameter->sampler, nullptr);
+
+        image.reset();
+        parameter.reset();
+
+        width = 0;
+        height = 0;
+        depth = 0;
+    }
+}
+
 Texture::Texture(Texture&& other) noexcept
     : Resource(std::move(other))
     , image(std::move(image))
     , parameter(std::move(other.parameter))
     , format(other.format)
-    , width(other.width)
-    , height(other.height)
-    , depth(other.depth)
+    , width(std::exchange(other.width, 0))
+    , height(std::exchange(other.height, 0))
+    , depth(std::exchange(other.depth, 0))
 {}
 Texture& Texture::operator=(Texture&& other) noexcept {
     Resource::operator=(std::move(other));
     image = std::move(other.image);
     parameter = std::move(other.parameter);
     format = other.format;
-    width = other.width;
-    height = other.height;
-    depth = other.depth;
+    width = std::exchange(other.width, 0);
+    height = std::exchange(other.height, 0);
+    depth = std::exchange(other.depth, 0);
     return *this;
 }
 
@@ -269,8 +294,7 @@ Texture::Texture(
 }
 
 Texture::~Texture() {
-    auto& con = *getContext();
-    con.fnTable.vkDestroySampler(con.device, parameter->sampler, nullptr);
+    onDestroy();
 }
 
 /******************************** IMAGE BUFFER ********************************/

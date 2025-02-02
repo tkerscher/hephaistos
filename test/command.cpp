@@ -21,6 +21,36 @@ ContextHandle getContext() {
 
 }
 
+TEST_CASE("timeline can be moved and destroyed", "[command]") {
+    Timeline timeline(getContext());
+    Timeline timeline2(std::move(timeline));
+
+    REQUIRE(!timeline);
+    REQUIRE(!timeline.getContext());
+    REQUIRE(timeline2);
+    REQUIRE(timeline2.getContext());
+
+    //check moved timeline still works
+    timeline2.setValue(10);
+    REQUIRE(timeline2.getValue() == 10);
+
+    timeline = std::move(timeline2);
+
+    REQUIRE(!timeline2);
+    REQUIRE(!timeline2.getContext());
+    REQUIRE(timeline);
+    REQUIRE(timeline.getContext());
+
+    //check moved timeline still works
+    timeline.setValue(20);
+    REQUIRE(timeline.getValue() == 20);
+
+    timeline.destroy();
+
+    REQUIRE(!timeline);
+    REQUIRE(!timeline.getContext());
+}
+
 TEST_CASE("timeline value can be set and queried", "[command]") {
     Timeline timeline(getContext());
 
@@ -116,6 +146,40 @@ TEST_CASE("sequences can handle subroutines", "[command]") {
 
     auto data = std::to_array<int>({ 19, 19, 7, 7, 7, 7, 23, 23 });
     REQUIRE(std::equal(data.begin(), data.end(), buffer.getMemory().data()));
+
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
+TEST_CASE("subroutines can be moved and destroyed", "[command]") {
+    Tensor<int> tensor(getContext(), 8);
+    Buffer<int> buffer(getContext(), 8);
+
+    auto sub = createSubroutine(getContext(), clearTensor(tensor, { .data = 42 }));
+    Subroutine sub2(std::move(sub));
+
+    REQUIRE(!sub);
+    REQUIRE(!sub.getContext());
+    REQUIRE(sub2);
+    REQUIRE(sub2.getContext());
+
+    sub = std::move(sub2);
+
+    REQUIRE(!sub2);
+    REQUIRE(!sub2.getContext());
+    REQUIRE(sub);
+    REQUIRE(sub.getContext());
+
+    sub2 = std::move(sub);
+
+    beginSequence(getContext()).And(sub2).Then(retrieveTensor(tensor, buffer)).Submit();
+
+    auto data = std::to_array<int>({ 42, 42, 42, 42, 42, 42, 42, 42 });
+    REQUIRE(std::equal(data.begin(), data.end(), buffer.getMemory().data()));
+
+    sub2.destroy();
+
+    REQUIRE(!sub2);
+    REQUIRE(!sub2.getContext());
 
     REQUIRE(!hasValidationErrorOccurred());
 }
