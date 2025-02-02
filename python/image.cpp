@@ -159,7 +159,7 @@ void registerImageModule(nb::module_& m) {
                 addResource(*image);
             }, "format"_a, "width"_a, "height"_a = 1, "depth"_a = 1)
         .def("__del__", [](hp::Image& i) { removeResource(i); })
-        .def_prop_ro("destroyed", [](const Image& i) { return !i; },
+        .def_prop_ro("destroyed", [](const hp::Image& i) { return !i; },
             "True, if the underlying resources have been destroyed.")
         .def_prop_ro("width",
             [](const hp::Image& img) -> uint32_t { return img.getWidth(); },
