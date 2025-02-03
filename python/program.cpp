@@ -194,7 +194,6 @@ void registerProgramModule(nb::module_& m) {
                         spec.size()
                     }
                 );
-                addResource(*p);
             }, "code"_a, "specialization"_a,
             "Creates a new program using the shader's byte code"
             "\n\nParameters\n----------\n"
@@ -202,7 +201,6 @@ void registerProgramModule(nb::module_& m) {
             "    Byte code of the program\n"
             "specialization: bytes\n"
             "    Data used for filling in specialization constants")
-        .def("__del__", [](hp::Program& p) { removeResource(p); })
         .def_prop_ro("destroyed", [](const hp::Program& p) { return !p; },
             "True, if the underlying resources have been destroyed.")
         .def_prop_ro("localSize",

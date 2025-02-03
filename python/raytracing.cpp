@@ -151,11 +151,9 @@ void registerRaytracing(nb::module_& m) {
                 for (auto i = 0u; i < meshes.size(); ++i)
                     plainMeshes[i] = meshes[i];
                 new (gs) hp::GeometryStore(getCurrentContext(), plainMeshes, keepMeshData);
-                addResource(*gs);
             }, "meshes"_a, "keepMeshData"_a = true,
             "Creates a geometry store responsible for managing the BLAS/geometries "
             "used to create and run acceleration structures.")
-        .def("__del__", [](hp::GeometryStore& gs) { removeResource(gs); })
         .def_prop_ro("destroyed", [](const hp::GeometryStore& gs) { return !gs; },
             "True, if the underlying resources have been destroyed.")
         .def_prop_ro("geometries",
@@ -184,10 +182,8 @@ void registerRaytracing(nb::module_& m) {
         .def("__init__", [](hp::AccelerationStructure* as, std::vector<hp::GeometryInstance> instances) {
                 nb::gil_scoped_release release;
                 new (as) hp::AccelerationStructure(getCurrentContext(), instances);
-                addResource(*as);
             }, "instances"_a,
             "Creates an acceleration structure for consumption in shaders from the given geometry instances.")
-        .def("__del__", [](hp::AccelerationStructure& as) { removeResource(as); })
         .def_prop_ro("destroyed", [](const hp::AccelerationStructure& as) { return !as; },
             "True, if the underlying resources have been destroyed.")
         .def("bindParameter",

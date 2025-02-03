@@ -2514,7 +2514,7 @@ class RawBuffer:
         """
         ...
 
-class ResourceContext:
+class ResourceSnapshot:
     """
     Destroys all resources created during the lifetime of its context.
     """
@@ -2526,6 +2526,18 @@ class ResourceContext:
         Number of resources created during the lifetime of its context.
         """
         ...
+    def capture(self) -> None:
+        """
+        Takes a snapshot of the currently alive resources.
+        """
+        ...
+    def restore(self) -> None:
+        """
+        Destroys all resources created since the last snapshot.
+        """
+        ...
+    def __enter__(self) -> None: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
 
 class RetrieveImageCommand:
     """

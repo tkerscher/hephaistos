@@ -156,9 +156,7 @@ void registerImageModule(nb::module_& m) {
                 uint32_t width, uint32_t height, uint32_t depth)
             {
                 new (image) hp::Image(getCurrentContext(), format, width, height, depth);
-                addResource(*image);
             }, "format"_a, "width"_a, "height"_a = 1, "depth"_a = 1)
-        .def("__del__", [](hp::Image& i) { removeResource(i); })
         .def_prop_ro("destroyed", [](const hp::Image& i) { return !i; },
             "True, if the underlying resources have been destroyed.")
         .def_prop_ro("width",
@@ -223,11 +221,9 @@ void registerImageModule(nb::module_& m) {
                     auto sampler = buildSampler(kwargs);
                     new (texture) hp::Texture(getCurrentContext(),
                         format, width, height, depth, sampler);
-                    addResource(*texture);
                 },
             "format"_a, "width"_a, "height"_a = 1, "depth"_a = 1,
             "kwargs"_a = nb::kwargs())
-        .def("__del__", [](hp::Texture& t) { removeResource(t); })
         .def_prop_ro("destroyed", [](const hp::Texture& t) { return !t; },
             "True, if the underlying resources have been destroyed.")
         .def_prop_ro("width",
@@ -275,9 +271,7 @@ void registerImageModule(nb::module_& m) {
         .def("__init__",
             [](hp::ImageBuffer* ib, uint32_t width, uint32_t height) {
                 new (ib) hp::ImageBuffer(getCurrentContext(), width, height);
-                addResource(*ib);
             }, "width"_a, "height"_a)
-        .def("__del__", [](hp::ImageBuffer& ib) { removeResource(ib); })
         .def_prop_ro("destroyed", [](const hp::ImageBuffer& ib) { return !ib;},
             "True, if the underlying resources have been destroyed.")
         .def_prop_ro("width", [](const hp::ImageBuffer& ib) { return ib.getWidth(); },

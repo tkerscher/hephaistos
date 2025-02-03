@@ -22,7 +22,6 @@ void registerCommandModule(nb::module_& m) {
             "submitted multiple times to the device. "
             "Recording sequence of commands require non negligible CPU time "
             "and may be amortized by reusing sequences via Subroutines.")
-        .def("__del__", [](hp::Subroutine& s) { removeResource(s); })
         .def_prop_ro("destroyed", [](const hp::Subroutine& s) { return !s; },
             "True, if the underlying resources have been destroyed.")
         .def_prop_ro("simultaneousUse",
@@ -46,9 +45,7 @@ void registerCommandModule(nb::module_& m) {
             hp::SubroutineBuilder builder(getCurrentContext(), simultaneous);
             for (auto c : commands)
                 builder.addCommand(*c);
-            auto sub = builder.finish();
-            addResource(sub);
-            return sub;
+            return builder.finish();
         }, "commands"_a, "simultaneous"_a = false,
         "creates a subroutine from the list of commands"
         "\n\nParameters\n----------\n"
@@ -71,13 +68,10 @@ void registerCommandModule(nb::module_& m) {
             "    Initial value of the internal counter\n")
         .def("__init__", [](hp::Timeline* t) {
                 new (t) hp::Timeline(getCurrentContext());
-                addResource(*t);
             })
         .def("__init__", [](hp::Timeline* t, uint64_t v) {
                 new (t) hp::Timeline(getCurrentContext(), v);
-                addResource(*t);
             }, "initialValue"_a)
-        .def("__del__", [](hp::Timeline& t) { removeResource(t); })
         .def_prop_ro("destroyed", [](const hp::Timeline& t) { return !t; },
             "True, if the underlying resources have been destroyed.")
         .def_prop_ro("id", [](const hp::Timeline& t) { return t.getId(); },

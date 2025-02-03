@@ -28,7 +28,7 @@ NB_MODULE(pyhephaistos, m) {
     registerTypeModule(m);
     registerDebugModule(m);
 
-#ifdef WARN_LEAKS
+#ifndef WARN_LEAKS
     nb::set_leak_warnings(false);
 #endif
 }

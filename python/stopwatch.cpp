@@ -15,10 +15,8 @@ void registerStopWatchModule(nb::module_& m) {
             [](hp::StopWatch* w) {
                 nb::gil_scoped_release release;
                 new (w) hp::StopWatch(getCurrentContext());
-                addResource(*w);
             },
             "Creates a new stopwatch for measuring elapsed time between commands.")
-        .def("__del__", [](hp::StopWatch& sw) { removeResource(sw); })
         .def_prop_ro("destroyed", [](const hp::StopWatch& sw) -> bool { return !sw; },
             "True, if the underlying resources have been destroyed.")
         .def("start", &hp::StopWatch::start, nb::rv_policy::reference_internal,

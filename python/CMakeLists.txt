@@ -54,6 +54,7 @@ nanobind_add_module(
     ${SRC}
 )  
 target_link_libraries(pyhephaistos PRIVATE hephaistos)
+target_compile_definitions(hephaistos PUBLIC HEPHAISTOS_MANAGED_RESOURCES)
 target_include_directories(pyhephaistos PRIVATE ${PYROOT})
 if(WARN_LEAKS)
     target_compile_definitions(pyhephaistos PRIVATE WARN_LEAKS)

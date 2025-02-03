@@ -38,13 +38,8 @@ public:
     }
 
     RawBuffer(uint64_t size)
-        : hp::Buffer<std::byte>(getCurrentContext(), size)
-    {
-        addResource(*this);
-    }
-    virtual ~RawBuffer() {
-        removeResource(*this);
-    }
+        : hp::Buffer<std::byte>(getCurrentContext(), size) {}
+    virtual ~RawBuffer() = default;
 };
 template<class T>
 class TypedBuffer : public hp::Buffer<T> {
@@ -59,13 +54,8 @@ public:
     }
 
     TypedBuffer(size_t size)
-        : hp::Buffer<T>(getCurrentContext(), size)
-    {
-        addResource(*this);
-    }
-    virtual ~TypedBuffer() {
-        removeResource(*this);
-    }
+        : hp::Buffer<T>(getCurrentContext(), size) {}
+    virtual ~TypedBuffer() = default;
 };
 template<class T>
 void registerBuffer(nb::module_& m, const char* name, const char* type_name) {
@@ -118,23 +108,12 @@ public:
     using array_type = nb::ndarray<T, nb::shape<-1>, nb::c_contig, nb::device::cpu>;
 
     TypedTensor(size_t count, bool mapped)
-        : hp::Tensor<T>(getCurrentContext(), count, mapped)
-    {
-        addResource(*this);    
-    }
+        : hp::Tensor<T>(getCurrentContext(), count, mapped) {}
     TypedTensor(uint64_t addr, size_t n, bool mapped)
-        : hp::Tensor<T>(getCurrentContext(), { reinterpret_cast<const T*>(addr), n }, mapped)
-    {
-        addResource(*this);
-    }
+        : hp::Tensor<T>(getCurrentContext(), { reinterpret_cast<const T*>(addr), n }, mapped) {}
     TypedTensor(const array_type& array, bool mapped)
-        : hp::Tensor<T>(getCurrentContext(), span_cast(array), mapped)
-    {
-        addResource(*this);
-    }
-    ~TypedTensor() override {
-        removeResource(*this);
-    }
+        : hp::Tensor<T>(getCurrentContext(), span_cast(array), mapped) {}
+    ~TypedTensor() override = default;
 };
 template<class T>
 void registerTensor(nb::module_& m, const char* name, const char* type_name) {
