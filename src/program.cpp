@@ -439,7 +439,7 @@ void Program::onDestroy() {
 }
 
 Program::Program(Program&&) noexcept = default;
-Program& Program::operator=(Program&&) noexcept = default;
+Program& Program::operator=(Program&&) = default;
 
 Program::Program(ContextHandle context, std::span<const uint32_t> code, std::span<const std::byte> specialization)
     : Resource(std::move(context))

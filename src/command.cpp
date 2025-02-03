@@ -34,7 +34,7 @@ void Subroutine::onDestroy() {
 }
 
 Subroutine::Subroutine(Subroutine&&) noexcept = default;
-Subroutine& Subroutine::operator=(Subroutine&&) noexcept = default;
+Subroutine& Subroutine::operator=(Subroutine&&) = default;
 
 Subroutine::Subroutine(
     ContextHandle context,
@@ -171,7 +171,7 @@ Timeline::Timeline(Timeline&& other) noexcept
     : Resource(std::move(other))
     , timeline(std::move(other.timeline))
 {}
-Timeline& Timeline::operator=(Timeline&& other) noexcept {
+Timeline& Timeline::operator=(Timeline&& other) {
     Resource::operator=(std::move(other));
     timeline = std::move(other.timeline);
     return *this;

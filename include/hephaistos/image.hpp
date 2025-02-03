@@ -143,7 +143,7 @@ public:
     Image& operator=(const Image&) = delete;
 
     Image(Image&& other) noexcept;
-    Image& operator=(Image&& other) noexcept;
+    Image& operator=(Image&& other);
 
     /**
      * @brief Allocates an image on the given context
@@ -215,7 +215,7 @@ public:
     Texture& operator=(const Texture&) = delete;
 
     Texture(Texture&& other) noexcept;
-    Texture& operator=(Texture&& other) noexcept;
+    Texture& operator=(Texture&& other);
 
     /**
      * @brief Allocates a texture on the given context
@@ -356,7 +356,7 @@ public:
     ImageBuffer& operator=(const ImageBuffer&) = delete;
 
     ImageBuffer(ImageBuffer&& other) noexcept;
-    ImageBuffer& operator=(ImageBuffer&& other) noexcept;
+    ImageBuffer& operator=(ImageBuffer&& other);
 
     /**
      * @brief Creates a new ImageBuffer

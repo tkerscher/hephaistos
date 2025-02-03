@@ -3,6 +3,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include "hephaistos/config.hpp"
@@ -89,13 +90,63 @@ protected:
     virtual void onDestroy() = 0;
 
     Resource(Resource&& other) noexcept;
-    Resource& operator=(Resource&& other) noexcept;
+    Resource& operator=(Resource&& other);
 
     Resource(ContextHandle context);
 
 private:
     ContextHandle context;
 };
+
+#ifdef HEPHAISTOS_MANAGED_RESOURCES
+
+/**
+ * Takes a snapshot of currently alive resources and allows to destroy newly
+ * created ones.
+*/
+class ResourceSnapshot {
+public:
+    /**
+     * @brief Returns the number of captured resources
+     * 
+     * @note This also counts resources that have been destroyed in the mean time
+    */
+    [[nodiscard]] size_t count() const noexcept;
+
+    /**
+     * @brief Takes a snapshot of currently alive resources
+     * 
+     * @brief Fails if context has been destroyed
+    */
+    void capture();
+    /**
+     * @brief Destroys resources created since the last capture
+     * 
+     * @note Does nothing if context has been destroyed
+    */
+    void restore();
+
+    ResourceSnapshot(const ContextHandle& context);
+private:
+    std::weak_ptr<vulkan::Context> context;
+    std::unordered_set<Resource*> snapshot;
+};
+
+/**
+ * @brief Returns the number of currently alive resources in the given context
+ * 
+ * @note Returns zero, if context is null
+*/
+[[nodiscard]] HEPHAISTOS_API size_t getResourceCount(const ContextHandle& context) noexcept;
+
+/**
+ * @brief Destroys all resources of the provided context
+ * 
+ * @note Does nothing if context is null
+*/
+HEPHAISTOS_API void destroyAllResources(const ContextHandle& context);
+
+#endif
 
 /**
  * @brief Queries vulkan support on this system

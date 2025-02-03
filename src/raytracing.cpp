@@ -160,7 +160,7 @@ void GeometryStore::onDestroy() {
 }
 
 GeometryStore::GeometryStore(GeometryStore&&) noexcept = default;
-GeometryStore& GeometryStore::operator=(GeometryStore&&) noexcept = default;
+GeometryStore& GeometryStore::operator=(GeometryStore&&) = default;
 
 GeometryStore::GeometryStore(
     ContextHandle context,
@@ -533,7 +533,7 @@ void AccelerationStructure::onDestroy() {
 }
 
 AccelerationStructure::AccelerationStructure(AccelerationStructure&&) noexcept = default;
-AccelerationStructure& AccelerationStructure::operator=(AccelerationStructure&&) noexcept = default;
+AccelerationStructure& AccelerationStructure::operator=(AccelerationStructure&&) = default;
 
 AccelerationStructure::AccelerationStructure(ContextHandle context, const GeometryInstance& instance)
     : AccelerationStructure(std::move(context), { &instance, 1 })

@@ -147,7 +147,7 @@ void StopWatch::onDestroy() {
 }
 
 StopWatch::StopWatch(StopWatch&& other) noexcept = default;
-StopWatch& StopWatch::operator=(StopWatch&& other) noexcept = default;
+StopWatch& StopWatch::operator=(StopWatch&& other) = default;
 
 StopWatch::StopWatch(ContextHandle context)
     : Resource(std::move(context))

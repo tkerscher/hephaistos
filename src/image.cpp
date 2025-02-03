@@ -86,7 +86,7 @@ Image::Image(Image&& other) noexcept
     , height(std::exchange(other.height, 0))
     , depth(std::exchange(other.depth, 0))
 {}
-Image& Image::operator=(Image&& other) noexcept {
+Image& Image::operator=(Image&& other) {
     Resource::operator=(std::move(other));
     image = std::move(other.image);
     parameter = std::move(other.parameter);
@@ -222,7 +222,7 @@ Texture::Texture(Texture&& other) noexcept
     , height(std::exchange(other.height, 0))
     , depth(std::exchange(other.depth, 0))
 {}
-Texture& Texture::operator=(Texture&& other) noexcept {
+Texture& Texture::operator=(Texture&& other) {
     Resource::operator=(std::move(other));
     image = std::move(other.image);
     parameter = std::move(other.parameter);
@@ -375,7 +375,7 @@ ImageBuffer::ImageBuffer(ImageBuffer&& other) noexcept
     , width(other.width)
     , height(other.height)
 {}
-ImageBuffer& ImageBuffer::operator=(ImageBuffer&& other) noexcept {
+ImageBuffer& ImageBuffer::operator=(ImageBuffer&& other) {
     Buffer<ElementType>::operator=(std::move(other));
     width = other.width;
     height = other.height;

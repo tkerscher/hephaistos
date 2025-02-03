@@ -187,7 +187,7 @@ public:
     GeometryStore& operator=(const GeometryStore&) = delete;
 
     GeometryStore(GeometryStore&&) noexcept;
-    GeometryStore& operator=(GeometryStore&&) noexcept;
+    GeometryStore& operator=(GeometryStore&&);
 
     /**
      * @brief Creates a new GeometryStore
@@ -253,7 +253,7 @@ public:
     AccelerationStructure& operator=(const AccelerationStructure&) = delete;
 
     AccelerationStructure(AccelerationStructure&&) noexcept;
-    AccelerationStructure& operator=(AccelerationStructure&&) noexcept;
+    AccelerationStructure& operator=(AccelerationStructure&&);
 
     /**
      * @brief Creates a new acceleration structure

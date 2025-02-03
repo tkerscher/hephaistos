@@ -41,7 +41,7 @@ public:
     Buffer<std::byte>& operator=(const Buffer<std::byte>&) = delete;
 
     Buffer(Buffer<std::byte>&& other) noexcept;
-    Buffer<std::byte>& operator=(Buffer<std::byte>&& other) noexcept;
+    Buffer<std::byte>& operator=(Buffer<std::byte>&& other);
 
     /**
      * @brief Allocates a new buffer
@@ -203,7 +203,7 @@ public:
     Tensor<std::byte>& operator=(const Tensor<std::byte>&) = delete;
 
     Tensor(Tensor<std::byte>&& other) noexcept;
-    Tensor<std::byte>& operator=(Tensor<std::byte>&& other) noexcept;
+    Tensor<std::byte>& operator=(Tensor<std::byte>&& other);
 
     /**
      * @brief Allocates a new Tensor

@@ -7,6 +7,7 @@ set(TEST_FILES
     ${TESTROOT}/buffer.cpp
     ${TESTROOT}/command.cpp
     ${TESTROOT}/compiler.cpp
+    ${TESTROOT}/context.cpp
     ${TESTROOT}/image.cpp
     ${TESTROOT}/program.cpp
     ${TESTROOT}/raytracing.cpp
@@ -27,5 +28,8 @@ set_target_properties(Catch2WithMain PROPERTIES FOLDER "dependencies")
 add_executable(tests ${TEST_FILES} ${TESTROOT}/main.cpp)
 target_link_libraries(tests PRIVATE hephaistos)
 target_link_libraries(tests PRIVATE Catch2::Catch2)
+
+# enable managed resources
+target_compile_definitions(hephaistos PUBLIC HEPHAISTOS_MANAGED_RESOURCES)
 
 # skip install. There's no point to it

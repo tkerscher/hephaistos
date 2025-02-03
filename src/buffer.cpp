@@ -35,7 +35,7 @@ Buffer<std::byte>::Buffer(Buffer<std::byte>&& other) noexcept
     , buffer(std::move(other.buffer))
     , memory(std::exchange(other.memory, std::span<std::byte>()))
 {}
-Buffer<std::byte>& Buffer<std::byte>::operator=(Buffer<std::byte>&& other) noexcept {
+Buffer<std::byte>& Buffer<std::byte>::operator=(Buffer<std::byte>&& other) {
     Resource::operator=(std::move(other));
     buffer = std::move(other.buffer);
     memory = std::exchange(other.memory, std::span<std::byte>());
@@ -153,7 +153,7 @@ Tensor<std::byte>::Tensor(Tensor<std::byte>&& other) noexcept
     , _size(std::exchange(other._size, 0))
     , parameter(std::move(other.parameter))
 {}
-Tensor<std::byte>& Tensor<std::byte>::operator=(Tensor<std::byte>&& other) noexcept {
+Tensor<std::byte>& Tensor<std::byte>::operator=(Tensor<std::byte>&& other) {
     Resource::operator=(std::move(other));
     buffer = std::move(other.buffer);
     _size = std::exchange(other._size, 0);

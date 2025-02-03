@@ -52,6 +52,14 @@ struct Context {
     VmaAllocator allocator;
 
     VolkDeviceTable fnTable;
+
+#ifdef HEPHAISTOS_MANAGED_RESOURCES
+    std::vector<Resource*> resources;
+    //set to true, if resources vector should not be modifed
+    //used on bulk destroying to prevent iterators from becoming invalid
+    //and for better performance
+    bool resources_locked = false;
+#endif
 };
 
 struct Device {

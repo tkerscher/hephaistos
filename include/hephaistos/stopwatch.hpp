@@ -65,7 +65,7 @@ public:
     StopWatch& operator=(const StopWatch&) = delete;
     
     StopWatch(StopWatch&& other) noexcept;
-    StopWatch& operator=(StopWatch&& other) noexcept;
+    StopWatch& operator=(StopWatch&& other);
 
     /**
      * @brief Creates a new StopWatch on the given context.

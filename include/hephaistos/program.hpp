@@ -476,7 +476,7 @@ public:
     Program& operator=(const Program&) = delete;
 
     Program(Program&& other) noexcept;
-    Program& operator=(Program&& other) noexcept;
+    Program& operator=(Program&& other);
 
     /**
      * @brief Creates a new Program on the given context

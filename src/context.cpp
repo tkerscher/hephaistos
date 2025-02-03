@@ -488,6 +488,15 @@ void Resource::destroy() {
 
     //destroy resource
     onDestroy();
+
+#ifdef HEPHAISTOS_MANAGED_RESOURCES
+    //remove this resource from list
+    //skip this step if we modify in bulk
+    if (!context->resources_locked) {
+        std::erase(context->resources, this);
+    }
+#endif
+
     //return context pointer
     context.reset();
 }
@@ -496,13 +505,126 @@ const ContextHandle& Resource::getContext() const noexcept {
     return context;
 }
 
+#ifdef HEPHAISTOS_MANAGED_RESOURCES
+Resource::Resource(Resource&& other) noexcept
+    : context(std::move(other.context)) 
+{
+    //update pointer in resource list
+    if (context) {
+        auto it = std::find(
+            context->resources.begin(),
+            context->resources.end(),
+            &other
+        );
+        if (it != context->resources.end())
+            *it = this;
+    }
+}
+Resource& Resource::operator=(Resource&& other) {
+    //destroy old resource if present
+    if (context) destroy();
+
+    context = std::move(other.context);
+    //update pointer in resource list
+    if (context) {
+        auto it = std::find(
+            context->resources.begin(),
+            context->resources.end(),
+            &other
+        );
+        if (it != context->resources.end())
+            *it = this;
+    }
+    return *this;
+}
+
+Resource::~Resource() {
+    //deregister resource if not yet destroyed
+    if (*this) {
+        context->resources.erase(std::remove(
+            context->resources.begin(),
+            context->resources.end(),
+            this
+        ), context->resources.end());
+    }
+}
+#else
 Resource::Resource(Resource&& other) noexcept = default;
-Resource& Resource::operator=(Resource&& other) noexcept = default;
+Resource& Resource::operator=(Resource&& other) {
+    //destroy old resource if present
+    if (context) destroy();
+    //move context
+    context = std::move(other.context);
+}
+
+Resource::~Resource() = default;
+#endif
 
 Resource::Resource(ContextHandle context)
     : context(std::move(context))
-{}
+{
+#ifdef HEPHAISTOS_MANAGED_RESOURCES
+    //register resource
+    this->context->resources.push_back(this);
+#endif
+}
 
-Resource::~Resource() = default;
+#ifdef HEPHAISTOS_MANAGED_RESOURCES
+
+/******************************* RESOURCE SNAPSHOT ***************************/
+
+size_t ResourceSnapshot::count() const noexcept {
+    return snapshot.size();
+}
+
+void ResourceSnapshot::capture() {
+    if (context.expired())
+        throw std::runtime_error("Can not capture resources. Context have been destroyed!");
+
+    auto ptr = context.lock();
+    snapshot = std::unordered_set<Resource*>(
+        ptr->resources.begin(), ptr->resources.end()
+    );
+}
+
+void ResourceSnapshot::restore() {
+    if (context.expired()) return;
+
+    auto ptr = context.lock();
+    //mark following operation as bulk
+    ptr->resources_locked = true;
+    //destroy and remove resources in reverse order
+    std::erase_if(ptr->resources,
+        [&snapshot = snapshot](Resource* res) -> bool {
+            bool remove = !snapshot.contains(res);
+            if (res && remove) res->destroy();
+            return remove;
+        });
+    //unlock
+    ptr->resources_locked = false;
+}
+
+ResourceSnapshot::ResourceSnapshot(const ContextHandle& context)
+    : context(context)
+{ }
+
+size_t getResourceCount(const ContextHandle& context) noexcept {
+    return context ? context->resources.size() : 0;
+}
+
+void destroyAllResources(const ContextHandle& context) {
+    if (!context) return;
+
+    //set bulk mode
+    context->resources_locked = true;
+    //destroy all resources
+    for (auto res : context->resources)
+        res->destroy();
+    context->resources.clear();
+    //finish bulk mode
+    context->resources_locked = false;
+}
+
+#endif
 
 }

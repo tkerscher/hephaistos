@@ -50,7 +50,7 @@ public:
     Subroutine& operator=(const Subroutine&) = delete;
 
     Subroutine(Subroutine&& other) noexcept;
-    Subroutine& operator=(Subroutine&& other) noexcept;
+    Subroutine& operator=(Subroutine&& other);
 
     ~Subroutine() override;
 
@@ -202,7 +202,7 @@ public:
     Timeline& operator=(const Timeline&) = delete;
 
     Timeline(Timeline&& other) noexcept;
-    Timeline& operator=(Timeline&& other) noexcept;
+    Timeline& operator=(Timeline&& other);
 
     /**
      * @brief Creates a new Timeline
