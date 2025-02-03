@@ -183,7 +183,10 @@ void registerContextModule(nb::module_& m) {
             "Takes a snapshot of currently alive resources")
         .def("restore", &hp::ResourceSnapshot::restore,
             "Destroys resources created since the last capture")
-        .def("__enter__", &hp::ResourceSnapshot::capture)
+        .def("__enter__", [](hp::ResourceSnapshot& snap) {
+            snap.capture();
+            return snap;
+        })
         .def("__exit__",
             [](
                 hp::ResourceSnapshot& snap,
