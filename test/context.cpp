@@ -73,7 +73,7 @@ TEST_CASE("ResourceSnapshot can destroy newly created resources", "[context]") {
     ResourceSnapshot snapshot(getContext());
     snapshot.capture();
 
-    REQUIRE(snapshot.count() == 4);
+    REQUIRE(snapshot.count() == 0);
     REQUIRE(getResourceCount(getContext()) == 4);
 
     Buffer<int> b3(getContext(), 10);
@@ -86,7 +86,7 @@ TEST_CASE("ResourceSnapshot can destroy newly created resources", "[context]") {
 
     snapshot.restore();
 
-    REQUIRE(snapshot.count() == 4);
+    REQUIRE(snapshot.count() == 0);
     REQUIRE(getResourceCount(getContext()) == 4);
 
     REQUIRE(b1);

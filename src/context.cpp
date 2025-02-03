@@ -574,7 +574,14 @@ Resource::Resource(ContextHandle context)
 /******************************* RESOURCE SNAPSHOT ***************************/
 
 size_t ResourceSnapshot::count() const noexcept {
-    return snapshot.size();
+    if (context.expired()) return 0;
+
+    auto ptr = context.lock();
+    return std::count_if(ptr->resources.begin(), ptr->resources.end(),
+        [&snapshot = snapshot](Resource* res) {
+            return res && *res && !snapshot.contains(res);
+        }
+    );
 }
 
 void ResourceSnapshot::capture() {

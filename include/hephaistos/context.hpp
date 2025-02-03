@@ -107,9 +107,7 @@ private:
 class ResourceSnapshot {
 public:
     /**
-     * @brief Returns the number of captured resources
-     * 
-     * @note This also counts resources that have been destroyed in the mean time
+     * @brief Returns the number of newly created resources
     */
     [[nodiscard]] size_t count() const noexcept;
 
