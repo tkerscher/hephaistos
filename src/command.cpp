@@ -16,20 +16,63 @@ Command::~Command() = default;
 
 /******************************** SUBROUTINE **********************************/
 
+namespace vulkan {
+
+struct Subroutine {
+    Command command;
+
+    const Context& context;
+};
+
+void destroySubroutine(Subroutine* subroutine) {
+    if (!subroutine) return;
+
+    subroutine->context.fnTable.vkFreeCommandBuffers(
+        subroutine->context.device,
+        subroutine->context.subroutinePool,
+        1, &subroutine->command.buffer
+    );
+
+    delete subroutine;
+}
+
+SubroutineHandle beginSubroutine(const ContextHandle& context, bool simultaneous_use) {
+    SubroutineHandle result{ new Subroutine({ { 0, 0 }, *context }), destroySubroutine };
+
+    //Allocate command buffer
+    VkCommandBufferAllocateInfo allocInfo{
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool = context->subroutinePool,
+        .commandBufferCount = 1
+    };
+    vulkan::checkResult(context->fnTable.vkAllocateCommandBuffers(
+        context->device, &allocInfo, &result->command.buffer));
+
+    //start recording
+    VkCommandBufferBeginInfo beginInfo{
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO
+    };
+    if (simultaneous_use)
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+    vulkan::checkResult(context->fnTable.vkBeginCommandBuffer(
+        result->command.buffer, &beginInfo));
+
+    //done
+    return result;
+}
+
+}
+
 bool Subroutine::simultaneousUse() const {
     return simultaneous_use;
 }
 const vulkan::Command& Subroutine::getCommandBuffer() const {
-    return *cmdBuffer;
+    return subroutine->command;
 }
 
 void Subroutine::onDestroy() {
-    if (cmdBuffer) {
-        auto& context = *getContext();
-        context.fnTable.vkFreeCommandBuffers(
-            context.device, context.subroutinePool,
-            1, &cmdBuffer->buffer);
-        cmdBuffer.reset();
+    if (subroutine) {
+        subroutine.reset();
     }
 }
 
@@ -38,10 +81,10 @@ Subroutine& Subroutine::operator=(Subroutine&&) = default;
 
 Subroutine::Subroutine(
     ContextHandle context,
-    std::unique_ptr<vulkan::Command> cmdBuffer,
+    SubroutineHandle subroutine,
     bool simultaneous_use)
     : Resource(std::move(context))
-    , cmdBuffer(std::move(cmdBuffer))
+    , subroutine(std::move(subroutine))
     , simultaneous_use(simultaneous_use)
 {}
 Subroutine::~Subroutine() {
@@ -49,14 +92,14 @@ Subroutine::~Subroutine() {
 }
 
 SubroutineBuilder::operator bool() const {
-    return static_cast<bool>(cmdBuffer);
+    return static_cast<bool>(subroutine);
 }
 
 SubroutineBuilder& SubroutineBuilder::addCommand(const Command& command) & {
     if (!*this)
         throw std::runtime_error("SubroutineBuilder has already finished!");
 
-    command.record(*cmdBuffer);
+    command.record(subroutine->command);
     return *this;
 }
 SubroutineBuilder SubroutineBuilder::addCommand(const Command& command) && {
@@ -68,8 +111,8 @@ Subroutine SubroutineBuilder::finish() {
         throw std::runtime_error("SubroutineBuilder has already finished!");
 
     //end recording & build subroutine
-    vulkan::checkResult(context->fnTable.vkEndCommandBuffer(cmdBuffer->buffer));
-    return Subroutine(std::move(context), std::move(cmdBuffer), simultaneous_use);
+    vulkan::checkResult(context->fnTable.vkEndCommandBuffer(subroutine->command.buffer));
+    return Subroutine(std::move(context), std::move(subroutine), simultaneous_use);
 }
 
 SubroutineBuilder::SubroutineBuilder(SubroutineBuilder&&) noexcept = default;
@@ -77,34 +120,10 @@ SubroutineBuilder& SubroutineBuilder::operator=(SubroutineBuilder&&) noexcept = 
 
 SubroutineBuilder::SubroutineBuilder(ContextHandle context, bool simultaneous_use)
     : context(std::move(context))
-    , cmdBuffer(std::make_unique<vulkan::Command>())
+    , subroutine(vulkan::beginSubroutine(this->context, simultaneous_use))
     , simultaneous_use(simultaneous_use)
-{
-    //Allocate command buffer
-    VkCommandBufferAllocateInfo allocInfo{
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = this->context->subroutinePool,
-        .commandBufferCount = 1
-    };
-    vulkan::checkResult(this->context->fnTable.vkAllocateCommandBuffers(
-        this->context->device, &allocInfo, &cmdBuffer->buffer));
-
-    //start recording
-    VkCommandBufferBeginInfo beginInfo{
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO
-    };
-    if (simultaneous_use)
-        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-    vulkan::checkResult(this->context->fnTable.vkBeginCommandBuffer(
-        cmdBuffer->buffer, &beginInfo));
-}
-SubroutineBuilder::~SubroutineBuilder() {
-    if (cmdBuffer) {
-        context->fnTable.vkFreeCommandBuffers(
-            context->device, context->subroutinePool,
-            1, &cmdBuffer->buffer);
-    }
-}
+{}
+SubroutineBuilder::~SubroutineBuilder() = default;
 
 /********************************* TIMELINE ***********************************/
 

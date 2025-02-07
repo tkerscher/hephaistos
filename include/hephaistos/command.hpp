@@ -63,13 +63,13 @@ protected:
 private:
     Subroutine(
         ContextHandle context,
-        std::unique_ptr<vulkan::Command> cmdBuffer,
+        SubroutineHandle subroutine,
         bool simultaneous_use);
 
     friend class SubroutineBuilder;
 
 private:
-    std::unique_ptr<vulkan::Command> cmdBuffer;
+    SubroutineHandle subroutine;
     bool simultaneous_use;
 };
 
@@ -114,7 +114,7 @@ public:
 
 private:
     ContextHandle context;
-    std::unique_ptr<vulkan::Command> cmdBuffer;
+    SubroutineHandle subroutine;
     bool simultaneous_use;
 };
 
