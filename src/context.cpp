@@ -196,6 +196,7 @@ void destroyContext(vulkan::Context* context) {
     }
     context->fnTable.vkDestroyDevice(context->device, nullptr);
     vulkan::returnInstance();
+    delete context;
 }
 
 ContextHandle createContext(

@@ -37,6 +37,8 @@ void destroyBuffer(Buffer* buffer) {
     if (!buffer)
         return;
     vmaDestroyBuffer(buffer->context.allocator, buffer->buffer, buffer->allocation);
+
+    delete buffer;
 }
 
 ImageHandle createImage(
@@ -103,6 +105,8 @@ void destroyImage(Image* image) {
         image->context.device, image->view, nullptr);
     vmaDestroyImage(image->context.allocator,
         image->image, image->allocation);
+
+    delete image;
 }
 
 }
