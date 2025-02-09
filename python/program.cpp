@@ -162,7 +162,7 @@ void registerProgramModule(nb::module_& m) {
         .def_rw("offset", &hp::DispatchIndirectCommand::offset,
             "Offset into the Tensor in bytes on where to start reading");
     
-    nb::class_<hp::Program>(m, "Program",
+    nb::class_<hp::Program, hp::Resource>(m, "Program",
             "Encapsulates a shader program enabling introspection into its "
             "bindings as well as keeping track of the parameters currently bound "
             "to them. Execution happens trough commands.")
@@ -201,8 +201,6 @@ void registerProgramModule(nb::module_& m) {
             "    Byte code of the program\n"
             "specialization: bytes\n"
             "    Data used for filling in specialization constants")
-        .def_prop_ro("destroyed", [](const hp::Program& p) { return !p; },
-            "True, if the underlying resources have been destroyed.")
         .def_prop_ro("localSize",
             [](const hp::Program& p) { return p.getLocalSize(); },
             "Returns the size of the local work group.")
@@ -288,9 +286,6 @@ void registerProgramModule(nb::module_& m) {
             "    Tensor from which to read the amount of workgroups\n"
             "offset: int, default=0\n"
             "    Offset at which to start reading\n")
-        .def("destroy", &hp::Program::destroy,
-            "Frees the allocated resources")
-        .def("__bool__", [](const hp::Program& p) -> bool { return bool(p); })
         .def("__repr__", [](const hp::Program& p) {
             std::ostringstream str;
             auto& ls = p.getLocalSize();

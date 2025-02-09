@@ -17,8 +17,6 @@ void registerStopWatchModule(nb::module_& m) {
                 new (w) hp::StopWatch(getCurrentContext());
             },
             "Creates a new stopwatch for measuring elapsed time between commands.")
-        .def_prop_ro("destroyed", [](const hp::StopWatch& sw) -> bool { return !sw; },
-            "True, if the underlying resources have been destroyed.")
         .def("start", &hp::StopWatch::start, nb::rv_policy::reference_internal,
             "Returns the command to start the stop watch.")
         .def("stop", &hp::StopWatch::stop, nb::rv_policy::reference_internal,
@@ -29,8 +27,5 @@ void registerStopWatchModule(nb::module_& m) {
             "Calculates the elapsed time between the timestamps the device recorded "
             "during its execution of the start() end stop() command in nanoseconds. "
             "If wait is true, blocks the call until both timestamps are recorded, "
-            "otherwise returns NaN if they are not yet available.")
-        .def("destroy", &hp::StopWatch::destroy,
-            "Frees the allocated resources")
-        .def("__bool__", [](const hp::StopWatch& sw) -> bool { return bool(sw); });
+            "otherwise returns NaN if they are not yet available.");
 }

@@ -17,19 +17,14 @@ void registerCommandModule(nb::module_& m) {
         "Base class for commands running on the device. "
         "Execution happens asynchronous after being submitted.");
 
-    nb::class_<hp::Subroutine>(m, "Subroutine",
+    nb::class_<hp::Subroutine, hp::Resource>(m, "Subroutine",
             "Subroutines are reusable sequences of commands that can be "
             "submitted multiple times to the device. "
             "Recording sequence of commands require non negligible CPU time "
             "and may be amortized by reusing sequences via Subroutines.")
-        .def_prop_ro("destroyed", [](const hp::Subroutine& s) { return !s; },
-            "True, if the underlying resources have been destroyed.")
         .def_prop_ro("simultaneousUse",
             [](const hp::Subroutine& s) -> bool { return s.simultaneousUse(); },
-            "True, if the subroutine can be used simultaneous")
-        .def("destroy", &hp::Subroutine::destroy,
-            "Frees the allocated resources")
-        .def("__bool__", [](const hp::Subroutine& s) -> bool { return bool(s); });
+            "True, if the subroutine can be used simultaneous");
     m.def("createSubroutine",
         [](nb::list list, bool simultaneous) -> hp::Subroutine {
             //try to minimize holding of GIL
@@ -56,7 +51,7 @@ void registerCommandModule(nb::module_& m) {
         "    has not yet finished. Disobeying this requirement results in undefined\n"
         "    behavior.");
 
-    nb::class_<hp::Timeline>(m, "Timeline",
+    nb::class_<hp::Timeline, hp::Resource>(m, "Timeline",
             "Timeline managing the execution of code and commands using an "
             "increasing internal counter. Both GPU and CPU can wait and/or "
             "increase this counter thus creating a synchronization between "
@@ -72,8 +67,6 @@ void registerCommandModule(nb::module_& m) {
         .def("__init__", [](hp::Timeline* t, uint64_t v) {
                 new (t) hp::Timeline(getCurrentContext(), v);
             }, "initialValue"_a)
-        .def_prop_ro("destroyed", [](const hp::Timeline& t) { return !t; },
-            "True, if the underlying resources have been destroyed.")
         .def_prop_ro("id", [](const hp::Timeline& t) { return t.getId(); },
             "Id of this timeline")
         .def_prop_rw("value",
@@ -82,8 +75,6 @@ void registerCommandModule(nb::module_& m) {
             "Returns or sets the current value of the timeline. "
             "Note that the value can only increase. "
             "Disobeying this requirement results in undefined behavior.")
-        .def("destroy", &hp::Timeline::destroy,
-            "Frees the allocated resources")
         .def("wait", [](const hp::Timeline& t, uint64_t v) {
                 nb::gil_scoped_release release;
                 t.waitValue(v);
@@ -101,7 +92,6 @@ void registerCommandModule(nb::module_& m) {
             "timeout: int\n"
             "    Time in nanoseconds to wait. May be rounded to the closest "
                 "internal precision of the device clock.")
-        .def("__bool__", [](const hp::Timeline& t) -> bool { return bool(t); })
         .def("__repr__", [](const hp::Timeline& t) -> std::string {
             std::ostringstream str;
             str << "Timeline (ID: 0x" << std::hex << t.getId() << ")\n";

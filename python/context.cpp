@@ -171,6 +171,14 @@ void registerContextModule(nb::module_& m) {
     m.def("getResourceCount", []() { return hp::getResourceCount(getCurrentContext()); },
         "Counts the number of resources currently alive");
     
+    nb::class_<hp::Resource>(m, "Resource",
+        "Base class of all resources allocated on the GPU")
+        .def_prop_ro("destroyed", [](const hp::Resource& r) { return !r; },
+            "True, if the underlying resources have been destroyed.")
+        .def("destroy", &hp::Resource::destroy,
+            "Frees the allocated resources.")
+        .def("__bool__", [](const hp::Resource& r) { return bool(r); });
+    
     nb::class_<hp::ResourceSnapshot>(m, "ResourceSnapshot",
         "Takes a snapshot of currently alive resources and allows to destroy "
         "resources created afterwards.")
