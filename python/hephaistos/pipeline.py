@@ -490,6 +490,7 @@ class _CounterWorkerThread:
     def __init__(self, fn: Callable[[int], None]) -> None:
         self._thread = Thread(target=self._loop, daemon=True)
         self._isSuspending = True
+        self._isStopping = False
         self._suspendLock = Lock()
         self._wakeEvent = Event()
         self._counter = 0
@@ -516,6 +517,16 @@ class _CounterWorkerThread:
             if self._isSuspending:
                 self._wakeEvent.set()
 
+    def stop(self) -> None:
+        """Stops the worker thread"""
+        # set stop flag
+        self._isStopping = True
+        # wake to prevent any deadlock
+        with self._suspendLock:
+            self._wakeEvent.set()
+        # wait for the worker to stop
+        self._thread.join()
+
     def _loop(self) -> None:
         """Thread body"""
         # infinite loop -> must run inside a daemon thread
@@ -526,6 +537,10 @@ class _CounterWorkerThread:
                 # resume work
                 self._wakeEvent.clear()
                 self._isSuspending = False
+            # check if we should stop
+            if self._isStopping:
+                break
+
             # quick and unsafe check
             if self._counter >= self._target:
                 # might want to suspend -> check again, but safe
@@ -576,6 +591,7 @@ class PipelineScheduler:
         processFn: Optional[Callable[[int, int], None]] = None,
     ) -> None:
         # save params
+        self._destroyed = False
         self._queueSize = queueSize
         self._totalTasks = 0
         self._pipeline = pipeline
@@ -592,6 +608,11 @@ class PipelineScheduler:
         else:
             self._processWorker = _CounterWorkerThread(self._process)
             self._processTimeline = Timeline()
+
+    @property
+    def destroyed(self) -> bool:
+        """True, if the scheduler has been destroyed."""
+        return self._destroyed
 
     @property
     def pipeline(self) -> Pipeline:
@@ -619,10 +640,35 @@ class PipelineScheduler:
     @property
     def tasksFinished(self) -> int:
         """Returns the number of finished tasks processed by the timeline"""
+        if self.destroyed:
+            return 0
+
         if self._processWorker is None:
             return self._pipelineTimeline.value
         else:
             return self._processWorker.count
+
+    def destroy(self) -> None:
+        """
+        Destroys the scheduler by stopping all background tasks.
+        Afterwards no more tasks can be scheduled.
+
+        Since work scheduled on the GPU can not be stopped, it will wait for all
+        scheduled tasks to finish before destroying.
+        """
+        # wait for tasks to finish
+        self.wait()
+
+        # stop worker threads
+        self._updateWorker.stop()
+        if self._processWorker is not None:
+            self._processWorker.stop()
+        # while we are at it, destroy timeline as well
+        self._updateTimeline.destroy()
+        self._pipelineTimeline.destroy()
+        if self._processTimeline is not None:
+            self._processTimeline.destroy()
+        self._destroyed = True
 
     def schedule(
         self, tasks: Iterable[Dict[str, Any]], *, timeout: Optional[float] = None
@@ -650,6 +696,10 @@ class PipelineScheduler:
             `submission.finalStep`.
             None if nSubmitted == 0.
         """
+        # check if not destroyed
+        if self.destroyed:
+            raise RuntimeError("Can not schedule work on destroyed scheduler!")
+
         # put task onto queue
         n = 0
         builder = None
@@ -707,6 +757,9 @@ class PipelineScheduler:
         Waiting on a task not scheduled may result in a deadlock if no further
         thread schedule tasks.
         """
+        if self.destroyed:
+            return
+
         if task is None:
             task = self.totalTasks
         if self._processTimeline is None:
@@ -732,12 +785,15 @@ class PipelineScheduler:
         finished: bool
             True, if the given task finished.
         """
+        if self.destroyed:
+            return True
+
         if task is None:
             task = self.totalTasks
         if self._processTimeline is None:
-            self._pipelineTimeline.waitTimeout(task, timeout)
+            return self._pipelineTimeline.waitTimeout(task, timeout)
         else:
-            self._processTimeline.waitTimeout(task, timeout)
+            return self._processTimeline.waitTimeout(task, timeout)
 
     def _update(self, n: int) -> None:
         """Internal update thread body"""
