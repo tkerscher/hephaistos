@@ -79,7 +79,8 @@ class vec(Structure):
 # Had some weird bug, where vec were constructed without any fields assigned
 # this is a work around, but still have no idea why it's needed
 def _initVecFields(scalar, dim):
-    return [(["x","y","z","w"][d], scalar) for d in range(dim)]
+    return [(["x", "y", "z", "w"][d], scalar) for d in range(dim)]
+
 
 class vec2(vec):
     _fields_ = _initVecFields(c_float, 2)
@@ -181,55 +182,55 @@ class mat(Structure):
 
 
 class mat2(mat):
-    _fields_ = [("items", vec2*2)]
+    _fields_ = [("items", vec2 * 2)]
     _type_ = vec2
     _length_ = 2
 
 
 class mat3x2(mat):
-    _fields_ = [("items", vec2*3)]
+    _fields_ = [("items", vec2 * 3)]
     _type_ = vec2
     _length_ = 3
 
 
 class mat4x2(mat):
-    _fields_ = [("items", vec2*4)]
+    _fields_ = [("items", vec2 * 4)]
     _type_ = vec2
     _length_ = 4
 
 
 class mat2x3(mat):
-    _fields_ = [("items", vec3*2)]
+    _fields_ = [("items", vec3 * 2)]
     _type_ = vec3
     _length_ = 3
 
 
 class mat3(mat):
-    _fields_ = [("items", vec3*3)]
+    _fields_ = [("items", vec3 * 3)]
     _type_ = vec3
     _length_ = 3
 
 
 class mat4x3(mat):
-    _fields_ = [("items", vec3*4)]
+    _fields_ = [("items", vec3 * 4)]
     _type_ = vec3
     _length_ = 4
 
 
 class mat2x4(mat):
-    _fields_ = [("items", vec4*2)]
+    _fields_ = [("items", vec4 * 2)]
     _type_ = vec4
     _length_ = 2
 
 
 class mat3x4(mat):
-    _fields_ = [("items", vec4*3)]
+    _fields_ = [("items", vec4 * 3)]
     _type_ = vec4
     _length_ = 3
 
 
 class mat4(mat):
-    _fields_ = [("items", vec4*4)]
+    _fields_ = [("items", vec4 * 4)]
     _type_ = vec4
     _length_ = 4
 

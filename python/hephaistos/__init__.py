@@ -6,6 +6,7 @@ from .util import (
     StructureTensor,
 )
 
+
 # make the Program.bindParams more pythonic
 def _bindParams(program: Program, *params, **namedparams) -> None:
     """
@@ -13,11 +14,13 @@ def _bindParams(program: Program, *params, **namedparams) -> None:
     """
     for i, p in enumerate(params):
         p.bindParameter(program, i)
-    
+
     names = [b.name for b in program.bindings]
     for name, p in namedparams.items():
         if name not in names:
             continue
         p.bindParameter(program, name)
-#register function in class
+
+
+# register function in class
 Program.bindParams = _bindParams

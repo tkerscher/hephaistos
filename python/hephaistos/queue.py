@@ -42,7 +42,7 @@ class QueueView:
         Whether the queue should omit its counter
     header: Structure | None, default=None
         Optional header prefixing the queue
-    
+
     Note
     ----
     Manipulating data in the queue does not update the counter, which is zero

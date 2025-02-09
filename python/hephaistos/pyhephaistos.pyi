@@ -23,6 +23,7 @@ class AccelerationStructure:
         given geometry instances.
         """
         ...
+
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: str
     ) -> None:
@@ -30,6 +31,7 @@ class AccelerationStructure:
         Binds the acceleration structure to the program at the given binding
         """
         ...
+
     @overload
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: int
@@ -38,11 +40,13 @@ class AccelerationStructure:
         Binds the acceleration structure to the program at the given binding
         """
         ...
+
     def destroy(self) -> None:
         """
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
@@ -115,24 +119,28 @@ class BindingTraits:
         Index of the binding
         """
         ...
+
     @property
     def count(self) -> int:
         """
         Number of elements in binding, i.e. array size
         """
         ...
+
     @property
     def imageTraits(self) -> Optional[hephaistos.pyhephaistos.ImageBindingTraits]:
         """
         Properties of the image if one is expected
         """
         ...
+
     @property
     def name(self) -> str:
         """
         Name of the binding. Might be empty.
         """
         ...
+
     @property
     def type(self) -> hephaistos.pyhephaistos.ParameterType:
         """
@@ -163,23 +171,27 @@ class ByteBuffer:
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def numpy(self) -> numpy.typing.NDArray:
         """
         Returns a numpy array using this buffer's memory.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this buffer.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
@@ -208,6 +220,7 @@ class ByteTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, size: int, mapped: bool = False) -> None:
         """
@@ -221,6 +234,7 @@ class ByteTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, addr: int, n: int, mapped: bool = False) -> None:
         """
@@ -236,12 +250,14 @@ class ByteTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @property
     def address(self) -> int:
         """
         The device address of this tensor.
         """
         ...
+
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: str
     ) -> None:
@@ -249,6 +265,7 @@ class ByteTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     @overload
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: int
@@ -257,17 +274,20 @@ class ByteTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     def destroy(self) -> None:
         """
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the host available to the device.
@@ -282,6 +302,7 @@ class ByteTensor:
             If None, flushes all remaining elements.
         """
         ...
+
     def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the device available to the host.
@@ -296,12 +317,14 @@ class ByteTensor:
             If None, invalidates all remaining elements.
         """
         ...
+
     @property
     def isMapped(self) -> bool:
         """
         True, if the underlying memory is writable by the CPU.
         """
         ...
+
     @property
     def isNonCoherent(self) -> bool:
         """
@@ -309,12 +332,14 @@ class ByteTensor:
         in mapped memory between devices and host available
         """
         ...
+
     @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
         """
         ...
+
     def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Retrieves n elements from the tensor at the given offset and stores it
@@ -328,24 +353,27 @@ class ByteTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this tensor.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
         """
         ...
+
     def update(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Updates the tensor at the given offset with n elements stored at addr.
@@ -358,7 +386,7 @@ class ByteTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
@@ -382,23 +410,27 @@ class CharBuffer:
         Returns a numpy array using this buffer's memory.
         """
         ...
+
     def destroy(self) -> None:
         """
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this buffer.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
@@ -427,6 +459,7 @@ class CharTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, size: int, mapped: bool = False) -> None:
         """
@@ -440,6 +473,7 @@ class CharTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, addr: int, n: int, mapped: bool = False) -> None:
         """
@@ -455,12 +489,14 @@ class CharTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @property
     def address(self) -> int:
         """
         The device address of this tensor.
         """
         ...
+
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: str
     ) -> None:
@@ -468,6 +504,7 @@ class CharTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     @overload
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: int
@@ -476,17 +513,20 @@ class CharTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     def destroy(self) -> None:
         """
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the host available to the device.
@@ -501,6 +541,7 @@ class CharTensor:
             If None, flushes all remaining elements.
         """
         ...
+
     def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the device available to the host.
@@ -515,12 +556,14 @@ class CharTensor:
             If None, invalidates all remaining elements.
         """
         ...
+
     @property
     def isMapped(self) -> bool:
         """
         True, if the underlying memory is writable by the CPU.
         """
         ...
+
     @property
     def isNonCoherent(self) -> bool:
         """
@@ -528,12 +571,14 @@ class CharTensor:
         in mapped memory between devices and host available
         """
         ...
+
     @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
         """
         ...
+
     def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Retrieves n elements from the tensor at the given offset and stores it
@@ -547,24 +592,27 @@ class CharTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this tensor.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
         """
         ...
+
     def update(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Updates the tensor at the given offset with n elements stored at addr.
@@ -577,7 +625,7 @@ class CharTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
@@ -622,23 +670,27 @@ class Compiler:
         resolving includes.
         """
         ...
+
     def clearIncludeDir(self) -> None:
         """
         Clears the internal list of include directories
         """
         ...
+
     def compile(self, code: str, headers: hephaistos.pyhephaistos.HeaderMap) -> bytes:
         """
         Compiles the given GLSL code using the provided header files and returns
         the SPIR-V code as bytes
         """
         ...
+
     @overload
     def compile(self, code: str) -> bytes:
         """
         Compiles the given GLSL code and returns the SPIR-V code as bytes
         """
         ...
+
     def popIncludeDir(self) -> None:
         """
         Removes the last added include dir from the internal list
@@ -656,12 +708,14 @@ class DebugMessage:
         Name of the message type
         """
         ...
+
     @property
     def idNumber(self) -> int:
         """
         Id of the message type
         """
         ...
+
     @property
     def message(self) -> str:
         """
@@ -695,6 +749,7 @@ class Device:
         integrated ones.
         """
         ...
+
     @property
     def name(self) -> str:
         """
@@ -713,30 +768,35 @@ class DispatchCommand:
         Amount of groups in X dimension
         """
         ...
+
     @groupCountX.setter
     def groupCountX(self, arg: int, /) -> None:
         """
         Amount of groups in X dimension
         """
         ...
+
     @property
     def groupCountY(self) -> int:
         """
         Amount of groups in Y dimension
         """
         ...
+
     @groupCountY.setter
     def groupCountY(self, arg: int, /) -> None:
         """
         Amount of groups in Y dimension
         """
         ...
+
     @property
     def groupCountZ(self) -> int:
         """
         Amount of groups in Z dimension
         """
         ...
+
     @groupCountZ.setter
     def groupCountZ(self, arg: int, /) -> None:
         """
@@ -755,18 +815,21 @@ class DispatchIndirectCommand:
         Offset into the Tensor in bytes on where to start reading
         """
         ...
+
     @offset.setter
     def offset(self, arg: int, /) -> None:
         """
         Offset into the Tensor in bytes on where to start reading
         """
         ...
+
     @property
     def tensor(self) -> Tensor:
         """
         Tensor from which to read the group size
         """
         ...
+
     @tensor.setter
     def tensor(self, arg: Tensor, /) -> None:
         """
@@ -791,23 +854,27 @@ class DoubleBuffer:
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def numpy(self) -> numpy.typing.NDArray:
         """
         Returns a numpy array using this buffer's memory.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this buffer.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
@@ -836,6 +903,7 @@ class DoubleTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, size: int, mapped: bool = False) -> None:
         """
@@ -849,6 +917,7 @@ class DoubleTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, addr: int, n: int, mapped: bool = False) -> None:
         """
@@ -864,12 +933,14 @@ class DoubleTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @property
     def address(self) -> int:
         """
         The device address of this tensor.
         """
         ...
+
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: str
     ) -> None:
@@ -877,6 +948,7 @@ class DoubleTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     @overload
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: int
@@ -885,17 +957,20 @@ class DoubleTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     def destroy(self) -> None:
         """
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the host available to the device.
@@ -910,6 +985,7 @@ class DoubleTensor:
             If None, flushes all remaining elements.
         """
         ...
+
     def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the device available to the host.
@@ -924,12 +1000,14 @@ class DoubleTensor:
             If None, invalidates all remaining elements.
         """
         ...
+
     @property
     def isMapped(self) -> bool:
         """
         True, if the underlying memory is writable by the CPU.
         """
         ...
+
     @property
     def isNonCoherent(self) -> bool:
         """
@@ -937,12 +1015,14 @@ class DoubleTensor:
         in mapped memory between devices and host available
         """
         ...
+
     @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
         """
         ...
+
     def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Retrieves n elements from the tensor at the given offset and stores it
@@ -956,24 +1036,27 @@ class DoubleTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this tensor.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
         """
         ...
+
     def update(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Updates the tensor at the given offset with n elements stored at addr.
@@ -986,7 +1069,7 @@ class DoubleTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
@@ -1010,23 +1093,27 @@ class FloatBuffer:
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def numpy(self) -> numpy.typing.NDArray:
         """
         Returns a numpy array using this buffer's memory.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this buffer.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
@@ -1055,6 +1142,7 @@ class FloatTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, size: int, mapped: bool = False) -> None:
         """
@@ -1068,6 +1156,7 @@ class FloatTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, addr: int, n: int, mapped: bool = False) -> None:
         """
@@ -1083,12 +1172,14 @@ class FloatTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @property
     def address(self) -> int:
         """
         The device address of this tensor.
         """
         ...
+
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: str
     ) -> None:
@@ -1096,6 +1187,7 @@ class FloatTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     @overload
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: int
@@ -1104,17 +1196,20 @@ class FloatTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     def destroy(self) -> None:
         """
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the host available to the device.
@@ -1129,6 +1224,7 @@ class FloatTensor:
             If None, flushes all remaining elements.
         """
         ...
+
     def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the device available to the host.
@@ -1143,12 +1239,14 @@ class FloatTensor:
             If None, invalidates all remaining elements.
         """
         ...
+
     @property
     def isMapped(self) -> bool:
         """
         True, if the underlying memory is writable by the CPU.
         """
         ...
+
     @property
     def isNonCoherent(self) -> bool:
         """
@@ -1156,12 +1254,14 @@ class FloatTensor:
         in mapped memory between devices and host available
         """
         ...
+
     @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
         """
         ...
+
     def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Retrieves n elements from the tensor at the given offset and stores it
@@ -1175,24 +1275,27 @@ class FloatTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this tensor.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
         """
         ...
+
     def update(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Updates the tensor at the given offset with n elements stored at addr.
@@ -1205,7 +1308,7 @@ class FloatTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
@@ -1232,12 +1335,14 @@ class Geometry:
         device address of the underlying blas
         """
         ...
+
     @blas_address.setter
     def blas_address(self, arg: int, /) -> None:
         """
         device address of the underlying blas
         """
         ...
+
     @property
     def indices_address(self) -> int:
         """
@@ -1245,6 +1350,7 @@ class Geometry:
         non existent
         """
         ...
+
     @indices_address.setter
     def indices_address(self, arg: int, /) -> None:
         """
@@ -1252,12 +1358,14 @@ class Geometry:
         non existent
         """
         ...
+
     @property
     def vertices_address(self) -> int:
         """
         device address of the vertex buffer or zero if it was discarded
         """
         ...
+
     @vertices_address.setter
     def vertices_address(self, arg: int, /) -> None:
         """
@@ -1279,42 +1387,49 @@ class GeometryInstance:
         device address of the referenced BLAS/geometry
         """
         ...
+
     @blas_address.setter
     def blas_address(self, arg: int, /) -> None:
         """
         device address of the referenced BLAS/geometry
         """
         ...
+
     @property
     def customIndex(self) -> int:
         """
         The custom index of this instance available in the shader.
         """
         ...
+
     @customIndex.setter
     def customIndex(self, arg: int, /) -> None:
         """
         The custom index of this instance available in the shader.
         """
         ...
+
     @property
     def mask(self) -> int:
         """
         Mask of this instance used for masking ray traces.
         """
         ...
+
     @mask.setter
     def mask(self, arg: int, /) -> None:
         """
         Mask of this instance used for masking ray traces.
         """
         ...
+
     @property
     def transform(self) -> numpy.typing.NDArray:
         """
         The transformation applied to the referenced geometry.
         """
         ...
+
     @transform.setter
     def transform(self, arg: numpy.typing.NDArray, /) -> None:
         """
@@ -1334,33 +1449,39 @@ class GeometryInstanceVector:
         Construct from an iterable object
         """
         ...
+
     @overload
     def __init__(self) -> None:
         """
         Default constructor
         """
         ...
+
     @overload
     def __init__(self, arg: hephaistos.pyhephaistos.GeometryInstanceVector) -> None:
         """
         Copy constructor
         """
         ...
+
     def append(self, arg: hephaistos.pyhephaistos.GeometryInstance, /) -> None:
         """
         Append `arg` to the end of the list.
         """
         ...
+
     def clear(self) -> None:
         """
         Remove all items from list.
         """
         ...
+
     def extend(self, arg: hephaistos.pyhephaistos.GeometryInstanceVector, /) -> None:
         """
         Extend `self` by appending elements from `arg`.
         """
         ...
+
     def insert(
         self, arg0: int, arg1: hephaistos.pyhephaistos.GeometryInstance, /
     ) -> None:
@@ -1368,6 +1489,7 @@ class GeometryInstanceVector:
         Insert object `arg1` before index `arg0`.
         """
         ...
+
     def pop(self, index: int = -1) -> hephaistos.pyhephaistos.GeometryInstance:
         """
         Remove and return item at `index` (default last).
@@ -1387,28 +1509,33 @@ class GeometryStore:
         used to create and run acceleration structures.
         """
         ...
+
     def createInstance(self, idx: int) -> hephaistos.pyhephaistos.GeometryInstance:
         """
         Creates a new instance of the specified geometry
         """
         ...
+
     def destroy(self) -> None:
         """
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     @property
     def geometries(self) -> hephaistos.pyhephaistos.GeometryVector:
         """
         Returns the list of stored geometries
         """
         ...
+
     @property
     def size(self) -> int:
         """
@@ -1426,38 +1553,45 @@ class GeometryVector:
         Construct from an iterable object
         """
         ...
+
     @overload
     def __init__(self) -> None:
         """
         Default constructor
         """
         ...
+
     @overload
     def __init__(self, arg: hephaistos.pyhephaistos.GeometryVector) -> None:
         """
         Copy constructor
         """
         ...
+
     def append(self, arg: hephaistos.pyhephaistos.Geometry, /) -> None:
         """
         Append `arg` to the end of the list.
         """
         ...
+
     def clear(self) -> None:
         """
         Remove all items from list.
         """
         ...
+
     def extend(self, arg: hephaistos.pyhephaistos.GeometryVector, /) -> None:
         """
         Extend `self` by appending elements from `arg`.
         """
         ...
+
     def insert(self, arg0: int, arg1: hephaistos.pyhephaistos.Geometry, /) -> None:
         """
         Insert object `arg1` before index `arg0`.
         """
         ...
+
     def pop(self, index: int = -1) -> hephaistos.pyhephaistos.Geometry:
         """
         Remove and return item at `index` (default last).
@@ -1479,38 +1613,45 @@ class HeaderMap:
         Construct from a dictionary
         """
         ...
+
     @overload
     def __init__(self) -> None:
         """
         Default constructor
         """
         ...
+
     @overload
     def __init__(self, arg: hephaistos.pyhephaistos.HeaderMap) -> None:
         """
         Copy constructor
         """
         ...
+
     def clear(self) -> None:
         """
         Remove all items
         """
         ...
+
     def items(self) -> hephaistos.pyhephaistos.HeaderMap.ItemView:
         """
         Returns an iterable view of the map's items.
         """
         ...
+
     def keys(self) -> hephaistos.pyhephaistos.HeaderMap.KeyView:
         """
         Returns an iterable view of the map's keys.
         """
         ...
+
     def update(self, arg: hephaistos.pyhephaistos.HeaderMap, /) -> None:
         """
         Update the map with element from `arg`
         """
         ...
+
     def values(self) -> hephaistos.pyhephaistos.HeaderMap.ValueView:
         """
         Returns an iterable view of the map's values.
@@ -1549,6 +1690,7 @@ class Image:
         Binds the image to the program at the given binding
         """
         ...
+
     @overload
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: int, /
@@ -1557,35 +1699,41 @@ class Image:
         Binds the image to the program at the given binding
         """
         ...
+
     @property
     def depth(self) -> int:
         """
         Depth of the image in pixels
         """
         ...
+
     def destroy(self) -> None:
         """
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     @property
     def format(self) -> hephaistos.pyhephaistos.ImageFormat:
         """
         Format of the image
         """
         ...
+
     @property
     def height(self) -> int:
         """
         Height of the image in pixels
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
@@ -1594,6 +1742,7 @@ class Image:
         be useful to allocate buffers for transferring the image.
         """
         ...
+
     @property
     def width(self) -> int:
         """
@@ -1612,6 +1761,7 @@ class ImageBindingTraits:
         Image dimensions
         """
         ...
+
     @property
     def format(self) -> hephaistos.pyhephaistos.ImageFormat:
         """
@@ -1640,23 +1790,27 @@ class ImageBuffer:
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     @property
     def height(self) -> int:
         """
         Height of the image in pixels
         """
         ...
+
     def loadFile(filename: str) -> hephaistos.pyhephaistos.ImageBuffer:
         """
         Loads the image at the given filepath and returns a new ImageBuffer
         """
         ...
+
     def loadMemory(data: bytes) -> hephaistos.pyhephaistos.ImageBuffer:
         """
         Loads serialized image data from memory and returns a new ImageBuffer
@@ -1667,17 +1821,20 @@ class ImageBuffer:
             Binary data containing the image data
         """
         ...
+
     def numpy(self) -> numpy.typing.NDArray:
         """
         Returns a numpy array that allows to manipulate the data handled
         by this ImageBuffer
         """
         ...
+
     def save(self, filename: str) -> None:
         """
         Saves the image under the given filepath
         """
         ...
+
     @property
     def width(self) -> int:
         """
@@ -1737,23 +1894,27 @@ class IntBuffer:
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def numpy(self) -> numpy.typing.NDArray:
         """
         Returns a numpy array using this buffer's memory.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this buffer.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
@@ -1782,6 +1943,7 @@ class IntTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, size: int, mapped: bool = False) -> None:
         """
@@ -1795,6 +1957,7 @@ class IntTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, addr: int, n: int, mapped: bool = False) -> None:
         """
@@ -1810,12 +1973,14 @@ class IntTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @property
     def address(self) -> int:
         """
         The device address of this tensor.
         """
         ...
+
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: str
     ) -> None:
@@ -1823,6 +1988,7 @@ class IntTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     @overload
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: int
@@ -1831,17 +1997,20 @@ class IntTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     def destroy(self) -> None:
         """
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the host available to the device.
@@ -1856,6 +2025,7 @@ class IntTensor:
             If None, flushes all remaining elements.
         """
         ...
+
     def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the device available to the host.
@@ -1870,12 +2040,14 @@ class IntTensor:
             If None, invalidates all remaining elements.
         """
         ...
+
     @property
     def isMapped(self) -> bool:
         """
         True, if the underlying memory is writable by the CPU.
         """
         ...
+
     @property
     def isNonCoherent(self) -> bool:
         """
@@ -1883,12 +2055,14 @@ class IntTensor:
         in mapped memory between devices and host available
         """
         ...
+
     @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
         """
         ...
+
     def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Retrieves n elements from the tensor at the given offset and stores it
@@ -1902,24 +2076,27 @@ class IntTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this tensor.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
         """
         ...
+
     def update(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Updates the tensor at the given offset with n elements stored at addr.
@@ -1932,7 +2109,7 @@ class IntTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
@@ -1952,30 +2129,35 @@ class LocalSize:
         Number of threads in X dimension
         """
         ...
+
     @x.setter
     def x(self, arg: int, /) -> None:
         """
         Number of threads in X dimension
         """
         ...
+
     @property
     def y(self) -> int:
         """
         Number of threads in Y dimension
         """
         ...
+
     @y.setter
     def y(self, arg: int, /) -> None:
         """
         Number of threads in Y dimension
         """
         ...
+
     @property
     def z(self) -> int:
         """
         Number of threads in Z dimension
         """
         ...
+
     @z.setter
     def z(self, arg: int, /) -> None:
         """
@@ -2000,23 +2182,27 @@ class LongBuffer:
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def numpy(self) -> numpy.typing.NDArray:
         """
         Returns a numpy array using this buffer's memory.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this buffer.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
@@ -2045,6 +2231,7 @@ class LongTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, size: int, mapped: bool = False) -> None:
         """
@@ -2058,6 +2245,7 @@ class LongTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, addr: int, n: int, mapped: bool = False) -> None:
         """
@@ -2073,12 +2261,14 @@ class LongTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @property
     def address(self) -> int:
         """
         The device address of this tensor.
         """
         ...
+
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: str
     ) -> None:
@@ -2086,6 +2276,7 @@ class LongTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     @overload
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: int
@@ -2094,17 +2285,20 @@ class LongTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     def destroy(self) -> None:
         """
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the host available to the device.
@@ -2119,6 +2313,7 @@ class LongTensor:
             If None, flushes all remaining elements.
         """
         ...
+
     def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the device available to the host.
@@ -2133,12 +2328,14 @@ class LongTensor:
             If None, invalidates all remaining elements.
         """
         ...
+
     @property
     def isMapped(self) -> bool:
         """
         True, if the underlying memory is writable by the CPU.
         """
         ...
+
     @property
     def isNonCoherent(self) -> bool:
         """
@@ -2146,12 +2343,14 @@ class LongTensor:
         in mapped memory between devices and host available
         """
         ...
+
     @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
         """
         ...
+
     def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Retrieves n elements from the tensor at the given offset and stores it
@@ -2165,24 +2364,27 @@ class LongTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this tensor.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
         """
         ...
+
     def update(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Updates the tensor at the given offset with n elements stored at addr.
@@ -2195,7 +2397,7 @@ class LongTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
@@ -2216,6 +2418,7 @@ class Mesh:
         triangles.
         """
         ...
+
     @indices.setter
     def indices(self, arg: numpy.typing.NDArray, /) -> None:
         """
@@ -2223,6 +2426,7 @@ class Mesh:
         triangles.
         """
         ...
+
     @property
     def vertices(self) -> numpy.typing.NDArray:
         """
@@ -2230,6 +2434,7 @@ class Mesh:
         x, y and z positions.
         """
         ...
+
     @vertices.setter
     def vertices(self, arg: numpy.typing.NDArray, /) -> None:
         """
@@ -2248,38 +2453,45 @@ class MeshVector:
         Construct from an iterable object
         """
         ...
+
     @overload
     def __init__(self) -> None:
         """
         Default constructor
         """
         ...
+
     @overload
     def __init__(self, arg: hephaistos.pyhephaistos.MeshVector) -> None:
         """
         Copy constructor
         """
         ...
+
     def append(self, arg: hephaistos.pyhephaistos.Mesh, /) -> None:
         """
         Append `arg` to the end of the list.
         """
         ...
+
     def clear(self) -> None:
         """
         Remove all items from list.
         """
         ...
+
     def extend(self, arg: hephaistos.pyhephaistos.MeshVector, /) -> None:
         """
         Extend `self` by appending elements from `arg`.
         """
         ...
+
     def insert(self, arg0: int, arg1: hephaistos.pyhephaistos.Mesh, /) -> None:
         """
         Insert object `arg1` before index `arg0`.
         """
         ...
+
     def pop(self, index: int = -1) -> hephaistos.pyhephaistos.Mesh:
         """
         Remove and return item at `index` (default last).
@@ -2320,6 +2532,7 @@ class Program:
             Data used for filling in specialization constants
         """
         ...
+
     @overload
     def __init__(self, code: bytes) -> None:
         """
@@ -2331,6 +2544,7 @@ class Program:
             Byte code of the program
         """
         ...
+
     def bindParams(*params, **namedparams) -> None:
         """
         Binds the given parameters.
@@ -2339,23 +2553,27 @@ class Program:
         name.
         """
         ...
+
     @property
     def bindings(self) -> list[hephaistos.pyhephaistos.BindingTraits]:
         """
         Returns a list of all bindings.
         """
         ...
+
     def destroy(self) -> None:
         """
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def dispatch(
         self, x: int = 1, y: int = 1, z: int = 1
     ) -> hephaistos.pyhephaistos.DispatchCommand:
@@ -2372,6 +2590,7 @@ class Program:
             Number of groups to dispatch in Z dimension
         """
         ...
+
     def dispatchIndirect(
         self, tensor: hephaistos.pyhephaistos.Tensor, offset: int = 0
     ) -> hephaistos.pyhephaistos.DispatchIndirectCommand:
@@ -2388,6 +2607,7 @@ class Program:
             Offset at which to start reading
         """
         ...
+
     def dispatchIndirectPush(
         self, push: bytes, tensor: hephaistos.pyhephaistos.Tensor, offset: int = 0
     ) -> hephaistos.pyhephaistos.DispatchIndirectCommand:
@@ -2405,6 +2625,7 @@ class Program:
             Offset at which to start reading
         """
         ...
+
     def dispatchPush(
         self, push: bytes, x: int = 1, y: int = 1, z: int = 1
     ) -> hephaistos.pyhephaistos.DispatchCommand:
@@ -2424,17 +2645,20 @@ class Program:
             Number of groups to dispatch in Z dimension
         """
         ...
-    def isBindingBound(i: int,/) -> bool:
+
+    def isBindingBound(i: int, /) -> bool:
         """
         Checks wether the i-th binding is currently bound.
         """
         ...
+
     @overload
-    def isBindingBound(name: str,/) -> bool:
+    def isBindingBound(name: str, /) -> bool:
         """
         Checks wether the binding specified by its name is currently bound
         """
         ...
+
     @property
     def localSize(self) -> hephaistos.pyhephaistos.LocalSize:
         """
@@ -2490,23 +2714,27 @@ class RawBuffer:
         The memory address of the allocated buffer.
         """
         ...
+
     def destroy(self) -> None:
         """
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The size of the buffer in bytes.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
@@ -2518,7 +2746,7 @@ class ResourceSnapshot:
     """
     Destroys all resources created during the lifetime of its context.
     """
-    
+
     def __init__(self) -> None: ...
     @property
     def count(self) -> int:
@@ -2526,16 +2754,19 @@ class ResourceSnapshot:
         Number of resources created during the lifetime of its context.
         """
         ...
+
     def capture(self) -> None:
         """
         Takes a snapshot of the currently alive resources.
         """
         ...
+
     def restore(self) -> None:
         """
         Destroys all resources created since the last snapshot.
         """
         ...
+
     def __enter__(self) -> ResourceSnapshot: ...
     def __exit__(self, exc_type, exc_value, traceback) -> None: ...
 
@@ -2560,7 +2791,7 @@ class RetrieveTensorCommand:
         bufferOffset: Optional[int] = None,
         tensorOffset: Optional[int] = None,
         size: Optional[int] = None,
-        unsafe: bool = False
+        unsafe: bool = False,
     ) -> None: ...
 
 class SequenceBuilder:
@@ -2577,6 +2808,7 @@ class SequenceBuilder:
         Issues the subroutine to run parallel in the current step.
         """
         ...
+
     @overload
     def And(
         self, cmd: hephaistos.pyhephaistos.Command
@@ -2585,21 +2817,25 @@ class SequenceBuilder:
         Issues the command to run parallel in the current step.
         """
         ...
+
     def AndList(self, list: list) -> hephaistos.pyhephaistos.SequenceBuilder:
         """
         Issues each element of the list to run parallel in the current step
         """
         ...
+
     def NextStep(self) -> hephaistos.pyhephaistos.SequenceBuilder:
         """
         Issues a new step. Following calls to And are ensured to run after previous ones finished.
         """
         ...
+
     def Submit(self) -> hephaistos.pyhephaistos.Submission:
         """
         Submits the recorded steps as a single batch to the GPU.
         """
         ...
+
     def Then(
         self, subroutine: hephaistos.pyhephaistos.Subroutine
     ) -> hephaistos.pyhephaistos.SequenceBuilder:
@@ -2607,6 +2843,7 @@ class SequenceBuilder:
         Issues a new step to execute after waiting for the previous one to finish.
         """
         ...
+
     @overload
     def Then(
         self, cmd: hephaistos.pyhephaistos.Command
@@ -2615,6 +2852,7 @@ class SequenceBuilder:
         Issues a new step to execute after waiting for the previous one to finish.
         """
         ...
+
     def WaitFor(
         self, timeline: hephaistos.pyhephaistos.Timeline, value: int
     ) -> hephaistos.pyhephaistos.SequenceBuilder:
@@ -2622,12 +2860,14 @@ class SequenceBuilder:
         Issues the following steps to wait for the given timeline to reach the given value
         """
         ...
+
     @overload
     def WaitFor(self, value: int) -> hephaistos.pyhephaistos.SequenceBuilder:
         """
         Issues the following steps to wait on the sequence timeline to reach the given value.
         """
         ...
+
     def __init__(
         self, timeline: hephaistos.pyhephaistos.Timeline, startValue: int
     ) -> None:
@@ -2642,6 +2882,7 @@ class SequenceBuilder:
             Counter value to wait for on the timeline to start with
         """
         ...
+
     @overload
     def __init__(self, timeline: hephaistos.pyhephaistos.Timeline) -> None:
         """
@@ -2653,6 +2894,7 @@ class SequenceBuilder:
             Timeline to use for orchestrating commands and subroutines
         """
         ...
+
     def printWaitGraph(self) -> str:
         """
         Returns a visualization of the current wait graph in the form:
@@ -2678,23 +2920,27 @@ class ShortBuffer:
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def numpy(self) -> numpy.typing.NDArray:
         """
         Returns a numpy array using this buffer's memory.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this buffer.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
@@ -2723,6 +2969,7 @@ class ShortTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, size: int, mapped: bool = False) -> None:
         """
@@ -2736,6 +2983,7 @@ class ShortTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, addr: int, n: int, mapped: bool = False) -> None:
         """
@@ -2751,12 +2999,14 @@ class ShortTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @property
     def address(self) -> int:
         """
         The device address of this tensor.
         """
         ...
+
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: str
     ) -> None:
@@ -2764,6 +3014,7 @@ class ShortTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     @overload
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: int
@@ -2772,17 +3023,20 @@ class ShortTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     def destroy(self) -> None:
         """
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the host available to the device.
@@ -2797,6 +3051,7 @@ class ShortTensor:
             If None, flushes all remaining elements.
         """
         ...
+
     def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the device available to the host.
@@ -2811,12 +3066,14 @@ class ShortTensor:
             If None, invalidates all remaining elements.
         """
         ...
+
     @property
     def isMapped(self) -> bool:
         """
         True, if the underlying memory is writable by the CPU.
         """
         ...
+
     @property
     def isNonCoherent(self) -> bool:
         """
@@ -2824,12 +3081,14 @@ class ShortTensor:
         in mapped memory between devices and host available
         """
         ...
+
     @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
         """
         ...
+
     def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Retrieves n elements from the tensor at the given offset and stores it
@@ -2843,24 +3102,27 @@ class ShortTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this tensor.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
         """
         ...
+
     def update(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Updates the tensor at the given offset with n elements stored at addr.
@@ -2873,7 +3135,7 @@ class ShortTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
@@ -2883,7 +3145,7 @@ class ShortTensor:
 class StopWatch:
     """
     Allows the measuring of elapsed time between commands execution
-    
+
     """
 
     def __init__(self) -> None:
@@ -2891,17 +3153,20 @@ class StopWatch:
         Creates a new stopwatch for measuring elapsed time between commands.
         """
         ...
+
     def destroy(self) -> None:
         """
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def getElapsedTime(self, wait: bool = False) -> list[float]:
         """
         Retrieves the elapsed time between start() and stop() in nanoseconds.
@@ -2909,16 +3174,19 @@ class StopWatch:
         otherwise returns NaN.
         """
         ...
+
     def reset(self) -> None:
         """
         Resets the stop watch.
         """
         ...
+
     def start(self) -> hephaistos.pyhephaistos.Command:
         """
         Returns the command to start the stop watch.
         """
         ...
+
     def stop(self) -> hephaistos.pyhephaistos.Command:
         """
         Returns the command to stop the stop watch. Can be recorded multiple
@@ -2937,48 +3205,56 @@ class SubgroupProperties:
         Support for GL_KHR_shader_subgroup_arithmetic
         """
         ...
+
     @property
     def ballotSupport(self) -> bool:
         """
         Support for GL_KHR_shader_subgroup_ballot
         """
         ...
+
     @property
     def basicSupport(self) -> bool:
         """
         Support for GL_KHR_shader_subgroup_basic
         """
         ...
+
     @property
     def quadSupport(self) -> bool:
         """
         Support for GL_KHR_shader_subgroup_quad
         """
         ...
+
     @property
     def shuffleClusteredSupport(self) -> bool:
         """
         Support for GL_KHR_shader_subgroup_clustered
         """
         ...
+
     @property
     def shuffleRelativeSupport(self) -> bool:
         """
         Support for GL_KHR_shader_subgroup_shuffle_relative
         """
         ...
+
     @property
     def shuffleSupport(self) -> bool:
         """
         Support for GL_KHR_shader_subgroup_shuffle
         """
         ...
+
     @property
     def subgroupSize(self) -> int:
         """
         Threads per subgroup
         """
         ...
+
     @property
     def voteSupport(self) -> bool:
         """
@@ -2998,23 +3274,27 @@ class Submission:
         The value the timeline will reach when the submission finishes.
         """
         ...
+
     @property
     def forgettable(self) -> bool:
         """
         True, if the Submission can be discarded safely, i.e. fire and forget.
         """
         ...
+
     @property
     def timeline(self) -> hephaistos.pyhephaistos.Timeline:
         """
         The timeline this submission was issued with.
         """
         ...
+
     def wait(self) -> None:
         """
         Blocks the caller until the submission finishes.
         """
         ...
+
     def waitTimeout(self, ns: int) -> bool:
         """
         Blocks the caller until the submission finished or the specified time
@@ -3034,12 +3314,14 @@ class Subroutine:
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     @property
     def simultaneousUse(self) -> bool:
         """
@@ -3129,6 +3411,7 @@ class Texture:
         Binds the texture to the program at the given binding
         """
         ...
+
     @overload
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: int, /
@@ -3137,35 +3420,41 @@ class Texture:
         Binds the texture to the program at the given binding
         """
         ...
+
     def destroy(self) -> None:
         """
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     @property
     def depth(self) -> int:
         """
         Depth of the texture in pixels
         """
         ...
+
     @property
     def format(self) -> hephaistos.pyhephaistos.ImageFormat:
         """
         Format of the texture
         """
         ...
+
     @property
     def height(self) -> int:
         """
         Height of the texture in pixels
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
@@ -3174,6 +3463,7 @@ class Texture:
         be useful to allocate buffers for transferring the texture.
         """
         ...
+
     @property
     def width(self) -> int:
         """
@@ -3203,18 +3493,21 @@ class Timeline:
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     @property
     def id(self) -> int:
         """
         Id of this timeline
         """
         ...
+
     @property
     def value(self) -> int:
         """
@@ -3223,6 +3516,7 @@ class Timeline:
         behavior.
         """
         ...
+
     @value.setter
     def value(self, arg: int, /) -> None:
         """
@@ -3231,11 +3525,13 @@ class Timeline:
         behavior.
         """
         ...
+
     def wait(self, value: int) -> None:
         """
         Waits for the timeline to reach the given value.
         """
         ...
+
     def waitTimeout(self, value: int, timeout: int) -> bool:
         """
         Waits for the timeline to reach the given value for a certain amount.
@@ -3251,7 +3547,6 @@ class Timeline:
         """
         ...
 
-
 class TypeSupport:
     """List of supported extended types, e.g. float64"""
 
@@ -3265,7 +3560,6 @@ class TypeSupport:
     def int16(self) -> bool: ...
     @property
     def int8(self) -> bool: ...
-
 
 class UnsignedIntBuffer:
     """
@@ -3284,23 +3578,27 @@ class UnsignedIntBuffer:
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def numpy(self) -> numpy.typing.NDArray:
         """
         Returns a numpy array using this buffer's memory.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this buffer.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
@@ -3329,6 +3627,7 @@ class UnsignedIntTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, size: int, mapped: bool = False) -> None:
         """
@@ -3342,6 +3641,7 @@ class UnsignedIntTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, addr: int, n: int, mapped: bool = False) -> None:
         """
@@ -3357,12 +3657,14 @@ class UnsignedIntTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @property
     def address(self) -> int:
         """
         The device address of this tensor.
         """
         ...
+
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: str
     ) -> None:
@@ -3370,6 +3672,7 @@ class UnsignedIntTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     @overload
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: int
@@ -3378,17 +3681,20 @@ class UnsignedIntTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     def destroy(self) -> None:
         """
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the host available to the device.
@@ -3403,6 +3709,7 @@ class UnsignedIntTensor:
             If None, flushes all remaining elements.
         """
         ...
+
     def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the device available to the host.
@@ -3417,12 +3724,14 @@ class UnsignedIntTensor:
             If None, invalidates all remaining elements.
         """
         ...
+
     @property
     def isMapped(self) -> bool:
         """
         True, if the underlying memory is writable by the CPU.
         """
         ...
+
     @property
     def isNonCoherent(self) -> bool:
         """
@@ -3430,12 +3739,14 @@ class UnsignedIntTensor:
         in mapped memory between devices and host available
         """
         ...
+
     @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
         """
         ...
+
     def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Retrieves n elements from the tensor at the given offset and stores it
@@ -3449,24 +3760,27 @@ class UnsignedIntTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this tensor.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
         """
         ...
+
     def update(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Updates the tensor at the given offset with n elements stored at addr.
@@ -3479,7 +3793,7 @@ class UnsignedIntTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
@@ -3503,23 +3817,27 @@ class UnsignedLongBuffer:
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def numpy(self) -> numpy.typing.NDArray:
         """
         Returns a numpy array using this buffer's memory.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this buffer.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
@@ -3548,6 +3866,7 @@ class UnsignedLongTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, size: int, mapped: bool = False) -> None:
         """
@@ -3561,6 +3880,7 @@ class UnsignedLongTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, addr: int, n: int, mapped: bool = False) -> None:
         """
@@ -3576,12 +3896,14 @@ class UnsignedLongTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @property
     def address(self) -> int:
         """
         The device address of this tensor.
         """
         ...
+
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: str
     ) -> None:
@@ -3589,6 +3911,7 @@ class UnsignedLongTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     @overload
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: int
@@ -3597,17 +3920,20 @@ class UnsignedLongTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     def destroy(self) -> None:
         """
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the host available to the device.
@@ -3622,6 +3948,7 @@ class UnsignedLongTensor:
             If None, flushes all remaining elements.
         """
         ...
+
     def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the device available to the host.
@@ -3636,12 +3963,14 @@ class UnsignedLongTensor:
             If None, invalidates all remaining elements.
         """
         ...
+
     @property
     def isMapped(self) -> bool:
         """
         True, if the underlying memory is writable by the CPU.
         """
         ...
+
     @property
     def isNonCoherent(self) -> bool:
         """
@@ -3649,12 +3978,14 @@ class UnsignedLongTensor:
         in mapped memory between devices and host available
         """
         ...
+
     @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
         """
         ...
+
     def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Retrieves n elements from the tensor at the given offset and stores it
@@ -3668,24 +3999,27 @@ class UnsignedLongTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this tensor.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
         """
         ...
+
     def update(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Updates the tensor at the given offset with n elements stored at addr.
@@ -3698,7 +4032,7 @@ class UnsignedLongTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
@@ -3722,23 +4056,27 @@ class UnsignedShortBuffer:
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def numpy(self) -> numpy.typing.NDArray:
         """
         Returns a numpy array using this buffer's memory.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this buffer.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
@@ -3767,6 +4105,7 @@ class UnsignedShortTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, size: int, mapped: bool = False) -> None:
         """
@@ -3780,6 +4119,7 @@ class UnsignedShortTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @overload
     def __init__(self, addr: int, n: int, mapped: bool = False) -> None:
         """
@@ -3795,12 +4135,14 @@ class UnsignedShortTensor:
             If True, tries to map memory to host address space
         """
         ...
+
     @property
     def address(self) -> int:
         """
         The device address of this tensor.
         """
         ...
+
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: str
     ) -> None:
@@ -3808,6 +4150,7 @@ class UnsignedShortTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     @overload
     def bindParameter(
         self, program: hephaistos.pyhephaistos.Program, binding: int
@@ -3816,17 +4159,20 @@ class UnsignedShortTensor:
         Binds the tensor to the program at the given binding
         """
         ...
+
     def destroy(self) -> None:
         """
         Frees the allocated resources.
         """
         ...
+
     @property
     def destroyed(self) -> bool:
         """
         True, if the underlying resources have been destroyed.
         """
         ...
+
     def flush(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the host available to the device.
@@ -3841,6 +4187,7 @@ class UnsignedShortTensor:
             If None, flushes all remaining elements.
         """
         ...
+
     def invalidate(self, offset: int = 0, size: int | None = None, /) -> None:
         """
         Makes writes in mapped memory from the device available to the host.
@@ -3855,12 +4202,14 @@ class UnsignedShortTensor:
             If None, invalidates all remaining elements.
         """
         ...
+
     @property
     def isMapped(self) -> bool:
         """
         True, if the underlying memory is writable by the CPU.
         """
         ...
+
     @property
     def isNonCoherent(self) -> bool:
         """
@@ -3868,12 +4217,14 @@ class UnsignedShortTensor:
         in mapped memory between devices and host available
         """
         ...
+
     @property
     def memory(self) -> int:
         """
         Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.
         """
         ...
+
     def retrieve(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Retrieves n elements from the tensor at the given offset and stores it
@@ -3887,24 +4238,27 @@ class UnsignedShortTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
         """
         ...
+
     @property
     def size(self) -> int:
         """
         The number of elements in this tensor.
         """
         ...
+
     @property
     def size_bytes(self) -> int:
         """
         The size of the tensor in bytes.
         """
         ...
+
     def update(self, addr: int, n: int, offset: int = 0, /) -> None:
         """
         Updates the tensor at the given offset with n elements stored at addr.
@@ -3917,7 +4271,7 @@ class UnsignedShortTensor:
             Amount of elements to copy
         offset: int, default=0
             Offset into the tensor in amount of elements where the copy starts
-        
+
         Note
         ----
         This operation is only guaranteed to succeed on mapped tensors.
