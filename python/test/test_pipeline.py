@@ -143,3 +143,7 @@ def test_scheduler():
         m, b = m2[i], b2[i]
         expected = np.arange(256) * m + b
         assert np.all(results[i + len(m1)] == expected)
+
+    # destroy scheduler
+    scheduler.destroy()
+    assert scheduler.destroyed
