@@ -631,6 +631,16 @@ void destroyAllResources(const ContextHandle& context) {
     context->resources.clear();
     //finish bulk mode
     context->resources_locked = false;
+
+    //take the opportunity to clean up context
+    //-> free up memory taken by memory pools
+    context->fnTable.vkTrimCommandPool(context->device, context->oneTimeSubmitPool, 0);
+    context->fnTable.vkTrimCommandPool(context->device, context->subroutinePool, 0);
+    while (!context->sequencePool.empty()) {
+        context->fnTable.vkDestroyCommandPool(
+            context->device, context->sequencePool.front(), nullptr);
+        context->sequencePool.pop();
+    }
 }
 
 #endif
