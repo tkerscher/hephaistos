@@ -5,14 +5,24 @@ import warnings
 from contextlib import ExitStack
 
 from ctypes import Structure, c_uint32, pointer, sizeof
-from hephaistos import Buffer, ByteTensor, Command, RawBuffer, Tensor, clearTensor
+from hephaistos import (
+    Buffer,
+    ByteTensor,
+    Command,
+    RawBuffer,
+    Tensor,
+    clearTensor,
+    execute,
+    retrieveTensor,
+    updateTensor,
+)
 from hephaistos.util import printSize
 from numpy import ndarray
 from numpy.ctypeslib import as_array
 
 from numpy.typing import NDArray
 from os import PathLike
-from typing import Any, BinaryIO, Dict, Optional, Set, Type, Union
+from typing import Any, BinaryIO, Dict, List, Literal, Optional, Set, Type, Union
 
 
 class QueueView:
@@ -200,6 +210,11 @@ class QueueSubView:
         if key not in self:
             raise KeyError(f"No field with name {key}")
         self._orig[key][self._mask] = value
+
+    @property
+    def count(self) -> int:
+        """Number of samples in view"""
+        return self._count
 
     @property
     def fields(self) -> Set[str]:
@@ -484,6 +499,142 @@ def clearQueue(
     if header is not None:
         offset += sizeof(header)
     return clearTensor(queue, size=sizeof(QueueView.Counter), offset=offset)
+
+
+class IOQueue:
+    """
+    Util class for input and output queues used in pipeline stages moving data
+    between host and device in the specified direction. Incorporates suitable
+    buffering on the host side.
+
+    Parameters
+    ----------
+    item: Type[Structure]
+        Structure describing a single item
+    capacity: int | None, default=None
+        Maximum number of items the queue can hold. If None, the capacity has to
+        be specified later via a call to `initialize`.
+    mode: "update" | "retrieve"
+        Direction of the synchronization between host and GPU.
+    header: Structure | None, default=None
+        Optional header prefixing the queue
+    skipCounter: bool, default=False
+        True, if the queue should not have a counter.
+
+    Note
+    ----
+    If the mode is "retrieve" and the queue has a counter, the queue counter on
+    the GPU will be cleared after initialization and each retrieval.
+    """
+
+    def __init__(
+        self,
+        item: Type[Structure],
+        capacity: Optional[int] = None,
+        *,
+        mode: Literal["update", "retrieve"],
+        header: Optional[Type[Structure]] = None,
+        skipCounter: bool = False,
+    ) -> None:
+        # save params
+        self._item = item
+        self._capacity = capacity
+        self._mode = mode
+        self._header = header
+        self._skipCounter = skipCounter
+        self._buffers = None
+        self._tensor = None
+        if capacity is not None:
+            self.initialize(capacity)
+
+    @property
+    def capacity(self) -> Union[int, None]:
+        """Capacity of the queue. None if not yet initialized"""
+        return self._capacity
+
+    @property
+    def header(self) -> Optional[Structure]:
+        """Optional header. None if no header is present"""
+        return self._header
+
+    @property
+    def hasCounter(self) -> bool:
+        """True, if queue has a counter"""
+        return not self._skipCounter
+
+    @property
+    def initialized(self) -> bool:
+        """True, if the queue have been initialized"""
+        return self._tensor is not None
+
+    @property
+    def item(self) -> Type[Structure]:
+        """Structure describing the items of the queue"""
+        return self._item
+
+    @property
+    def mode(self) -> Literal["update", "retrieve"]:
+        """Direction of the queue synchronization"""
+        return self._mode
+
+    @property
+    def tensor(self) -> Union[QueueTensor, None]:
+        """Tensor holding the queue on the GPU. None if not yet initialized"""
+        return self._tensor
+
+    def buffer(self, i: int) -> Union[QueueBuffer, None]:
+        """The i-th buffer holding the queue on the host. None if not yet initialized"""
+        if self.initialized:
+            return self._buffers[i]
+        else:
+            return None
+
+    def initialize(self, capacity: int) -> None:
+        """
+        Initialized the queue and associated buffers of the given capacity.
+        Destroys any previously initialized queues.
+        """
+        self._capacity = capacity
+        qParams = {"header": self._header, "skipCounter": self._skipCounter}
+        self._buffers = [QueueBuffer(self.item, capacity, **qParams) for _ in range(2)]
+        self._tensor = QueueTensor(self.item, capacity, **qParams)
+        # set input buffer counter to max by default
+        if self.mode == "update" and not self._skipCounter:
+            for buf in self._buffers:
+                buf.view.count = capacity
+        # clear queue
+        if not self._skipCounter:
+            execute(clearQueue(self._tensor))
+
+    def view(self, config: int) -> Union[QueueView, QueueSubView]:
+        """
+        View into the i-th queue buffer. If mode is "retrieve" and the queue has
+        a counter, a view trimmed to the amount of items will be returned.
+        """
+        buffer = self.buffer(config)
+        if self.mode == "retrieve":
+            return buffer.view[: buffer.count]
+        else:
+            return buffer.view
+
+    def run(self, config: int) -> List[Command]:
+        """
+        Creates the command responsible for syncing the queues on the host and
+        """
+        if not self.initialized:
+            raise RuntimeError("Queue has not yet been initialized!")
+
+        if self.mode == "update":
+            return [updateTensor(self.buffer(config), self.tensor)]
+        elif self.mode == "retrieve" and self._skipCounter:
+            return [retrieveTensor(self.tensor, self.buffer(config))]
+        elif self.mode == "retrieve" and not self._skipCounter:
+            return [
+                retrieveTensor(self.tensor, self.buffer(config)),
+                clearQueue(self.tensor),
+            ]
+        else:
+            raise RuntimeError(f"Unexpected mode: '{self.mode}'!")
 
 
 def saveQueue(
