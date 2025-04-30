@@ -38,6 +38,10 @@ from typing import (
 )
 
 
+Task = Dict[str, Any]
+"""Type alias for pipeline tasks"""
+
+
 class PipelineStage(ABC):
     """
     Base class for pipeline stages.
@@ -172,6 +176,13 @@ class PipelineStage(ABC):
             + "\n"
             + "\n".join(f"{param} : {self.getParam(param)}" for param in self.fields)
         )
+
+    def _getParamsTensor(self, name: str, i: int) -> StructureTensor:
+        """
+        Returns the tensor containing the parameter structure using the name
+        passed to the constructor of the i-th configuration.
+        """
+        return self._device[i][name]
 
     def _finishParams(self, i: int) -> None:
         """
@@ -572,7 +583,8 @@ class PipelineScheduler:
     Parameters
     ----------
     pipeline: Pipeline
-        Pipeline onto which to schedule tasks
+        Pipeline onto which to schedule tasks. Can either be a single pipeline
+        or a dictionary of multiple ones.
     queueSize: int, default=0
         Size of the task queue. Size of 0 means infinite.
     processFn: Callable( (config: int, task: int) -> None ), default=None
@@ -585,7 +597,7 @@ class PipelineScheduler:
 
     def __init__(
         self,
-        pipeline: Pipeline,
+        pipeline: Union[Pipeline, Dict[str, Pipeline]],
         *,
         queueSize: int = 0,
         processFn: Optional[Callable[[int, int], None]] = None,
@@ -615,8 +627,8 @@ class PipelineScheduler:
         return self._destroyed
 
     @property
-    def pipeline(self) -> Pipeline:
-        """The underlying pipeline into which tasks are orchestrated"""
+    def pipeline(self) -> Union[Pipeline, Dict[str, Pipeline]]:
+        """The underlying pipeline(s) into which tasks are orchestrated"""
         return self._pipeline
 
     @property
@@ -671,7 +683,10 @@ class PipelineScheduler:
         self._destroyed = True
 
     def schedule(
-        self, tasks: Iterable[Dict[str, Any]], *, timeout: Optional[float] = None
+        self,
+        tasks: Iterable[Union[Task, Tuple[str, Task]]],
+        *,
+        timeout: Optional[float] = None,
     ) -> Tuple[int, Submission]:
         """
         Schedules the given list of tasks to be processed by the pipeline after
@@ -679,9 +694,12 @@ class PipelineScheduler:
 
         Parameters
         ----------
-        tasks: Iterable[Dict[str, Any]]
+        tasks: Iterable[Task | (str, Task)]
             Sequence of tasks to schedule onto the pipeline defined by the set
-            of parameters to apply to the stages.
+            of parameters to apply to the stages. If the scheduler orchestrates
+            multiple pipelines, tasks must be bundled into tuples with their
+            first element being the name of the pipeline to schedule the task
+            onto.
         timeout: float | None, default=None
             Timeout in seconds for waiting on free space in the queue.
             If None, waits indefinitely.
@@ -714,6 +732,11 @@ class PipelineScheduler:
             if builder is None:
                 builder = beginSequence(self._pipelineTimeline, self._totalTasks)
 
+            # fetch correct pipeline
+            pipeline = self.pipeline
+            if isinstance(task, tuple):
+                pipeline = pipeline[task[0]]
+
             # issue wait on previous task
             builder.WaitFor(self._pipelineTimeline, self._totalTasks)
             # issue wait on update thread
@@ -726,7 +749,7 @@ class PipelineScheduler:
                 builder.WaitFor(self._processTimeline, self._totalTasks - 1)
             # run task
             i = self._totalTasks % 2
-            builder.And(self._pipeline.getSubroutine(i))
+            builder.And(pipeline.getSubroutine(i))
 
             # update counters
             n += 1
@@ -798,9 +821,14 @@ class PipelineScheduler:
     def _update(self, n: int) -> None:
         """Internal update thread body"""
         # fetch next task (don't need to block, as this is handled by the worker)
-        task: Optional[Dict[str, Any]] = self._updateQueue.get(block=False)
+        task: Union[Task, Tuple[str, Task]] = self._updateQueue.get(block=False)
+        # fetch correct pipeline
+        pipeline = self.pipeline
+        if isinstance(task, tuple):
+            name, task = task
+            pipeline = pipeline[name]
         # update pipeline
-        self._pipeline.setParams(**task)
+        pipeline.setParams(**task)
         # wait for the i-th config to be safe to update
         if n >= 2:
             self._pipelineTimeline.wait(n - 1)
@@ -808,7 +836,7 @@ class PipelineScheduler:
         # eventually calls user provided functions
         # -> treat as evil to prevent from deadlocking timeline
         try:
-            self._pipeline.update(n % 2)
+            pipeline.update(n % 2)
         except Exception as ex:
             warnings.warn(f"Exception raised while preparing task {n}:\n{ex}")
         # advance timeline

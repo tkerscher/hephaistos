@@ -96,7 +96,7 @@ def test_pipeline():
     assert np.all(retr.view(1, np.int32) == expected)
 
 
-def test_scheduler():
+def test_scheduler_single():
     # create pipeline
     comp = PipelineTestStage()
     retr = pl.RetrieveTensorStage(comp.tensor)
@@ -104,9 +104,7 @@ def test_scheduler():
 
     # create processing function
     results = []
-
-    def process(i: int, n: int):
-        results.append(retr.view(i, np.int32).copy())
+    process = lambda i, n: results.append(retr.view(i, np.int32).copy())
 
     # create scheduler
     scheduler = pl.PipelineScheduler(pipeline, processFn=process)
@@ -143,6 +141,47 @@ def test_scheduler():
         m, b = m2[i], b2[i]
         expected = np.arange(256) * m + b
         assert np.all(results[i + len(m1)] == expected)
+
+    # destroy scheduler
+    scheduler.destroy()
+    assert scheduler.destroyed
+
+
+def test_scheduler_multi():
+    # create multiple pipelines
+    t = PipelineTestStage()
+    p1 = pl.Pipeline([t, pl.RetrieveTensorStage(t.tensor)])
+    p2 = pl.Pipeline([t, pl.RetrieveTensorStage(t.tensor)])
+    p3 = pl.Pipeline([t, pl.RetrieveTensorStage(t.tensor)])
+
+    # create scheduler
+    scheduler = pl.PipelineScheduler({"p1": p1, "p2": p2, "p3": p3})
+
+    # create tasks
+    N = 8
+    m = [2 * x + 1 for x in range(N)]
+    b = [50 * (x + 1) for x in range(N)]
+    tasks = [(f"p{i % 3 + 1}", {"test__m": m[i], "b": b[i]}) for i in range(N)]
+    # schedule tasks
+    scheduler.schedule(tasks)
+    # check if everything was scheduled
+    assert scheduler.totalTasks == N
+
+    # wait on scheduler to finish
+    scheduler.wait()
+
+    # check if everything was processed
+    assert scheduler.tasksFinished == N
+
+    # fetch results
+    r1 = p1.stages[1][1].view(1, np.int32)
+    r2 = p2.stages[1][1].view(0, np.int32)
+    r3 = p3.stages[1][1].view(1, np.int32)
+    # check results
+    x = np.arange(256)
+    assert np.all(r1 == m[3] * x + b[3])
+    assert np.all(r2 == m[4] * x + b[4])
+    assert np.all(r3 == m[5] * x + b[5])
 
     # destroy scheduler
     scheduler.destroy()
