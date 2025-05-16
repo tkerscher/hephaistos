@@ -372,7 +372,7 @@ class Pipeline:
     """
 
     def __init__(
-        self, stages: List[Union[PipelineStage, Tuple[str, PipelineStage]]]
+        self, stages: Iterable[Union[PipelineStage, Tuple[str, PipelineStage]]]
     ) -> None:
         # create stage list and dict
         stages = [s if isinstance(s, tuple) else (s.name, s) for s in stages]
@@ -472,7 +472,10 @@ class Pipeline:
 
 
 def runPipeline(
-    stages: Iterable[PipelineStage], i: int = 0, *, update: bool = True
+    stages: Iterable[Union[PipelineStage, Tuple[str, PipelineStage]]],
+    i: int = 0,
+    *,
+    update: bool = True,
 ) -> None:
     """
     Runs the i-th configuration of the stages as if they make up a pipeline in
@@ -483,12 +486,14 @@ def runPipeline(
     likely slower if called repeatedly. Consider creating a `Pipeline` in that
     case.
     """
-    if update:
-        for stage in stages:
+    cmds = []
+    for stage in stages:
+        if isinstance(stage, tuple):
+            _, stage = stage
+        if update:
             stage.update(i)
-    beginSequence().AndList(
-        list(chain.from_iterable(stage.run(i) for stage in stages))
-    ).Submit().wait()
+        cmds.extend(stage.run(i))
+    beginSequence().AndList(cmds).Submit().wait()
 
 
 class _CounterWorkerThread:
