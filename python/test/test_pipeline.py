@@ -104,7 +104,9 @@ def test_scheduler_single():
 
     # create processing function
     results = []
-    process = lambda i, n: results.append(retr.view(i, np.int32).copy())
+    process = lambda config, batch, args: results.append(
+        retr.view(config, np.int32).copy()
+    )
 
     # create scheduler
     scheduler = pl.PipelineScheduler(pipeline, processFn=process)
@@ -186,3 +188,52 @@ def test_scheduler_multi():
     # destroy scheduler
     scheduler.destroy()
     assert scheduler.destroyed
+
+
+def test_dynamicTask():
+    # create pipeline
+    comp = PipelineTestStage()
+    retr = pl.RetrieveTensorStage(comp.tensor)
+    pipeline = pl.Pipeline([comp, retr])
+    params = {"m": 5, "b": 12}
+    expected = np.arange(256) * params["m"] + params["b"]
+
+    # create dynamic task
+    class DummyDynamicTask(pl.DynamicTask):
+        def __init__(self) -> None:
+            super().__init__(params, initialBatchCount=4)
+            self.counter = 0
+            self.failed = False
+
+        def processBatch(self, config: int) -> int:
+            self.counter += 1
+            # check result to see if batch was issued correctly
+            result = retr.view(config, np.int32)
+            if not np.all(result == expected):
+                self.failed = True
+
+            # issue new batches
+            if self.counter == 1:
+                return 2
+            elif self.counter == 4:
+                return 3
+            else:
+                return 0
+
+    # create scheduler + issue task
+    tasks = [
+        DummyDynamicTask(),
+        DummyDynamicTask(),
+        DummyDynamicTask(),
+    ]
+    scheduler = pl.DynamicTaskScheduler(pipeline)
+    scheduler.scheduleTasks(tasks)
+
+    # call both wait functions
+    scheduler.waitNext()
+    assert tasks[0].isFinished
+    scheduler.waitAll()
+
+    # check task
+    assert all(not t.failed for t in tasks)
+    assert all(t.counter == 9 for t in tasks)

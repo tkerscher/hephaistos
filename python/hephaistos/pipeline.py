@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from ctypes import Structure, addressof, memmove, sizeof, c_uint8
 from itertools import chain
-from queue import Queue
+from queue import Empty, Queue
 from threading import Event, Lock, Thread
 import warnings
 
@@ -23,23 +23,19 @@ from hephaistos import (
 from hephaistos.util import StructureTensor
 from numpy import frombuffer, float32
 
+from collections.abc import Collection, Iterable, Set
 from numpy.typing import DTypeLike, NDArray
 from typing import (
     Any,
     Callable,
     Dict,
-    Iterable,
     List,
     Optional,
-    Set,
+    Protocol,
     Tuple,
     Type,
     Union,
 )
-
-
-Task = Dict[str, Any]
-"""Type alias for pipeline tasks"""
 
 
 class PipelineStage(ABC):
@@ -133,7 +129,7 @@ class PipelineStage(ABC):
         else:
             raise ValueError(f"No parameter with name {name}")
 
-    def getParams(self) -> Dict[str, any]:
+    def getParams(self) -> Dict[str, Any]:
         """Creates a dictionary with all parameters that can be set"""
         return {name: self.getParam(name) for name in self.fields}
 
@@ -569,6 +565,63 @@ class _CounterWorkerThread:
             self._counter += 1
 
 
+PipelineParams = Dict[str, Any]
+Task = Union[
+    PipelineParams,  # default pipeline + no user args
+    Tuple[str, PipelineParams],  # named pipeline + no user args
+    Tuple[PipelineParams, Any],  # default pipeline + user args
+    Tuple[str, PipelineParams, Any],  # named pipeline + user args
+]
+"""
+Type alias for tasks to be issued to a scheduler. At the minimum consists of a
+dictionary of pipeline parameters mapped to the values to be used for the task.
+In case of multiple pipelines in the scheduler, must be prepend by the name of
+pipeline to run and packed into a tuple. Optionally, can also contain a user
+defined object after the parameters, which will get passed to the process
+function.
+"""
+
+
+def _unpackTask(task: Task) -> Tuple[str, PipelineParams, Any]:
+    """unpacks the given task and replaces missing entries with default values"""
+    if isinstance(task, dict):
+        # should we check if the dict is valid?
+        return "", task, None
+    elif isinstance(task, tuple):
+        if len(task) == 2:
+            i1, i2 = task
+            if isinstance(i1, str) and isinstance(i2, dict):
+                return i1, i2, None
+            elif isinstance(i1, dict):
+                return "", i1, i2
+        elif len(task) == 3:
+            i1, i2, i3 = task
+            if isinstance(i1, str) and isinstance(i2, dict):
+                return task
+
+    # fallen through all cases -> invalid format
+    raise ValueError(f"invalid task format: {task}")
+
+
+class SchedulerProcessCallback(Protocol):
+    """Callback function called by `PipelineScheduler` for each finished batch."""
+
+    def __call__(self, config: int, batch: int, args: Any) -> None:
+        """
+        Parameters
+        ----------
+        config: int
+            Id of the config slot used by the pipeline when it ran the batch.
+        batch: int
+            Counter increasing with each scheduled batch, i.e. 0 for the first
+            one, 1 for the second and so forth.
+        args: Any
+            Optional user argument passed along the task when issued to the
+            scheduler.
+        """
+        pass
+
+
 class PipelineScheduler:
     """
     Schedules tasks into a pipeline and orchestrates the processing of the
@@ -587,17 +640,24 @@ class PipelineScheduler:
 
     Parameters
     ----------
-    pipeline: Pipeline
+    pipeline: Pipeline | dict[str, Pipeline]
         Pipeline onto which to schedule tasks. Can either be a single pipeline
         or a dictionary of multiple ones.
     queueSize: int, default=0
         Size of the task queue. Size of 0 means infinite.
-    processFn: Callable( (config: int, task: int) -> None ), default=None
+    processFn: Callable( (config: int, task: int[, args: Any]) -> None ), default=None
         Function to be called after each finished task on the pipeline with
         config being the pipeline's config used and task the increasing task
         count processed, i.e. 0 for the first task, 1 for the second and so on.
         The scheduler ensures tasks using the same configuration to wait until
-        processing finished. Will run in its own thread.
+        processing finished. Optionally, can accept a third argument that will
+        be filled with the object provided when the task was scheduled and can
+        be used to pass additional task specific information to the process
+        function.
+
+    Note
+    ----
+    The process function will be called from a different thread.
     """
 
     def __init__(
@@ -605,7 +665,7 @@ class PipelineScheduler:
         pipeline: Union[Pipeline, Dict[str, Pipeline]],
         *,
         queueSize: int = 0,
-        processFn: Optional[Callable[[int, int], None]] = None,
+        processFn: Optional[SchedulerProcessCallback] = None,
     ) -> None:
         # save params
         self._destroyed = False
@@ -616,15 +676,17 @@ class PipelineScheduler:
         # create queue worker
         self._updateTimeline = Timeline()
         self._updateWorker = _CounterWorkerThread(self._update)
-        self._updateQueue = Queue()
+        self._updateQueue = Queue(queueSize)
         # create process worker if needed
         self._processFn = processFn
         if processFn is None:
             self._processWorker = None
             self._processTimeline = None
+            self._userArgsQueue = None
         else:
             self._processWorker = _CounterWorkerThread(self._process)
             self._processTimeline = Timeline()
+            self._userArgsQueue = Queue()
 
     @property
     def destroyed(self) -> bool:
@@ -689,10 +751,10 @@ class PipelineScheduler:
 
     def schedule(
         self,
-        tasks: Iterable[Union[Task, Tuple[str, Task]]],
+        tasks: Iterable[Task],
         *,
         timeout: Optional[float] = None,
-    ) -> Tuple[int, Submission]:
+    ) -> Tuple[int, Union[Submission, None]]:
         """
         Schedules the given list of tasks to be processed by the pipeline after
         previous tasks submissions have finished.
@@ -727,20 +789,39 @@ class PipelineScheduler:
         n = 0
         builder = None
         for task in tasks:
+            # unpack task
+            pipeName, params, args = _unpackTask(task)
+            # fetch correct pipeline
+            if isinstance(self.pipeline, Pipeline):
+                if pipeName != "":
+                    warnings.warn(
+                        f"Skipping task {task}: scheduler has no pipeline {pipeName!r}!"
+                    )
+                    continue
+                pipeline = self.pipeline
+            else:
+                if pipeName not in self.pipeline:
+                    warnings.warn(
+                        f"Skipping task {task}: scheduler has no pipeline {pipeName!r}!"
+                    )
+                    continue
+                pipeline = self.pipeline[pipeName]
+
+            # do not try to enlist more tasks then what fits in the queue
+            if self.queueSize > 0 and n > self.queueSize:
+                break
             # try to enlist in queue
             try:
-                self._updateQueue.put(task, timeout=timeout)
+                self._updateQueue.put((pipeline, params), timeout=timeout)
             except:
                 break
+            # args queue is always infinite so there should be no problem here
+            if self._userArgsQueue is not None:
+                self._userArgsQueue.put(args)
 
             # lazy create builder
             if builder is None:
                 builder = beginSequence(self._pipelineTimeline, self._totalTasks)
-
-            # fetch correct pipeline
-            pipeline = self.pipeline
-            if isinstance(task, tuple):
-                pipeline = pipeline[task[0]]
 
             # issue wait on previous task
             builder.WaitFor(self._pipelineTimeline, self._totalTasks)
@@ -765,6 +846,7 @@ class PipelineScheduler:
             return (0, None)
 
         # submit work
+        assert builder is not None
         submission = builder.Submit()
         # just to ensure we're not breaking stuff in the future
         assert submission.forgettable
@@ -826,14 +908,11 @@ class PipelineScheduler:
     def _update(self, n: int) -> None:
         """Internal update thread body"""
         # fetch next task (don't need to block, as this is handled by the worker)
-        task: Union[Task, Tuple[str, Task]] = self._updateQueue.get(block=False)
-        # fetch correct pipeline
-        pipeline = self.pipeline
-        if isinstance(task, tuple):
-            name, task = task
-            pipeline = pipeline[name]
+        pipeline: Pipeline
+        params: PipelineParams
+        pipeline, params = self._updateQueue.get(block=False)
         # update pipeline
-        pipeline.setParams(**task)
+        pipeline.setParams(**params)
         # wait for the i-th config to be safe to update
         if n >= 2:
             self._pipelineTimeline.wait(n - 1)
@@ -849,14 +928,209 @@ class PipelineScheduler:
 
     def _process(self, n: int) -> None:
         """Internal process thread body"""
+        # some asserts that should never fail to make the type checker happy
+        assert self._processFn is not None
+        assert self._processTimeline is not None
+        assert self._userArgsQueue is not None
+
+        # fetch user args
+        # deadlocks are prevented by the worker thread
+        args = self._userArgsQueue.get()
+
         # wait on task to finish
         self._pipelineTimeline.wait(n + 1)
         # process
         # external provided function
         # -> treat as evil to prevent from deadlocking timeline
         try:
-            self._processFn(n % 2, n)
+            self._processFn(n % 2, n, args)
         except Exception as ex:
             warnings.warn(f"Exception raised while processing task {n}:\n{ex}")
         # advance timeline
         self._processTimeline.value = n + 1
+
+
+class DynamicTask(ABC):
+    """
+    Base class for tasks that allows to reissue more batches to achieve a
+    certain task, e.g. converging of a numerical estimate.
+
+    Params
+    ------
+    task: Task
+        Pipeline parameterization of the task to be scheduled.
+    pipeline: Pipeline | None, default=None
+        Name of the pipeline the task will run on. Can be None if the scheduler
+        contains only a single pipeline.
+    """
+
+    def __init__(
+        self,
+        parameters: PipelineParams,
+        pipeline: str | None = None,
+        *,
+        initialBatchCount: int = 1,
+    ) -> None:
+        self._params = parameters
+        self._pipeline = pipeline
+        self._remaining = initialBatchCount
+        self._finishedEvent = Event()
+
+    @property
+    def batchesRemaining(self) -> int:
+        """Number of outstanding batches"""
+        return self._remaining
+
+    @property
+    def isFinished(self) -> bool:
+        """True, if the task has finished."""
+        return self._finishedEvent.is_set()
+
+    @property
+    def pipeline(self) -> str | None:
+        """Name of the pipeline onto which to schedule the task."""
+        return self._pipeline
+
+    @property
+    def parameters(self) -> PipelineParams:
+        """Parameterization used to schedule batches on the pipeline"""
+        return self._params
+
+    def wait(self, timeout: Optional[float] = None) -> bool:
+        """
+        Waits for the task to be finished at most `timeout` seconds or
+        indefinitely if `None` was provided. Returns `True` if the task finished
+        or `False` if the time ran out.
+        """
+        return self._finishedEvent.wait(timeout)
+
+    def onBatchFinished(self, config: int) -> int:
+        """
+        Called by the scheduler once the next batch for this task is ready.
+        Returns the number of new batches to schedule.
+        """
+        # one batch finished
+        # do this before processBatch() so the amount remaining is accurate
+        self._remaining -= 1
+        # process batch
+        n = self.processBatch(config)
+        self._remaining += n
+
+        # finished?
+        if self._remaining == 0:
+            self._finishedEvent.set()
+        # tell scheduler about any new batches to issue
+        return n
+
+    @abstractmethod
+    def processBatch(self, config: int) -> int:
+        """
+        Implemented in derived classed processing the last finished batch and
+        updating the task accordingly. Returns the number of new batches to
+        issue in addition to the remaining ones.
+
+        Note
+        ----
+        This function will be called from a different thread than the one that
+        issued the task.
+        """
+        pass
+
+
+class DynamicTaskScheduler:
+    """
+    Scheduler orchestrating the processing of `DynamicTask`s.
+
+    Params
+    ------
+    pipeline: Pipeline | dict[str, Pipeline]
+        Pipeline or dictionary of named pipelines onto which the tasks will be
+        scheduled.
+    """
+
+    def __init__(self, pipeline: Union[Pipeline, Dict[str, Pipeline]]) -> None:
+        self._scheduler = PipelineScheduler(pipeline, processFn=self._process)
+        self._schedulerLock = Lock()
+        self._resultQueue = Queue()
+        self._inFlightCounter = 0
+        self._inFlightCounterLock = Lock()
+        self._allFinishedEvent = Event()
+
+    @property
+    def tasksRemaining(self) -> int:
+        """Returns the number of scheduled tasks that have not yet finished"""
+        with self._inFlightCounterLock:
+            return self._inFlightCounter
+
+    def scheduleTask(self, task: DynamicTask) -> None:
+        """Issues the given task to be scheduled."""
+        with self._inFlightCounterLock:
+            self._inFlightCounter += 1
+            # if we schedule new tasks after an initial batch is finished, we
+            # need to reset the event for waitAll() to work as expected
+            self._allFinishedEvent.clear()
+        self._schedule(task, task.batchesRemaining)
+
+    def scheduleTasks(self, tasks: Collection[DynamicTask]) -> None:
+        """Issues the given list of tasks to be scheduled"""
+        with self._inFlightCounterLock:
+            self._inFlightCounter += len(tasks)
+            # if we schedule new tasks after an initial batch is finished, we
+            # need to reset the event for waitAll() to work as expected
+            self._allFinishedEvent.clear()
+        for task in tasks:
+            self._schedule(task, task.batchesRemaining)
+
+    def waitAll(self, timeout: Optional[float] = None) -> bool:
+        """
+        Waits at most `timeout` seconds for all scheduled tasks to finish or
+        indefinitely, if `None` was passed.
+        """
+        return self._allFinishedEvent.wait(timeout)
+
+    def waitNext(self, timeout: Optional[float] = None) -> Union[Task, None]:
+        """
+        Waits until the next task is finished for at most `timeout` seconds.
+        Returns the finished task or `None` if timed out.
+        """
+        try:
+            result = self._resultQueue.get(True, timeout)
+        except Empty:
+            result = None
+        return result
+
+    def _schedule(self, task: DynamicTask, nBatches: int) -> None:
+        """Internal task schedule implementation"""
+        # prepare batches
+        # use a copy of the params just to be safe
+        # TODO: Should we allow tasks to change the params when processing batches?
+        params = task.parameters.copy()
+        if task.pipeline is None:
+            item = (params, task)
+        else:
+            item = (task.pipeline, params, task)
+        batches = [item] * nBatches
+        # both the user thread and the process thread may schedule more batches
+        # -> need to synchronize access to the underlying scheduler
+        with self._schedulerLock:
+            n, _ = self._scheduler.schedule(batches)
+        # we assume that all batches have been scheduled
+        assert n == nBatches
+
+    def _process(self, config: int, batch: int, args: Any) -> None:
+        # tell the task
+        task: DynamicTask = args
+        nNewBatches = task.onBatchFinished(config)
+
+        # task finished?
+        if task.batchesRemaining == 0:
+            # put task on the finished pile
+            self._resultQueue.put(task)
+            # reduce counter and notify if all tasks have finished
+            with self._inFlightCounterLock:
+                self._inFlightCounter -= 1
+                if self._inFlightCounter <= 0:
+                    self._allFinishedEvent.set()
+        else:
+            # issue new batches
+            self._schedule(task, nNewBatches)
