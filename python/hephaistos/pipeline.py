@@ -10,7 +10,7 @@ import warnings
 from hephaistos import (
     Command,
     Program,
-    RawBuffer,
+    Buffer,
     Submission,
     Subroutine,
     Tensor,
@@ -89,7 +89,7 @@ class PipelineStage(ABC):
         self._local = {name: param() for name, param in params.items()}
         # create double buffered device config
         self._device = [
-            {name: StructureTensor(param, True) for name, param in params.items()}
+            {name: StructureTensor(T, mapped=True) for name, T in params.items()}
             for _ in range(2)
         ]
         # check tensors are mapped
@@ -277,9 +277,9 @@ class RetrieveTensorStage(PipelineStage):
         super().__init__({})
         self._src = src
         # create local buffers
-        self._buffers = [RawBuffer(src.size_bytes) for _ in range(2)]
+        self._buffers = [Buffer(src.nbytes) for _ in range(2)]
         # create byte array to mimic std::span<std::byte>
-        span = c_uint8 * src.size_bytes
+        span = c_uint8 * src.nbytes
         self._data = [span.from_address(buf.address) for buf in self._buffers]
 
     @property
@@ -291,7 +291,7 @@ class RetrieveTensorStage(PipelineStage):
         """Returns the memory address of the i-th configuration"""
         return self._buffers[i].address
 
-    def buffer(self, i: int) -> RawBuffer:
+    def buffer(self, i: int) -> Buffer:
         """Returns the i-th buffer"""
         return self._buffers[i]
 
@@ -319,9 +319,9 @@ class UpdateTensorStage(PipelineStage):
         super().__init__({})
         self._dst = dst
         # create local buffers
-        self._buffers = [RawBuffer(dst.size_bytes) for _ in range(2)]
+        self._buffers = [Buffer(dst.nbytes) for _ in range(2)]
         # create byte array to mimic std::span<std::byte>
-        span = c_uint8 * dst.size_bytes
+        span = c_uint8 * dst.nbytes
         self._data = [span.from_address(buf.address) for buf in self._buffers]
 
     @property
@@ -333,7 +333,7 @@ class UpdateTensorStage(PipelineStage):
         """Returns the memory address of the i-th configuration"""
         return self._buffers[i].address
 
-    def buffer(self, i: int) -> RawBuffer:
+    def buffer(self, i: int) -> Buffer:
         """Returns the i-th buffer"""
         return self._buffers[i]
 

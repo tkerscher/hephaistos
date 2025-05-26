@@ -157,7 +157,9 @@ void registerProgramModule(nb::module_& m) {
     nb::class_<hp::DispatchIndirectCommand, hp::Command>(m, "DispatchIndirectCommand",
             "Command for executing a program using the group size read from "
             "the provided tensor at given offset")
-        .def_rw("tensor", &hp::DispatchIndirectCommand::tensor,
+        .def_prop_rw("tensor",
+            [](hp::DispatchIndirectCommand& c) -> const hp::Tensor<std::byte>& { return c.tensor.get(); },
+            [](hp::DispatchIndirectCommand& c, const hp::Tensor<std::byte>& t) { c.tensor = std::cref(t); },
             "Tensor from which to read the group size")
         .def_rw("offset", &hp::DispatchIndirectCommand::offset,
             "Offset into the Tensor in bytes on where to start reading");

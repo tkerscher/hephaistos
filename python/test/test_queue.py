@@ -27,11 +27,11 @@ def test_queueSize():
 
 def test_QueueBuffer():
     buf = QueueBuffer(Item, 100, skipCounter=True)
-    assert buf.size_bytes == queueSize(Item, 100, skipCounter=True)
+    assert buf.nbytes == queueSize(Item, 100, skipCounter=True)
     buf = QueueBuffer(Item, 100, header=Header, skipCounter=True)
-    assert buf.size_bytes == queueSize(Item, 100, header=Header, skipCounter=True)
+    assert buf.nbytes == queueSize(Item, 100, header=Header, skipCounter=True)
     buf = QueueBuffer(Item, 100, header=Header)
-    assert buf.size_bytes == queueSize(Item, 100, header=Header)
+    assert buf.nbytes == queueSize(Item, 100, header=Header)
 
     assert buf.item == Item
     assert buf.capacity == 100
@@ -57,11 +57,11 @@ def test_QueueBuffer():
 
 def test_QueueTensor():
     ten = QueueTensor(Item, 100, skipCounter=True)
-    assert ten.size_bytes == queueSize(Item, 100, skipCounter=True)
+    assert ten.nbytes == queueSize(Item, 100, skipCounter=True)
     ten = QueueTensor(Item, 100, header=Header, skipCounter=True)
-    assert ten.size_bytes == queueSize(Item, 100, header=Header, skipCounter=True)
+    assert ten.nbytes == queueSize(Item, 100, header=Header, skipCounter=True)
     ten = QueueTensor(Item, 100, header=Header)
-    assert ten.size_bytes == queueSize(Item, 100, header=Header)
+    assert ten.nbytes == queueSize(Item, 100, header=Header)
 
     assert ten.item == Item
     assert ten.capacity == 100

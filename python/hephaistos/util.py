@@ -1,7 +1,7 @@
 import ctypes
 from typing import Any, Union
 from numpy.ctypeslib import as_array
-from .pyhephaistos import ByteTensor, RawBuffer
+from .pyhephaistos import Tensor, Buffer
 
 
 def printSize(size_bytes: int) -> str:
@@ -58,7 +58,7 @@ def createFlatType(struct: ctypes.Structure) -> ctypes.Structure:
     return Flat
 
 
-class ArrayBuffer(RawBuffer):
+class ArrayBuffer(Buffer):
     """
     Helper class for creating buffer holding an array of a given type.
     """
@@ -100,20 +100,20 @@ class ArrayBuffer(RawBuffer):
         return iter(self._arr)
 
 
-class ArrayTensor(ByteTensor):
+class ArrayTensor(Tensor):
     """
     Helper class for creating a tensor big enough to hold an array of given type
     and size.
     """
 
-    def __init__(self, type: ctypes.Structure, size: int, mapped: bool = False):
+    def __init__(self, type: ctypes.Structure, size: int, *, mapped: bool = False):
         """
         Create a typed array tensor of given type and size.
         """
-        super().__init__(ctypes.sizeof(type) * size, mapped)
+        super().__init__(ctypes.sizeof(type) * size, mapped=mapped)
 
 
-class StructureBuffer(RawBuffer):
+class StructureBuffer(Buffer):
     """
     Helper class for creating typed buffers.
     """
@@ -140,18 +140,18 @@ class StructureBuffer(RawBuffer):
         super().__getattribute__("_pointer").contents.__setattr__(__name, __value)
 
 
-class StructureTensor(ByteTensor):
+class StructureTensor(Tensor):
     """
     Helper class for creating tensors matching the size of a given struct.
     """
 
-    def __init__(self, typeOrData: Union[ctypes.Structure, Any], mapped: bool = False):
+    def __init__(self, typeOrData: Union[ctypes.Structure, Any], *, mapped: bool = False):
         """
         Creates a tensor with the exact size to hold the given structure.
         """
         if type(typeOrData) == type(ctypes.Structure):
-            super().__init__(ctypes.sizeof(typeOrData), mapped)
+            super().__init__(ctypes.sizeof(typeOrData), mapped=mapped)
         else:
             super().__init__(
-                ctypes.addressof(typeOrData), ctypes.sizeof(typeOrData), mapped
+                ctypes.addressof(typeOrData), ctypes.sizeof(typeOrData), mapped=mapped
             )

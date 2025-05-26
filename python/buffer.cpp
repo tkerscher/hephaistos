@@ -18,6 +18,21 @@ namespace hp = hephaistos;
 namespace nb = nanobind;
 using namespace nb::literals;
 
+enum class DType : uint16_t {
+    //[type] [bits] matching dlpack
+    int8 = 0x0008,
+    int16 = 0x0010,
+    int32 = 0x0020,
+    int64 = 0x0040,
+    uint8 = 0x0108,
+    uint16 = 0x0110,
+    uint32 = 0x0120,
+    uint64 = 0x0140,
+    float16 = 0x0210,
+    float32 = 0x0220,
+    float64 = 0x0240
+};
+
 namespace {
 
 constexpr auto units = std::to_array({" B", " KB", " MB", " GB"});
@@ -28,110 +43,228 @@ void printSize(size_t size, std::ostream& str) {
     str << size << units[dim];
 }
 
+#define PRINT_TYPE(x) case DType::##x: str << #x; break;
+
+void printType(DType dtype, std::ostream& str) {
+    switch(dtype) {
+    PRINT_TYPE(int8)
+    PRINT_TYPE(int16)
+    PRINT_TYPE(int32)
+    PRINT_TYPE(int64)
+    PRINT_TYPE(uint8)
+    PRINT_TYPE(uint16)
+    PRINT_TYPE(uint32)
+    PRINT_TYPE(uint64)
+    PRINT_TYPE(float16)
+    PRINT_TYPE(float32)
+    PRINT_TYPE(float64)
+    default:
+        str << "unknown";
+    }
 }
 
-class RawBuffer : public hp::Buffer<std::byte> {
+#undef PRINT_TYPE
+
+nb::dlpack::dtype toDLPack(DType dtype) {
+    return {
+        static_cast<uint8_t>(static_cast<uint16_t>(dtype) >> 8),
+        static_cast<uint8_t>(static_cast<uint16_t>(dtype) & 0xFF),
+        1
+    };
+}
+constexpr uint64_t getItemSize(DType dtype) {
+    return (static_cast<uint64_t>(dtype) & 0xFF) / 8;
+}
+uint64_t getArraySize(std::span<const size_t> shape, nb::dlpack::dtype dtype) {
+    uint64_t nbytes = dtype.bits / 8;
+    for (auto s : shape) nbytes *= s;
+    return nbytes;
+}
+
+using ndarray = nb::ndarray<nb::numpy, nb::device::cpu>;
+using const_ndarray = nb::ndarray<nb::numpy, nb::device::cpu, nb::ro, nb::c_contig>;
+
+std::span<const std::byte> as_span(const const_ndarray& array) {
+    return { reinterpret_cast<const std::byte*>(array.data()), array.nbytes() };
+}
+
+class Buffer : public hp::Buffer<std::byte> {
 public:
-    int64_t getAddress() const noexcept {
-        //python is weird...
-        return reinterpret_cast<int64_t>(getMemory().data());
+    ndarray numpy() const { return array; }
+    
+    DType dtype() const { return _dtype; }
+    size_t ndim() const { return array.ndim(); }
+    size_t size() const { return array.size(); }
+    nb::tuple shape() const {
+        nb::list result;
+        for (auto i = 0; i < ndim(); ++i)
+            result.append(array.shape(i));
+        return nb::tuple(result);
     }
 
-    RawBuffer(uint64_t size)
-        : hp::Buffer<std::byte>(getCurrentContext(), size) {}
-    virtual ~RawBuffer() = default;
-};
-template<class T>
-class TypedBuffer : public hp::Buffer<T> {
-public:
-    using array_type = nb::ndarray<T, nb::numpy, nb::shape<1, -1>>;
-
-    array_type numpy() const {
-        size_t shape = hp::Buffer<T>::size();
-        return array_type(
-            static_cast<void*>(hp::Buffer<T>::getMemory().data()),
-            1, &shape);
+    std::string print() const {
+        std::ostringstream str;
+        str << "Buffer (";
+        printSize(size_bytes(), str);
+        str << ") of type ";
+        printType(_dtype, str);
+        str << "[";
+        for (auto i = 0; i < array.ndim() - 1; ++i) {
+            str << array.shape(i) << ",";
+        }
+        str << array.shape(array.ndim() - 1) << "]";
+        return str.str();
     }
-
-    TypedBuffer(size_t size)
-        : hp::Buffer<T>(getCurrentContext(), size) {}
-    virtual ~TypedBuffer() = default;
+    
+    Buffer(std::span<const size_t> shape, DType dtype)
+        : hp::Buffer<std::byte>(getCurrentContext(), getArraySize(shape, toDLPack(dtype)))
+        , array(getMemory().data(), shape.size(), shape.data(), {}, nullptr, toDLPack(dtype))
+        , _dtype(dtype)
+    {}
+    ~Buffer() override = default;
+    
+private:
+    ndarray array;
+    DType _dtype;
 };
-template<class T>
-void registerBuffer(nb::module_& m, const char* name, const char* type_name) {
-    //build doc string
-    std::ostringstream docStream;
-    docStream
-        << "Buffer representing memory allocated on the host holding an array of type "
-        << type_name
-        << " and given size which can be accessed as numpy array."
-        << "\n\nParameters\n----------\n"
-        << "size: int\n"
-        << "    Number of elements\n";
 
-    nb::class_<TypedBuffer<T>, hp::Buffer<std::byte>>(m, name)
-        .def(nb::init<size_t>(), "size"_a)
-        .def_prop_ro("size", [](const TypedBuffer<T>& b) { return b.size(); },
-            "The number of elements in this buffer.")
-        .def_prop_ro("size_bytes", [](const TypedBuffer<T>& b) { return b.size_bytes(); },
-            "The size of the buffer in bytes.")
-        .def("numpy", &TypedBuffer<T>::numpy, nb::rv_policy::reference_internal,
-            "Returns a numpy array using this buffer's memory.")
-        .def("__repr__", [name = std::string(name)](const TypedBuffer<T>& t) {
-            std::ostringstream str;
-            str << name
-                << "[" << t.size() << "] (";
-            printSize(t.size_bytes(), str);
-            str << ")\n";
-            return str.str();
-        })
-        .doc() = docStream.str();
-}
-
-namespace {
-
-template<class T>
-std::span<const T> span_cast(const nb::ndarray<T, nb::shape<-1>, nb::c_contig, nb::device::cpu>& array) {
-    return { array.data(), array.size() };
-}
-
-}
-
-template<class T>
-class TypedTensor : public hp::Tensor<T> {
+template<DType DT>
+class TypedBuffer : public Buffer {
 public:
-    using array_type = nb::ndarray<T, nb::shape<-1>, nb::c_contig, nb::device::cpu>;
+    TypedBuffer(std::span<const size_t> shape) : Buffer(shape, DT) {}
+    ~TypedBuffer() override = default;    
+};
 
-    TypedTensor(size_t count, bool mapped)
-        : hp::Tensor<T>(getCurrentContext(), count, mapped) {}
-    TypedTensor(uint64_t addr, size_t n, bool mapped)
-        : hp::Tensor<T>(getCurrentContext(), { reinterpret_cast<const T*>(addr), n }, mapped) {}
-    TypedTensor(const array_type& array, bool mapped)
-        : hp::Tensor<T>(getCurrentContext(), span_cast(array), mapped) {}
+template<DType DT>
+void registerTypedBuffer(nb::module_& m, const char* name) {
+    nb::class_<TypedBuffer<DT>, Buffer>(m, name)
+        .def("__init__", [](TypedBuffer<DT>* b, size_t size) {
+            new (b) TypedBuffer<DT>({ &size, 1 });
+        }, "size"_a)
+        .def("__init__", [](TypedBuffer<DT>* b, nb::typed<nb::tuple, nb::int_> shape) {
+            auto ndim = shape.size();
+            std::vector<size_t> sizes(ndim);
+            for (auto i = 0; i < ndim; ++i)
+                sizes[i] = nb::cast<size_t>(shape[i]);
+            new (b) Buffer(sizes, DT);
+        }, "shape"_a);
+}
+
+template<DType DT>
+class TypedTensor : public hp::Tensor<std::byte> {
+public:
+    TypedTensor(size_t size, bool mapped)
+        : hp::Tensor<std::byte>(getCurrentContext(), size, mapped)
+    {}
     ~TypedTensor() override = default;
 };
-template<class T>
-void registerTensor(nb::module_& m, const char* name, const char* type_name) {
-    //build doc string
-    std::ostringstream docStream;
-    docStream
-        << "Tensor representing memory allocated on the device holding an array of type "
-        << type_name
-        << " and given size. If mapped can be accessed from the host using its memory "
-        << "address. Mapping can optionally be requested but will be ignored if the "
-        << "device does not support it. Query its support after creation via isMapped.\n";
 
-    nb::class_<TypedTensor<T>, hp::Tensor<std::byte>>(m, name)
-        .def(nb::init<size_t, bool>(),
-            "size"_a, "mapped"_a = false,
-            "Creates a new tensor of given size."
+template<DType DT>
+void registerTypedTensor(nb::module_& m, const char* name) {
+    nb::class_<TypedTensor<DT>, hp::Tensor<std::byte>>(m, name)
+        .def("__init__", [](TypedTensor<DT>* t, size_t size, bool mapped) {
+                size *= getItemSize(DT);
+                new (t) TypedTensor<DT>(size, mapped);
+            }, "_size"_a, nb::kw_only(), "mapped"_a = false)
+        .def("__init__", [](TypedTensor<DT>* t, nb::typed<nb::tuple, nb::int_> shape, bool mapped) {
+                auto ndim = shape.size();
+                auto size = getItemSize(DT);
+                for (auto i = 0; i < ndim; ++i)
+                    size *= nb::cast<uint64_t>(shape[i]);
+                new (t) TypedTensor<DT>(size, mapped);
+            }, "shape"_a, nb::kw_only(), "mapped"_a = false);
+}
+
+}
+
+void registerBufferModule(nb::module_& m) {
+    nb::enum_<DType>(m, "DType")
+        .value("int8", DType::int8)
+        .value("int16", DType::int16)
+        .value("int32", DType::int32)
+        .value("int64", DType::int64)
+        .value("uint8", DType::uint8)
+        .value("uint16", DType::uint16)
+        .value("uint32", DType::uint32)
+        .value("uint64", DType::uint64)
+        .value("float16", DType::float16)
+        .value("float32", DType::float32)
+        .value("float64", DType::float64)
+        .export_values();
+
+    nb::class_<hp::Buffer<std::byte>, hp::Resource>(m, "Buffer",
+            "Buffer for allocating a raw chunk of memory on the host "
+            "accessible via its memory address. "
+            "Useful as a base class providing more complex functionality."
             "\n\nParameters\n----------\n"
             "size: int\n"
-            "    Number of elements\n"
+            "    size of the buffer in bytes")
+        .def("__init__", [](hp::Buffer<std::byte>* b, size_t size) {
+                new (b) hp::Buffer<std::byte>(getCurrentContext(), size);
+            }, "size"_a)
+        .def_prop_ro("address", [](const hp::Buffer<std::byte>& b) {
+                return reinterpret_cast<int64_t>(b.getMemory().data());
+            },
+            "The memory address of the allocated buffer.")
+        .def_prop_ro("nbytes", [](const hp::Buffer<std::byte>& b) { return b.size_bytes(); },
+            "The size of the buffer in bytes.")
+        .def("__repr__", [](const hp::Buffer<std::byte>& b) {
+            std::ostringstream str;
+            str << "Buffer: ";
+            printSize(b.size_bytes(), str);
+            str << '\n';
+            return str.str();
+        });
+    nb::class_<Buffer, hp::Buffer<std::byte>>(m, "NDBuffer",
+            "Buffer allocating memory on the host accessible on the Python side"
+            "via a numpy array.\n\n"
+            "Parameters\n"
+            "----------\n"
+            "shape\n"
+            "    Shape of the corresponding numpy array\n"
+            "dtype: hephaistos::DType, default=float32\n"
+            "    Data type of the corresponding numpy array.\n")
+        .def("__init__", [](Buffer* b, size_t size, DType dtype) {
+                new (b) Buffer({ &size, 1 }, dtype);
+            }, "shape"_a, nb::kw_only(), "dtype"_a = DType::float32)
+        .def("__init__", [](Buffer* b, nb::typed<nb::tuple, nb::int_> shape, DType dtype) {
+                auto ndim = shape.size();
+                std::vector<size_t> sizes(ndim);
+                for (auto i = 0; i < ndim; ++i)
+                    sizes[i] = nb::cast<size_t>(shape[i]);
+                new (b) Buffer(sizes, dtype);
+            }, "shape"_a, nb::kw_only(), "dtype"_a = DType::float32)
+        .def("numpy", &Buffer::numpy, nb::rv_policy::reference_internal,
+            "Returns numpy array using the buffer's memory")
+        .def_prop_ro("dtype", &Buffer::dtype,
+            "Underlying data type.")
+        .def_prop_ro("ndim", &Buffer::ndim,
+            "Number of dimensions of the underlying array")
+        .def_prop_ro("shape", &Buffer::shape,
+            "Shape of the underlying array")
+        .def_prop_ro("size", &Buffer::size,
+            "Returns total number of items in the buffer or array.")
+        .def("__repr__", &Buffer::print);
+    
+    nb::class_<hp::Tensor<std::byte>, hp::Resource>(m, "Tensor",
+            "Tensor allocating memory on the device.")
+        .def("__init__", [](hp::Tensor<std::byte>* t, size_t size, bool mapped) {
+                new (t) hp::Tensor<std::byte>(getCurrentContext(), size, mapped);
+            }, "size"_a, nb::kw_only(), "mapped"_a = false,
+            "Creates a new tensor of given size.\n\n"
+            "Parameters\n"
+            "----------\n"
+            "size: int\n"
+            "    Size of the tensor in bytes\n"
             "mapped: bool, default=False\n"
-            "    If True, tries to map memory to host address space")
-        .def(nb::init<uint64_t, size_t, bool>(),
-            "addr"_a, "n"_a, "mapped"_a = false,
+            "    If True, tries to map the tensor to host address space.")
+        .def("__init__", [](hp::Tensor<std::byte>* t, size_t nbytes, uint64_t addr, bool mapped) {
+                new (t) hp::Tensor<std::byte>(
+                    getCurrentContext(),
+                    { reinterpret_cast<const std::byte*>(addr), nbytes },
+                    mapped
+                );
+            }, "size"_a, nb::kw_only(), "addr"_a, "mapped"_a = false,
             "Creates a new tensor and fills it with the provided data"
             "\n\nParameters\n----------\n"
             "addr: int\n"
@@ -140,8 +273,13 @@ void registerTensor(nb::module_& m, const char* name, const char* type_name) {
             "    Number of bytes to copy from addr\n"
             "mapped: bool, default=False\n"
             "    If True, tries to map memory to host address space")
-        .def(nb::init<const typename TypedTensor<T>::array_type&, bool>(),
-            "array"_a, "mapped"_a = false,
+        .def("__init__", [](hp::Tensor<std::byte>* t, const const_ndarray& array, bool mapped) {
+                new (t) hp::Tensor<std::byte>(
+                    getCurrentContext(),
+                    { reinterpret_cast<const std::byte*>(array.data()), array.nbytes() },
+                    mapped
+                );
+            }, "array"_a, nb::kw_only(), "mapped"_a = false,
             "Creates a new tensor and fills it with the provided data"
             "\n\nParameters\n----------\n"
             "array: NDArray\n"
@@ -149,23 +287,21 @@ void registerTensor(nb::module_& m, const char* name, const char* type_name) {
                 "Its type must match the tensor's.\n"
             "mapped: bool, default=False\n"
             "    If True, tries to map memory to host address space")
-        .def_prop_ro("address", [](const TypedTensor<T>& t) { return t.address(); },
+        .def_prop_ro("address", [](const hp::Tensor<std::byte>& t) { return t.address(); },
             "The device address of this tensor.")
-        .def_prop_ro("isMapped", [](const TypedTensor<T>& t) { return t.isMapped(); },
+        .def_prop_ro("isMapped", [](const hp::Tensor<std::byte>& t) { return t.isMapped(); },
             "True, if the underlying memory is writable by the CPU.")
-        .def_prop_ro("memory", [](const TypedTensor<T>& t)
+        .def_prop_ro("memory", [](const hp::Tensor<std::byte>& t)
                 { return reinterpret_cast<intptr_t>(t.getMemory().data()); },
             "Mapped memory address of the tensor as seen from the CPU. Zero if not mapped.")
-        .def_prop_ro("size", [](const TypedTensor<T>& t) { return t.size(); },
-            "The number of elements in this tensor.")
-        .def_prop_ro("size_bytes", [](const TypedTensor<T>& t) { return t.size_bytes(); },
+        .def_prop_ro("nbytes", [](const hp::Tensor<std::byte>& t) { return t.size_bytes(); },
             "The size of the tensor in bytes.")
-        .def_prop_ro("isNonCoherent", [](const TypedTensor<T>& t) { return t.isNonCoherent(); },
+        .def_prop_ro("isNonCoherent", [](const hp::Tensor<std::byte>& t) { return t.isNonCoherent(); },
             "Wether calls to flush() and invalidate() are necessary to make changes"
             "in mapped memory between devices and host available")
         .def("update",
-            [](TypedTensor<T>& t, uint64_t ptr, size_t n, uint64_t offset) {
-                t.update({ reinterpret_cast<const T*>(ptr), n }, offset);
+            [](hp::Tensor<std::byte>& t, uint64_t ptr, size_t n, uint64_t offset) {
+                t.update({ reinterpret_cast<std::byte*>(ptr), n }, offset);
             }, "addr"_a, "n"_a, "offset"_a = 0,
             "Updates the tensor at the given offset with n elements from addr"
             "\n\nParameters\n----------\n"
@@ -176,7 +312,7 @@ void registerTensor(nb::module_& m, const char* name, const char* type_name) {
             "offset: int, default=0\n"
             "   Offset into the tensor in number of elements where the copy starts")
         .def("flush",
-            [](TypedTensor<T>& t, uint64_t offset, std::optional<uint64_t> size) {
+            [](hp::Tensor<std::byte>& t, uint64_t offset, std::optional<uint64_t> size) {
                 uint64_t _size = hp::whole_size;
                 if (size) _size = *size;
                 t.flush(offset, _size);
@@ -188,8 +324,8 @@ void registerTensor(nb::module_& m, const char* name, const char* type_name) {
             "size: int | None, default=None\n"
             "   Number of elements to flush starting at offset. If None, flushes all remaining elements")
         .def("retrieve",
-            [](TypedTensor<T>& t, uint64_t ptr, size_t n, uint64_t offset) {
-                t.retrieve({ reinterpret_cast<T*>(ptr), n }, offset);
+            [](hp::Tensor<std::byte>& t, uint64_t ptr, size_t n, uint64_t offset) {
+                t.retrieve({ reinterpret_cast<std::byte*>(ptr), n }, offset);
             }, "addr"_a, "n"_a, "offset"_a = 0,
             "Retrieves data from the tensor at the given offset and "
             "stores it in dst. Only needed if isNonCoherent is True."
@@ -201,7 +337,7 @@ void registerTensor(nb::module_& m, const char* name, const char* type_name) {
             "offset: int, default=0\n"
             "   Offset into the tensor in amount of elements where the copy starts")
         .def("invalidate",
-            [](TypedTensor<T>& t, uint64_t offset, std::optional<uint64_t> size) {
+            [](hp::Tensor<std::byte>& t, uint64_t offset, std::optional<uint64_t> size) {
                 uint64_t _size = hp::whole_size;
                 if (size) _size = *size;
                 t.invalidate(offset, _size);
@@ -214,16 +350,15 @@ void registerTensor(nb::module_& m, const char* name, const char* type_name) {
             "size: int | None, default=None\n"
             "   Number of elements to invalidate starting at offset. "
                "If None, invalidates all remaining bytes")
-        .def("bindParameter", [](const TypedTensor<T>& t, hp::Program& p, uint32_t b)
+        .def("bindParameter", [](const hp::Tensor<std::byte>& t, hp::Program& p, uint32_t b)
             { t.bindParameter(p.getBinding(b)); }, "program"_a, "binding"_a,
             "Binds the tensor to the program at the given binding")
-        .def("bindParameter", [](const TypedTensor<T>& t, hp::Program& p, std::string_view b)
+        .def("bindParameter", [](const hp::Tensor<std::byte>& t, hp::Program& p, std::string_view b)
             { t.bindParameter(p.getBinding(b)); }, "program"_a, "binding"_a,
             "Binds the tensor to the program at the given binding")
-        .def("__repr__", [name = std::string(name)](const TypedTensor<T>& t) {
+        .def("__repr__", [](const hp::Tensor<std::byte>& t) {
             std::ostringstream str;
-            str << name
-                << "[" << t.size() << "] (";
+            str << "Tensor (";
             printSize(t.size_bytes(), str);
             str << ") at 0x" << std::uppercase << std::hex << t.address();
             if (t.isMapped())
@@ -231,61 +366,33 @@ void registerTensor(nb::module_& m, const char* name, const char* type_name) {
             else
                 str << '\n';
             return str.str();
-        })
-        .doc() = docStream.str();
-}
-
-void registerBufferModule(nb::module_& m) {
-    nb::class_<hp::Buffer<std::byte>, hp::Resource>(m, "Buffer",
-        "Base class for all buffers managing memory allocation on the host");
-    nb::class_<hp::Tensor<std::byte>, hp::Resource>(m, "Tensor",
-        "Base class for all tensors managing memory allocations on the device");
-
-    nb::class_<RawBuffer, hp::Buffer<std::byte>>(m, "RawBuffer",
-            "Buffer for allocating a raw chunk of memory on the host "
-            "accessible via its memory address. "
-            "Useful as a base class providing more complex functionality."
-            "\n\nParameters\n----------\n"
-            "size: int\n"
-            "    size of the buffer in bytes")
-        .def(nb::init<uint64_t>(), "size"_a)
-        .def_prop_ro("address", [](const RawBuffer& b) { return b.getAddress(); },
-            "The memory address of the allocated buffer.")
-        .def_prop_ro("size", [](const RawBuffer& b) { return b.size(); },
-            "The size of the buffer in bytes.")
-        .def_prop_ro("size_bytes", [](const RawBuffer& b) { return b.size_bytes(); },
-            "The size of the buffer in bytes.")
-        .def("__repr__", [](const RawBuffer& b) {
-            std::ostringstream str;
-            str << "RawBuffer: ";
-            printSize(b.size_bytes(), str);
-            str << '\n';
-            return str.str();
         });
 
     //Register typed buffers
-    registerBuffer<float>(m, "FloatBuffer", "float");
-    registerBuffer<double>(m, "DoubleBuffer", "double");
-    registerBuffer<uint8_t>(m, "ByteBuffer", "uint8");
-    registerBuffer<uint16_t>(m, "UnsignedShortBuffer", "uint16");
-    registerBuffer<uint32_t>(m, "UnsignedIntBuffer", "uint32");
-    registerBuffer<uint64_t>(m, "UnsignedLongBuffer", "uint64");
-    registerBuffer<int8_t>(m, "CharBuffer", "int8");
-    registerBuffer<int16_t>(m, "ShortBuffer", "int16");
-    registerBuffer<int32_t>(m, "IntBuffer", "int32");
-    registerBuffer<int64_t>(m, "LongBuffer", "int64");
+    registerTypedBuffer<DType::int8>(m, "CharBuffer");
+    registerTypedBuffer<DType::int16>(m, "ShortBuffer");
+    registerTypedBuffer<DType::int32>(m, "IntBuffer");
+    registerTypedBuffer<DType::int64>(m, "LongBuffer");
+    registerTypedBuffer<DType::uint8>(m, "ByteBuffer");
+    registerTypedBuffer<DType::uint16>(m, "UnsignedShortBuffer");
+    registerTypedBuffer<DType::uint32>(m, "UnsignedIntBuffer");
+    registerTypedBuffer<DType::uint64>(m, "UnsignedLongBuffer");
+    registerTypedBuffer<DType::float16>(m, "HalfBuffer");
+    registerTypedBuffer<DType::float32>(m, "FloatBuffer");
+    registerTypedBuffer<DType::float64>(m, "DoubleBuffer");
 
     //Register typed buffers
-    registerTensor<float>(m, "FloatTensor", "float");
-    registerTensor<double>(m, "DoubleTensor", "double");
-    registerTensor<uint8_t>(m, "ByteTensor", "uint8");
-    registerTensor<uint16_t>(m, "UnsignedShortTensor", "uint16");
-    registerTensor<uint32_t>(m, "UnsignedIntTensor", "uint32");
-    registerTensor<uint64_t>(m, "UnsignedLongTensor", "uint64");
-    registerTensor<int8_t>(m, "CharTensor", "int8");
-    registerTensor<int16_t>(m, "ShortTensor", "int16");
-    registerTensor<int32_t>(m, "IntTensor", "int32");
-    registerTensor<int64_t>(m, "LongTensor", "int64");
+    registerTypedTensor<DType::int8>(m, "CharTensor");
+    registerTypedTensor<DType::int16>(m, "ShortTensor");
+    registerTypedTensor<DType::int32>(m, "IntTensor");
+    registerTypedTensor<DType::int64>(m, "LongTensor");
+    registerTypedTensor<DType::uint8>(m, "ByteTensor");
+    registerTypedTensor<DType::uint16>(m, "UnsignedShortTensor");
+    registerTypedTensor<DType::uint32>(m, "UnsignedIntTensor");
+    registerTypedTensor<DType::uint64>(m, "UnsignedLongTensor");
+    registerTypedTensor<DType::float16>(m, "HalfTensor");
+    registerTypedTensor<DType::float32>(m, "FloatTensor");
+    registerTypedTensor<DType::float64>(m, "DoubleTensor");
 
     //retrieve tensor command
     nb::class_<hp::RetrieveTensorCommand, hp::Command>(m, "RetrieveTensorCommand",

@@ -9,7 +9,7 @@ from hephaistos import (
     Buffer,
     ByteTensor,
     Command,
-    RawBuffer,
+    Buffer,
     Tensor,
     clearTensor,
     execute,
@@ -195,7 +195,7 @@ class QueueSubView:
     def __contains__(self, key: str) -> bool:
         return key in self._orig
 
-    def __getitem__(self, key) -> Union[QueueView, NDArray]:
+    def __getitem__(self, key) -> Union[QueueView, QueueSubView, NDArray]:
         if isinstance(key, (int, ndarray, slice)):
             return QueueSubView(self, key)
         elif not isinstance(key, str):
@@ -353,7 +353,7 @@ def as_queue(
         The view describing the queue in the given buffer
     """
     if size is None:
-        size = buffer.size_bytes - offset
+        size = buffer.nbytes - offset
     # calculate capacity
     if header is not None:
         size -= sizeof(header)
@@ -369,7 +369,7 @@ def as_queue(
     )
 
 
-class QueueBuffer(RawBuffer):
+class QueueBuffer(Buffer):
     """
     Util class allocating enough memory to hold the given and gives a view to it
 
@@ -422,7 +422,7 @@ class QueueBuffer(RawBuffer):
 
     def __repr__(self) -> str:
         name, cap = self.item.__name__, self.capacity
-        return f"QueueBuffer: {name}[{cap}] ({printSize(self.size_bytes)})"
+        return f"QueueBuffer: {name}[{cap}] ({printSize(self.nbytes)})"
 
 
 class QueueTensor(ByteTensor):
@@ -458,7 +458,7 @@ class QueueTensor(ByteTensor):
         self._hasCounter = not skipCounter
 
     @property
-    def header(self) -> Optional[Structure]:
+    def header(self) -> Optional[Type[Structure]]:
         """Optional header. None if no header is present"""
         return self._header
 
@@ -479,7 +479,7 @@ class QueueTensor(ByteTensor):
 
     def __repr__(self) -> str:
         name, cap = self.item.__name__, self.capacity
-        return f"QueueBuffer: {name}[{cap}] ({printSize(self.size_bytes)})"
+        return f"QueueBuffer: {name}[{cap}] ({printSize(self.nbytes)})"
 
 
 def clearQueue(
@@ -553,7 +553,7 @@ class IOQueue:
         return self._capacity
 
     @property
-    def header(self) -> Optional[Structure]:
+    def header(self) -> Optional[Type[Structure]]:
         """Optional header. None if no header is present"""
         return self._header
 
