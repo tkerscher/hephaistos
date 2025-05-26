@@ -28,20 +28,20 @@ set(Python_EXECUTABLE "${PYTHON_EXECUTABLE}")
 set(Python_INCLUDE_DIR "${PYTHON_INCLUDE_DIR}")
 set(Python_LIBRARY "${PYTHON_LIBRARY}")
 
-# Create CMake targets for all Python components needed by nanobind
-if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.26)
-    find_package(Python 3.8 COMPONENTS Interpreter Development.Module Development.SABIModule REQUIRED)
+if (CMAKE_VERSION VERSION_LESS 3.18)
+  set(DEV_MODULE Development)
 else()
-    find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)
+  set(DEV_MODULE Development.Module)
 endif()
 
-# Run `nanobind.cmake_dir()` from Python to detect where nanobind is installed
-execute_process(
-    COMMAND "${Python_EXECUTABLE}" -c "import nanobind; print(nanobind.cmake_dir())"
-    OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE NB_DIR)
-list(APPEND CMAKE_PREFIX_PATH "${NB_DIR}")
+find_package(Python 3.8
+    REQUIRED COMPONENTS Interpreter ${DEV_MODULE}
+    OPTIONAL_COMPONENTS Development.SABIModule)
 
-# Now, import nanobind through CMake's find_package mechanism
+# Detect the installed nanobind package and import it into CMake
+execute_process(
+  COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+  OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_ROOT)
 find_package(nanobind CONFIG REQUIRED)
 
 # We are now ready to compile the actual extension module
@@ -60,5 +60,20 @@ if(WARN_LEAKS)
     target_compile_definitions(pyhephaistos PRIVATE WARN_LEAKS)
 endif()
 
+# create stubs
+nanobind_add_stub(
+    pyhephaistos_stub
+    MODULE pyhephaistos
+    OUTPUT pyhephaistos.pyi
+    MARKER_FILE py.typed
+    PYTHON_PATH $<TARGET_FILE_DIR:pyhephaistos>
+    DEPENDS pyhephaistos
+)
+
 # install
 install(TARGETS pyhephaistos LIBRARY DESTINATION hephaistos)
+install(FILES
+    $<TARGET_FILE_DIR:pyhephaistos>/../py.typed
+    $<TARGET_FILE_DIR:pyhephaistos>/../pyhephaistos.pyi
+    DESTINATION hephaistos
+)

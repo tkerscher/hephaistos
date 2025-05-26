@@ -217,8 +217,7 @@ void registerImageModule(nb::module_& m) {
                     new (texture) hp::Texture(getCurrentContext(),
                         format, width, height, depth, sampler);
                 },
-            "format"_a, "width"_a, "height"_a = 1, "depth"_a = 1,
-            "kwargs"_a = nb::kwargs())
+            "format"_a, "width"_a, "height"_a = 1, "depth"_a = 1, "kwargs"_a)
         .def_prop_ro("width",
             [](const hp::Texture& tex) -> uint32_t { return tex.getWidth(); },
             "Width of the texture in pixels")
