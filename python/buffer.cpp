@@ -20,17 +20,17 @@ using namespace nb::literals;
 
 enum class DType : uint16_t {
     //[type] [bits] matching dlpack
-    int8 = 0x0008,
-    int16 = 0x0010,
-    int32 = 0x0020,
-    int64 = 0x0040,
-    uint8 = 0x0108,
-    uint16 = 0x0110,
-    uint32 = 0x0120,
-    uint64 = 0x0140,
-    float16 = 0x0210,
-    float32 = 0x0220,
-    float64 = 0x0240
+    e_int8 = 0x0008,
+    e_int16 = 0x0010,
+    e_int32 = 0x0020,
+    e_int64 = 0x0040,
+    e_uint8 = 0x0108,
+    e_uint16 = 0x0110,
+    e_uint32 = 0x0120,
+    e_uint64 = 0x0140,
+    e_float16 = 0x0210,
+    e_float32 = 0x0220,
+    e_float64 = 0x0240
 };
 
 namespace {
@@ -43,7 +43,7 @@ void printSize(size_t size, std::ostream& str) {
     str << size << units[dim];
 }
 
-#define PRINT_TYPE(x) case DType::##x: str << #x; break;
+#define PRINT_TYPE(x) case DType::e_##x: str << #x; break;
 
 void printType(DType dtype, std::ostream& str) {
     switch(dtype) {
@@ -179,17 +179,17 @@ void registerTypedTensor(nb::module_& m, const char* name) {
 
 void registerBufferModule(nb::module_& m) {
     nb::enum_<DType>(m, "DType")
-        .value("int8", DType::int8)
-        .value("int16", DType::int16)
-        .value("int32", DType::int32)
-        .value("int64", DType::int64)
-        .value("uint8", DType::uint8)
-        .value("uint16", DType::uint16)
-        .value("uint32", DType::uint32)
-        .value("uint64", DType::uint64)
-        .value("float16", DType::float16)
-        .value("float32", DType::float32)
-        .value("float64", DType::float64)
+        .value("int8", DType::e_int8)
+        .value("int16", DType::e_int16)
+        .value("int32", DType::e_int32)
+        .value("int64", DType::e_int64)
+        .value("uint8", DType::e_uint8)
+        .value("uint16", DType::e_uint16)
+        .value("uint32", DType::e_uint32)
+        .value("uint64", DType::e_uint64)
+        .value("float16", DType::e_float16)
+        .value("float32", DType::e_float32)
+        .value("float64", DType::e_float64)
         .export_values();
 
     nb::class_<hp::Buffer<std::byte>, hp::Resource>(m, "Buffer",
@@ -226,14 +226,14 @@ void registerBufferModule(nb::module_& m) {
             "    Data type of the corresponding numpy array.\n")
         .def("__init__", [](Buffer* b, size_t size, DType dtype) {
                 new (b) Buffer({ &size, 1 }, dtype);
-            }, "shape"_a, nb::kw_only(), "dtype"_a = DType::float32)
+            }, "shape"_a, nb::kw_only(), "dtype"_a = DType::e_float32)
         .def("__init__", [](Buffer* b, nb::typed<nb::tuple, nb::int_> shape, DType dtype) {
                 auto ndim = shape.size();
                 std::vector<size_t> sizes(ndim);
                 for (auto i = 0; i < ndim; ++i)
                     sizes[i] = nb::cast<size_t>(shape[i]);
                 new (b) Buffer(sizes, dtype);
-            }, "shape"_a, nb::kw_only(), "dtype"_a = DType::float32)
+            }, "shape"_a, nb::kw_only(), "dtype"_a = DType::e_float32)
         .def("numpy", &Buffer::numpy, nb::rv_policy::reference_internal,
             "Returns numpy array using the buffer's memory")
         .def_prop_ro("dtype", &Buffer::dtype,
@@ -369,30 +369,30 @@ void registerBufferModule(nb::module_& m) {
         });
 
     //Register typed buffers
-    registerTypedBuffer<DType::int8>(m, "CharBuffer");
-    registerTypedBuffer<DType::int16>(m, "ShortBuffer");
-    registerTypedBuffer<DType::int32>(m, "IntBuffer");
-    registerTypedBuffer<DType::int64>(m, "LongBuffer");
-    registerTypedBuffer<DType::uint8>(m, "ByteBuffer");
-    registerTypedBuffer<DType::uint16>(m, "UnsignedShortBuffer");
-    registerTypedBuffer<DType::uint32>(m, "UnsignedIntBuffer");
-    registerTypedBuffer<DType::uint64>(m, "UnsignedLongBuffer");
-    registerTypedBuffer<DType::float16>(m, "HalfBuffer");
-    registerTypedBuffer<DType::float32>(m, "FloatBuffer");
-    registerTypedBuffer<DType::float64>(m, "DoubleBuffer");
+    registerTypedBuffer<DType::e_int8>(m, "CharBuffer");
+    registerTypedBuffer<DType::e_int16>(m, "ShortBuffer");
+    registerTypedBuffer<DType::e_int32>(m, "IntBuffer");
+    registerTypedBuffer<DType::e_int64>(m, "LongBuffer");
+    registerTypedBuffer<DType::e_uint8>(m, "ByteBuffer");
+    registerTypedBuffer<DType::e_uint16>(m, "UnsignedShortBuffer");
+    registerTypedBuffer<DType::e_uint32>(m, "UnsignedIntBuffer");
+    registerTypedBuffer<DType::e_uint64>(m, "UnsignedLongBuffer");
+    registerTypedBuffer<DType::e_float16>(m, "HalfBuffer");
+    registerTypedBuffer<DType::e_float32>(m, "FloatBuffer");
+    registerTypedBuffer<DType::e_float64>(m, "DoubleBuffer");
 
     //Register typed buffers
-    registerTypedTensor<DType::int8>(m, "CharTensor");
-    registerTypedTensor<DType::int16>(m, "ShortTensor");
-    registerTypedTensor<DType::int32>(m, "IntTensor");
-    registerTypedTensor<DType::int64>(m, "LongTensor");
-    registerTypedTensor<DType::uint8>(m, "ByteTensor");
-    registerTypedTensor<DType::uint16>(m, "UnsignedShortTensor");
-    registerTypedTensor<DType::uint32>(m, "UnsignedIntTensor");
-    registerTypedTensor<DType::uint64>(m, "UnsignedLongTensor");
-    registerTypedTensor<DType::float16>(m, "HalfTensor");
-    registerTypedTensor<DType::float32>(m, "FloatTensor");
-    registerTypedTensor<DType::float64>(m, "DoubleTensor");
+    registerTypedTensor<DType::e_int8>(m, "CharTensor");
+    registerTypedTensor<DType::e_int16>(m, "ShortTensor");
+    registerTypedTensor<DType::e_int32>(m, "IntTensor");
+    registerTypedTensor<DType::e_int64>(m, "LongTensor");
+    registerTypedTensor<DType::e_uint8>(m, "ByteTensor");
+    registerTypedTensor<DType::e_uint16>(m, "UnsignedShortTensor");
+    registerTypedTensor<DType::e_uint32>(m, "UnsignedIntTensor");
+    registerTypedTensor<DType::e_uint64>(m, "UnsignedLongTensor");
+    registerTypedTensor<DType::e_float16>(m, "HalfTensor");
+    registerTypedTensor<DType::e_float32>(m, "FloatTensor");
+    registerTypedTensor<DType::e_float64>(m, "DoubleTensor");
 
     //retrieve tensor command
     nb::class_<hp::RetrieveTensorCommand, hp::Command>(m, "RetrieveTensorCommand",
