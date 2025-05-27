@@ -73,7 +73,7 @@ nanobind_add_stub(
 # install
 install(TARGETS pyhephaistos LIBRARY DESTINATION hephaistos)
 install(FILES
-    $<TARGET_FILE_DIR:pyhephaistos>/../py.typed
-    $<TARGET_FILE_DIR:pyhephaistos>/../pyhephaistos.pyi
+    ${CMAKE_BINARY_DIR}/python/py.typed
+    ${CMAKE_BINARY_DIR}/python/pyhephaistos.pyi
     DESTINATION hephaistos
 )
