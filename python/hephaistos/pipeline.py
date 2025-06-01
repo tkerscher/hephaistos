@@ -430,6 +430,7 @@ class Pipeline:
                 stage, param = name.split("__", 1)
                 if not stage in self._stageDict:
                     warnings.warn(f'There is no stage "{stage}" in this pipeline!')
+                    continue
                 self._stageDict[stage].setParam(param, value)
             else:
                 for _, stage in self._stageList:
