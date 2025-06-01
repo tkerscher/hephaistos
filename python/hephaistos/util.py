@@ -145,7 +145,9 @@ class StructureTensor(Tensor):
     Helper class for creating tensors matching the size of a given struct.
     """
 
-    def __init__(self, typeOrData: Union[ctypes.Structure, Any], *, mapped: bool = False):
+    def __init__(
+        self, typeOrData: Union[ctypes.Structure, Any], *, mapped: bool = False
+    ):
         """
         Creates a tensor with the exact size to hold the given structure.
         """
