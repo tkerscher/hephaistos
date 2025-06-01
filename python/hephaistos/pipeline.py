@@ -1019,9 +1019,22 @@ class DynamicTask(ABC):
 
         # finished?
         if self._remaining == 0:
+            self.onTaskFinished()
             self._finishedEvent.set()
         # tell scheduler about any new batches to issue
         return n
+
+    def onTaskFinished(self) -> None:
+        """
+        Called once the task has finished, i.e. no more batches are missing.
+        Can be overloaded by derived classes.
+
+        Note
+        ----
+        This function will be called from a different thread than the one that
+        issued the task.
+        """
+        pass
 
     @abstractmethod
     def processBatch(self, config: int) -> int:
