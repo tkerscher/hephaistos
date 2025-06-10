@@ -107,6 +107,8 @@ void registerCommandModule(nb::module_& m) {
             "The value the timeline will reach when the submission finishes.")
         .def_prop_ro("forgettable", [](const hp::Submission& s){ return s.forgettable(); },
             "True, if the Submission can be discarded safely, i.e. fire and forget.")
+        .def_prop_ro("finished", [](const hp::Submission& s){ return s.hasFinished(); },
+            "True, if the Submission has already finished.")
         .def("wait", [](const hp::Submission& s) {
                 nb::gil_scoped_release release;
                 s.wait();

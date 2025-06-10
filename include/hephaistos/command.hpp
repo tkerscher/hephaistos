@@ -248,6 +248,11 @@ public:
     [[nodiscard]] bool forgettable() const noexcept;
 
     /**
+     * @brief Queries whether the submission has already finished.
+     */
+    [[nodiscard]] bool hasFinished() const;
+
+    /**
      * @brief Blocks calling code until submitted work has finished
     */
     void wait() const;

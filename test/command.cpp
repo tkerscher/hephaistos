@@ -83,11 +83,15 @@ TEST_CASE("sequences can wait for the cpu", "[command]") {
 
     auto submission = beginSequence(timeline).WaitFor(5).Submit();
 
+    REQUIRE(!submission.hasFinished());
+
     REQUIRE(!submission.wait(100));
     timeline.setValue(2);
     REQUIRE(!submission.wait(100));
     timeline.setValue(5);
     REQUIRE(submission.wait(100));
+
+    REQUIRE(submission.hasFinished());
 
     REQUIRE(!hasValidationErrorOccurred());
 }

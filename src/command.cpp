@@ -234,6 +234,10 @@ bool Submission::forgettable() const noexcept {
     return !resources || resources->commands.empty();
 }
 
+bool Submission::hasFinished() const {
+    return timeline.get().getValue() >= finalStep;
+}
+
 void Submission::wait() const {
     if (finalStep > 0)
         timeline.get().waitValue(finalStep);
