@@ -22,7 +22,18 @@ from numpy.ctypeslib import as_array
 
 from numpy.typing import NDArray
 from os import PathLike
-from typing import Any, BinaryIO, Dict, List, Literal, Optional, Set, Type, Union
+from typing import (
+    Any,
+    BinaryIO,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Set,
+    Type,
+    Union,
+    overload,
+)
 
 
 class QueueView:
@@ -114,6 +125,11 @@ class QueueView:
     def __contains__(self, key: str) -> bool:
         return key in self._fields
 
+    @overload
+    def __getitem__(self, key: str) -> NDArray: ...
+    @overload
+    def __getitem__(self, key: Union[int, NDArray, slice]) -> QueueSubView: ...
+
     def __getitem__(self, key: Any) -> Union[QueueSubView, NDArray]:
         if isinstance(key, (int, ndarray, slice)):
             return QueueSubView(self, key)
@@ -194,6 +210,11 @@ class QueueSubView:
 
     def __contains__(self, key: str) -> bool:
         return key in self._orig
+
+    @overload
+    def __getitem__(self, key: str) -> NDArray: ...
+    @overload
+    def __getitem__(self, key: Union[int, NDArray, slice]) -> QueueSubView: ...
 
     def __getitem__(self, key) -> Union[QueueView, QueueSubView, NDArray]:
         if isinstance(key, (int, ndarray, slice)):
