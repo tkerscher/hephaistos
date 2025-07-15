@@ -22,7 +22,8 @@ constexpr auto ExtensionName = "Raytracing";
 constexpr auto DeviceExtensions = std::to_array({
     VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
     VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
-    VK_KHR_RAY_QUERY_EXTENSION_NAME
+    VK_KHR_RAY_QUERY_EXTENSION_NAME,
+    VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME
 });
 
 }
@@ -47,8 +48,12 @@ bool isRaytracingSupported(const DeviceHandle& device) {
     }
 
     //Query features
+    VkPhysicalDeviceRayTracingPositionFetchFeaturesKHR posFetchFeatures{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_POSITION_FETCH_FEATURES_KHR,
+    };
     VkPhysicalDeviceRayQueryFeaturesKHR queryFeatures{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR,
+        .pNext = &posFetchFeatures
     };
     VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
@@ -61,6 +66,8 @@ bool isRaytracingSupported(const DeviceHandle& device) {
     vkGetPhysicalDeviceFeatures2(device->device, &features);
 
     //check features
+    if (!posFetchFeatures.rayTracingPositionFetch)
+        return false;
     if (!queryFeatures.rayQuery)
         return false;
     if (!accelerationStructureFeatures.accelerationStructure)
@@ -102,9 +109,14 @@ private:
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR,
         .rayQuery = VK_TRUE
     };
+    VkPhysicalDeviceRayTracingPositionFetchFeaturesKHR positionFetchFeatures{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_POSITION_FETCH_FEATURES_KHR,
+        .pNext = &queryFeatures,
+        .rayTracingPositionFetch = VK_TRUE
+    };
     VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
-        .pNext = &queryFeatures,
+        .pNext = &positionFetchFeatures,
         .accelerationStructure = VK_TRUE
     };
 };
@@ -305,7 +317,8 @@ GeometryStore::GeometryStore(
             .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
             .type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,
             .flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR |
-                     VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR,
+                     VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR |
+                     VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_DATA_ACCESS_KHR,
             .geometryCount = 1,
             .pGeometries = &geometries[i]
         };
@@ -598,7 +611,8 @@ AccelerationStructure::AccelerationStructure(
     VkAccelerationStructureBuildGeometryInfoKHR tlasGeometryInfo{
         .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
         .type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,
-        .flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
+        .flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR |
+                 VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_DATA_ACCESS_KHR,
         .geometryCount = 1,
         .pGeometries = &tlasGeometry
     };

@@ -87,6 +87,7 @@ struct Result{
     int32_t hit;
     int32_t customIdx;
     int32_t instanceIdx;
+    float hitT;
     float hitX;
     float hitY;
     float hitZ;
@@ -96,6 +97,7 @@ struct Result{
 
 const auto customIdx = std::to_array<uint32_t>({ 17,4,21,15,4,31 });
 const auto instanceIdx = std::to_array<uint32_t>({ 0,1,2,3,4,5 });
+const auto expectedT = std::to_array<float>({ 1.f, 1.f, 1.f, 1.f, 1.f, 1.f });
 const auto expectedX = std::to_array<float>({ 0.f, 0.f, -1.f, 1.f, 0.f, 0.f });
 const auto expectedY = std::to_array<float>({ 0.f, 0.f, 0.f, 0.f, 1.f, -1.f });
 const auto expectedZ = std::to_array<float>({ 1.f, -1.f, 0.f, 0.f, 0.f, 0.f });
@@ -177,6 +179,7 @@ TEST_CASE("ray queries are available in shaders", "[raytracing]") {
         REQUIRE(result[i].hit == 1);
         REQUIRE(result[i].customIdx == customIdx[i]);
         REQUIRE(result[i].instanceIdx == instanceIdx[i]);
+        REQUIRE_THAT(result[i].hitT, Catch::Matchers::WithinAbs(expectedT[i], eps));
         REQUIRE_THAT(result[i].hitX, Catch::Matchers::WithinAbs(expectedX[i], eps));
         REQUIRE_THAT(result[i].hitY, Catch::Matchers::WithinAbs(expectedY[i], eps));
         REQUIRE_THAT(result[i].hitZ, Catch::Matchers::WithinAbs(expectedZ[i], eps));

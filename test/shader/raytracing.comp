@@ -1,6 +1,7 @@
 #version 460
 #extension GL_EXT_ray_tracing : enable
 #extension GL_EXT_ray_query : enable
+#extension GL_EXT_ray_tracing_position_fetch : enable
 
 layout(local_size_x = 1) in;
 
@@ -8,6 +9,7 @@ struct Result{
     int hit;
     int customIdx;
     int instanceIdx;
+    float t;
     //dont use vec3
     float hitX;
     float hitY;
@@ -41,9 +43,18 @@ void main() {
         result[idx].hit = 1;
         result[idx].customIdx = rayQueryGetIntersectionInstanceCustomIndexEXT(rayQuery, true);
         result[idx].instanceIdx = rayQueryGetIntersectionInstanceIdEXT(rayQuery, true);
+        result[idx].t = rayQueryGetIntersectionTEXT(rayQuery, true);
 
-        float t = rayQueryGetIntersectionTEXT(rayQuery, true);
-        vec3 pos = dir[idx] * t;
+        vec3 vertices[3];
+        vec2 barys = rayQueryGetIntersectionBarycentricsEXT(rayQuery, true);
+        rayQueryGetIntersectionTriangleVertexPositionsEXT(rayQuery, true, vertices);
+
+        precise vec3 e1 = vertices[1] - vertices[0];
+        precise vec3 e2 = vertices[2] - vertices[0];
+        vec3 pos = vertices[0] + fma(vec3(barys.x), e1, barys.y * e2);
+
+        mat4x3 m = rayQueryGetIntersectionObjectToWorldEXT(rayQuery, true);
+        pos = m * vec4(pos, 1.0);
 
         result[idx].hitX = pos.x;
         result[idx].hitY = pos.y;
@@ -53,6 +64,7 @@ void main() {
         result[idx].hit = 0;
         result[idx].customIdx = 0;
         result[idx].instanceIdx = 0;
+        result[idx].t = 0.0;
         result[idx].hitX = 0.0;
         result[idx].hitY = 0.0;
         result[idx].hitZ = 0.0;
