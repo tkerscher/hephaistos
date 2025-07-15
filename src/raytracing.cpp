@@ -565,16 +565,7 @@ AccelerationStructure::AccelerationStructure(
         VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
         VMA_ALLOCATION_CREATE_MAPPED_BIT |
         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-    //get device address
-    VkDeviceAddress instanceBufferAddress;
-    {
-        VkBufferDeviceAddressInfo addressInfo{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-            .buffer = instanceBuffer->buffer
-        };
-        instanceBufferAddress = context->fnTable.vkGetBufferDeviceAddress(
-            context->device, &addressInfo);
-    }
+    auto instanceBufferAddress = vulkan::getBufferDeviceAddress(instanceBuffer);
     //type cast buffer
     std::span< VkAccelerationStructureInstanceKHR> asInstances{
         static_cast<VkAccelerationStructureInstanceKHR*>(instanceBuffer->allocInfo.pMappedData),
@@ -648,15 +639,7 @@ AccelerationStructure::AccelerationStructure(
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
         VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
         0);
-    //get device address
-    {
-        VkBufferDeviceAddressInfo addressInfo{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-            .buffer = scratchBuffer->buffer
-        };
-        tlasGeometryInfo.scratchData.deviceAddress =
-            context->fnTable.vkGetBufferDeviceAddress(context->device, &addressInfo);
-    }
+    tlasGeometryInfo.scratchData.deviceAddress = vulkan::getBufferDeviceAddress(scratchBuffer);
 
     //range info
     VkAccelerationStructureBuildRangeInfoKHR tlasRangeInfo{

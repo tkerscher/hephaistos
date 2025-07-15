@@ -192,13 +192,7 @@ Tensor<std::byte>::Tensor(ContextHandle context, uint64_t size, bool mapped)
         .offset = 0,
         .range = VK_WHOLE_SIZE
     };
-
-    VkBufferDeviceAddressInfo addressInfo{
-        .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-        .buffer = buffer->buffer
-    };
-    parameter->address = getContext()->fnTable.vkGetBufferDeviceAddress(
-        getContext()->device, &addressInfo);
+    parameter->address = vulkan::getBufferDeviceAddress(buffer);
 }
 Tensor<std::byte>::Tensor(const Buffer<std::byte>& source, bool mapped)
     : Tensor<std::byte>(source.getContext(), source.size_bytes(), mapped)

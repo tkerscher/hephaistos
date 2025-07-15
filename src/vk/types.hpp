@@ -89,6 +89,8 @@ void destroyBuffer(Buffer* buffer);
     return { nullptr, destroyBuffer };
 }
 
+[[nodiscard]] VkDeviceAddress getBufferDeviceAddress(const BufferHandle& buffer);
+
 [[nodiscard]] ImageHandle createImage(
     const ContextHandle& context,
     VkFormat format,

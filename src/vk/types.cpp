@@ -41,6 +41,14 @@ void destroyBuffer(Buffer* buffer) {
     delete buffer;
 }
 
+VkDeviceAddress getBufferDeviceAddress(const BufferHandle& buffer) {
+    VkBufferDeviceAddressInfo info{
+        .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+        .buffer = buffer->buffer
+    };
+    return buffer->context.fnTable.vkGetBufferDeviceAddress(buffer->context.device, &info);
+}
+
 ImageHandle createImage(
     const ContextHandle& context,
     VkFormat format,
