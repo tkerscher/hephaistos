@@ -130,14 +130,15 @@ void DispatchCommand::record(vulkan::Command& cmd) const {
         VK_PIPELINE_BIND_POINT_COMPUTE,
         prog.pipeline);
 
-    //bind params
-    context.fnTable.vkCmdPushDescriptorSetKHR(cmd.buffer,
-        VK_PIPELINE_BIND_POINT_COMPUTE,
-        prog.pipeLayout,
-        prog.set,
-        static_cast<uint32_t>(params.size()),
-        params.data());
-
+    //bind params if there are any
+    if (!params.empty()) {
+        context.fnTable.vkCmdPushDescriptorSetKHR(cmd.buffer,
+            VK_PIPELINE_BIND_POINT_COMPUTE,
+            prog.pipeLayout,
+            prog.set,
+            static_cast<uint32_t>(params.size()),
+            params.data());
+    }
     //push constant if there is any
     if (!pushData.empty()) {
         context.fnTable.vkCmdPushConstants(cmd.buffer,
