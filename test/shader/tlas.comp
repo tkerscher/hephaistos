@@ -1,0 +1,75 @@
+#version 460
+
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_buffer_reference_uvec2 : require
+#extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int32 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+layout(local_size_x = 1) in;
+
+layout(scalar, row_major) buffer;
+layout(scalar, row_major) uniform;
+
+layout(buffer_reference) writeonly buffer TLASInstance {
+    mat4x3 transform;
+    uint32_t customIdxAndMask;
+    uint32_t sbtOffsetAndFlags;
+    uint64_t blasAddress;
+};
+
+layout(push_constant) uniform PushConstants {
+    uint64_t instanceBufferAddress;
+    uint64_t triangleBlasAddress;
+    uint64_t squareBlasAddress;
+} push;
+
+const mat4x3 matrices[6] = {
+    {
+        {1.0, 0.0, 0.0},
+        {0.0, 1.0, 0.0},
+        {0.0, 0.0, 1.0},
+        {0.0, 0.0, 1.0}
+    },
+    {
+        {1.0, 0.0, 0.0},
+        {0.0, 1.0, 0.0},
+        {0.0, 0.0, 1.0},
+        {0.0, 0.0, -1.0}
+    },
+    {
+        {0.0, 0.0, -1.0},
+        {0.0, 1.0, 0.0},
+        {1.0, 0.0, 0.0},
+        {-1.0, 0.0, 0.0}
+    },
+    {
+        {0.0, 0.0, -1.0},
+        {0.0, 1.0, 0.0},
+        {1.0, 0.0, 0.0},
+        {1.0, 0.0, 0.0}
+    },
+    {
+        {1.0, 0.0, 0.0},
+        {0.0, 0.0, -1.0},
+        {0.0, 1.0, 0.0},
+        {0.0, 1.0, 0.0}
+    },
+    {
+        {1.0, 0.0, 0.0},
+        {0.0, 0.0, -1.0},
+        {0.0, 1.0, 0.0},
+        {0.0, -1.0, 0.0}
+    }
+};
+
+const uint32_t indices[6] = { 17, 4, 21, 15, 4, 31 };
+
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+
+    TLASInstance instance = TLASInstance(push.instanceBufferAddress)[i];
+    instance.transform = matrices[i];
+    instance.customIdxAndMask = indices[i] | (0xFF << 24);
+    instance.blasAddress = (i % 2 == 1) ? push.squareBlasAddress : push.triangleBlasAddress;
+}

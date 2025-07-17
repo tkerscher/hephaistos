@@ -522,18 +522,237 @@ GeometryStore::~GeometryStore() {
 
 /*************************** ACCELERATION STRUCTURE ***************************/
 
+namespace {
+
+constexpr VkBufferUsageFlags TLAS_BUFFER_USAGE_FLAGS =
+    VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
+    VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+constexpr VkBufferUsageFlags INSTANCE_BUFFER_USAGE_FLAGS =
+    VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+    VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
+    // VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+    // VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+
+constexpr VmaAllocationCreateFlags INSTANCE_BUFFER_ALLOCATION_FLAGS =
+    VMA_ALLOCATION_CREATE_MAPPED_BIT |
+    VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+
+constexpr VkBufferUsageFlags SCRATCH_BUFFER_USAGE_FLAGS =
+    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+    VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+const GeometryInstance defaultGeometryInstance = {};
+
+}
+
+struct AccelerationStructure::BuildResources {
+    BufferHandle instanceBuffer = vulkan::createEmptyBuffer();
+    BufferHandle scratchBuffer = vulkan::createEmptyBuffer();
+
+    VkDeviceAddress instanceBufferAddress = 0;
+    std::span<VkAccelerationStructureInstanceKHR> instances = {};
+
+    VkAccelerationStructureGeometryKHR tlasGeometry = {};
+    VkAccelerationStructureBuildGeometryInfoKHR tlasGeometryInfo = {};
+    VkAccelerationStructureBuildRangeInfoKHR tlasRangeInfo = {};
+    const VkAccelerationStructureBuildRangeInfoKHR* pRangeInfo = &tlasRangeInfo;
+
+    VkDeviceSize init(
+        const ContextHandle& context,
+        const GeometryInstance* pInstances,
+        uint32_t instanceCount
+    );
+
+    void build(const ContextHandle& context);
+};
+
 struct AccelerationStructure::Parameter {
     VkAccelerationStructureKHR tlas = 0;
     VkWriteDescriptorSetAccelerationStructureKHR descriptorInfo{};
 
+    uint32_t capacity = 0;
+    uint32_t instanceCount = 0;
+
     BufferHandle tlasBuffer = vulkan::createEmptyBuffer();
+
+    void init(
+        const ContextHandle& context,
+        BuildResources& buildResources,
+        VkDeviceSize tlasSize
+    );
 };
+
+VkDeviceSize AccelerationStructure::BuildResources::init(
+    const ContextHandle& context,
+    const GeometryInstance* pInstances,
+    uint32_t instanceCount
+) {
+    //create instance buffer
+    instanceBuffer = vulkan::createBuffer(
+        context,
+        instanceCount * sizeof(VkAccelerationStructureInstanceKHR),
+        INSTANCE_BUFFER_USAGE_FLAGS,
+        INSTANCE_BUFFER_ALLOCATION_FLAGS
+    );
+    instanceBufferAddress = vulkan::getBufferDeviceAddress(instanceBuffer);
+    instances = {
+        static_cast<VkAccelerationStructureInstanceKHR*>(instanceBuffer->allocInfo.pMappedData),
+        instanceCount
+    };
+    //fill instance buffer
+    auto pInstance = &defaultGeometryInstance;
+    auto pOut = instances.data();
+    for (auto i = 0u; i < instanceCount; ++i, ++pOut) {
+        //point to actual data if we have any
+        if (pInstances)
+            pInstance = &pInstances[i];
+
+        //copy transform matrix
+        memcpy(pOut, &pInstance->transform, sizeof(VkTransformMatrixKHR));
+        //set rest
+        pOut->instanceCustomIndex = pInstance->customIndex;
+        pOut->mask = pInstance->mask;
+        pOut->instanceShaderBindingTableRecordOffset = 0;
+        pOut->flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+        pOut->accelerationStructureReference = pInstance->blas_address;
+    }
+
+    //create tlas geometry
+    tlasGeometry = {
+        .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
+        .geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR,
+        .flags = VK_GEOMETRY_OPAQUE_BIT_KHR
+    };
+    tlasGeometry.geometry.instances = {
+        .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
+        .arrayOfPointers = VK_FALSE,
+        .data = {.deviceAddress = instanceBufferAddress }
+    };
+    tlasRangeInfo = { .primitiveCount = instanceCount };
+
+    //get size info
+    tlasGeometryInfo = {
+        .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
+        .type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,
+        .flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR |
+                 VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_DATA_ACCESS_KHR,
+        .geometryCount = 1,
+        .pGeometries = &tlasGeometry
+    };
+    VkAccelerationStructureBuildSizesInfoKHR sizeInfo{
+        .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR
+    };
+    context->fnTable.vkGetAccelerationStructureBuildSizesKHR(
+        context->device,
+        VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+        &tlasGeometryInfo, &instanceCount, &sizeInfo
+    );
+    //create scratch buffer
+    scratchBuffer = vulkan::createBuffer(
+        context,
+        sizeInfo.buildScratchSize,
+        SCRATCH_BUFFER_USAGE_FLAGS,
+        0
+    );
+    tlasGeometryInfo.scratchData.deviceAddress = vulkan::getBufferDeviceAddress(scratchBuffer);
+    //return tlas size so we do not need to store it
+    return sizeInfo.accelerationStructureSize;
+}
+
+void AccelerationStructure::BuildResources::build(const ContextHandle& context) {
+    vulkan::oneTimeSubmit(*context, [this, &context](VkCommandBuffer cmd) {
+        context->fnTable.vkCmdBuildAccelerationStructuresKHR(cmd, 1, &tlasGeometryInfo, &pRangeInfo);
+    });
+}
+
+void AccelerationStructure::Parameter::init(
+    const ContextHandle& context,
+    AccelerationStructure::BuildResources& buildResources,
+    VkDeviceSize tlasSize
+) {
+    capacity = buildResources.instances.size();
+    instanceCount = buildResources.instances.size();
+    //create acceleration structure
+    tlasBuffer = vulkan::createBuffer(
+        context,
+        tlasSize,
+        TLAS_BUFFER_USAGE_FLAGS,
+        VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
+    );
+    VkAccelerationStructureCreateInfoKHR tlasInfo{
+        .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR,
+        .buffer = tlasBuffer->buffer,
+        .size = tlasSize,
+        .type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR
+    };
+    vulkan::checkResult(context->fnTable.vkCreateAccelerationStructureKHR(
+        context->device, &tlasInfo, nullptr, &tlas
+    ));
+    buildResources.tlasGeometryInfo.dstAccelerationStructure = tlas;
+
+    //building tlas is handled by BuildResources::build()
+
+    //build descriptor info for binding tlas
+    descriptorInfo = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
+        .accelerationStructureCount = 1,
+        .pAccelerationStructures = &tlas
+    };
+}
 
 void AccelerationStructure::bindParameter(VkWriteDescriptorSet& binding) const {
     binding.pNext = &param->descriptorInfo;
     binding.pBufferInfo = nullptr;
     binding.pImageInfo = nullptr;
     binding.pTexelBufferView = nullptr;
+}
+
+uint32_t AccelerationStructure::capacity() const noexcept {
+    return param->capacity;
+}
+uint32_t AccelerationStructure::size() const noexcept {
+    return param->instanceCount;
+}
+
+uint64_t AccelerationStructure::instanceBufferAddress() const {
+    if (frozen())
+        throw std::runtime_error("Cannot fetch instance buffer address of frozen acceleration structure!");
+
+    return buildResources->instanceBufferAddress;
+}
+
+void AccelerationStructure::update(std::span<const GeometryInstance> instances) {
+    if (frozen())
+        throw std::runtime_error("Cannot update frozen acceleration structure!");
+    if (instances.size() > buildResources->instances.size())
+        throw std::runtime_error("Too many instances to fit in acceleration structure!");
+    
+    //copy instances to buffer
+    auto pOut = buildResources->instances.data();
+    auto n = buildResources->instances.size();
+    for (auto i = 0; i < n; ++i, ++pOut) {
+        //either fetch next instance or use default to make next one inactive
+        const auto& instance = i < instances.size() ? instances[i] : defaultGeometryInstance;
+        //copy instance
+        memcpy(pOut, &instance.transform, sizeof(VkTransformMatrixKHR));
+        pOut->instanceCustomIndex = instance.customIndex;
+        pOut->mask = instance.mask;
+        pOut->accelerationStructureReference = instance.blas_address;
+        //other fields should still be valid
+    }
+    //rebuild tlas
+    buildResources->build(getContext());
+    param->instanceCount = instances.size();
+}
+
+bool AccelerationStructure::frozen() const noexcept {
+    return !buildResources;
+}
+void AccelerationStructure::freeze() {
+    //free build resources, we no longer need it
+    buildResources.reset();
 }
 
 void AccelerationStructure::onDestroy() {
@@ -548,121 +767,120 @@ void AccelerationStructure::onDestroy() {
 AccelerationStructure::AccelerationStructure(AccelerationStructure&&) noexcept = default;
 AccelerationStructure& AccelerationStructure::operator=(AccelerationStructure&&) = default;
 
-AccelerationStructure::AccelerationStructure(ContextHandle context, const GeometryInstance& instance)
-    : AccelerationStructure(std::move(context), { &instance, 1 })
+AccelerationStructure::AccelerationStructure(ContextHandle context, uint32_t capacity)
+    : AccelerationStructure(std::move(context), nullptr, capacity, false)
+{
+    param->instanceCount = 0;
+}
+AccelerationStructure::AccelerationStructure(ContextHandle context, const GeometryInstance& instance, bool frozen)
+    : AccelerationStructure(std::move(context), &instance, 1, frozen)
+{}
+AccelerationStructure::AccelerationStructure(ContextHandle context, std::span<const GeometryInstance> instances, bool frozen)
+    : AccelerationStructure(std::move(context), instances.data(), instances.size(), frozen)
 {}
 AccelerationStructure::AccelerationStructure(
-    ContextHandle _context,
-    std::span<const GeometryInstance> instances)
-    : Resource(std::move(_context))
+    ContextHandle context,
+    const GeometryInstance* pInstances,
+    size_t instanceCount,
+    bool frozen
+)
+    : Resource(std::move(context))
+    , buildResources(std::make_unique<BuildResources>())
     , param(std::make_unique<Parameter>())
 {
-    auto& context = getContext();
-    //create instance buffer
-    auto instanceBuffer = vulkan::createBuffer(context,
-        instances.size() * sizeof(VkAccelerationStructureInstanceKHR),
-        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-        VMA_ALLOCATION_CREATE_MAPPED_BIT |
-        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-    auto instanceBufferAddress = vulkan::getBufferDeviceAddress(instanceBuffer);
-    //type cast buffer
-    std::span< VkAccelerationStructureInstanceKHR> asInstances{
-        static_cast<VkAccelerationStructureInstanceKHR*>(instanceBuffer->allocInfo.pMappedData),
-        instances.size()
-    };
+    auto tlasSize = buildResources->init(getContext(), pInstances, instanceCount);
+    param->init(getContext(), *buildResources, tlasSize);
+    buildResources->build(getContext());
 
-    //fill instance buffer
-    auto pIn = instances.begin();
-    auto pOut = asInstances.data();
-    for (auto i = 0u; i < instances.size(); ++i, ++pIn, ++pOut) {
-        //copy transformation matrix
-        memcpy(pOut, &pIn->transform, sizeof(VkTransformMatrixKHR));
-        //set rest
-        pOut->instanceCustomIndex = pIn->customIndex;
-        pOut->mask = pIn->mask;
-        pOut->instanceShaderBindingTableRecordOffset = 0;
-        pOut->flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
-        pOut->accelerationStructureReference = pIn->blas_address;
-    }
-
-    //Create tlas geometry
-    VkAccelerationStructureGeometryKHR tlasGeometry{
-        .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
-        .geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR,
-        .flags = VK_GEOMETRY_OPAQUE_BIT_KHR
-    };
-    tlasGeometry.geometry.instances = VkAccelerationStructureGeometryInstancesDataKHR{
-        .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
-        .arrayOfPointers = VK_FALSE,
-        .data = { .deviceAddress = instanceBufferAddress }
-    };
-
-    //get size info
-    VkAccelerationStructureBuildGeometryInfoKHR tlasGeometryInfo{
-        .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
-        .type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,
-        .flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR |
-                 VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_DATA_ACCESS_KHR,
-        .geometryCount = 1,
-        .pGeometries = &tlasGeometry
-    };
-    uint32_t primitiveCount = static_cast<uint32_t>(instances.size());
-    VkAccelerationStructureBuildSizesInfoKHR tlasSizeInfo{
-        .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR,
-    };
-    context->fnTable.vkGetAccelerationStructureBuildSizesKHR(
-        context->device,
-        VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
-        &tlasGeometryInfo, &primitiveCount, &tlasSizeInfo);
-
-    //create buffer for tlas
-    param->tlasBuffer = vulkan::createBuffer(context,
-        tlasSizeInfo.accelerationStructureSize,
-        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
-        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
-    //Create acceleration structure
-    VkAccelerationStructureCreateInfoKHR accInfo{
-        .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR,
-        .buffer = param->tlasBuffer->buffer,
-        .size = tlasSizeInfo.accelerationStructureSize,
-        .type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR
-    };
-    vulkan::checkResult(context->fnTable.vkCreateAccelerationStructureKHR(
-        context->device, &accInfo, nullptr, &param->tlas));
-    tlasGeometryInfo.dstAccelerationStructure = param->tlas;
-
-    //create scratch buffer
-    auto scratchBuffer = vulkan::createBuffer(context,
-        tlasSizeInfo.buildScratchSize,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        0);
-    tlasGeometryInfo.scratchData.deviceAddress = vulkan::getBufferDeviceAddress(scratchBuffer);
-
-    //range info
-    VkAccelerationStructureBuildRangeInfoKHR tlasRangeInfo{
-        .primitiveCount = static_cast<uint32_t>(instances.size())
-    };
-    auto pRangeInfo = &tlasRangeInfo;
-
-    //build tlas one device
-    vulkan::oneTimeSubmit(*context, [&context, &tlasGeometryInfo, &pRangeInfo](VkCommandBuffer cmd) {
-        context->fnTable.vkCmdBuildAccelerationStructuresKHR(cmd,
-        1, &tlasGeometryInfo, &pRangeInfo);
-    });
-
-    //build descriptor info
-    param->descriptorInfo = VkWriteDescriptorSetAccelerationStructureKHR{
-        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
-        .accelerationStructureCount = 1,
-        .pAccelerationStructures = &param->tlas
-    };
+    if (frozen) freeze();
 }
 
 AccelerationStructure::~AccelerationStructure() {
     onDestroy();
 }
+
+void BuildAccelerationStructureCommand::record(vulkan::Command& cmd) const {
+    //to shorten things
+    auto& context = accelerationStructure.get().getContext();
+    auto& buildResources = accelerationStructure.get().buildResources;
+    auto instanceBuffer = buildResources->instanceBuffer->buffer;
+    auto scratchBuffer = buildResources->scratchBuffer->buffer;
+
+    //we're acting on the acceleration structure build stage
+    cmd.stage |= VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
+
+    //ensure previous memory operation have finished
+    if (!unsafe) {
+        //acceleration structure barrier
+        //TODO: Not sure if a buffer barrier on the underlying buffer would also work?
+        VkMemoryBarrier memoryBarrier{
+            .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR,
+            .dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR
+        };
+        auto bufferBarriers = std::to_array<VkBufferMemoryBarrier>({
+            //scratch buffer
+            {
+                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+                .srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+                .buffer = scratchBuffer,
+                .size = VK_WHOLE_SIZE
+            },
+            //instance buffer
+            {
+                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+                .srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+                .buffer = instanceBuffer,
+                .size = VK_WHOLE_SIZE
+            }
+        });
+        context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+            VK_DEPENDENCY_BY_REGION_BIT,
+            1, &memoryBarrier,
+            static_cast<uint32_t>(bufferBarriers.size()), bufferBarriers.data(),
+            0, nullptr);
+    }
+
+    //build acceleration structure
+    context->fnTable.vkCmdBuildAccelerationStructuresKHR(cmd.buffer,
+        1, &buildResources->tlasGeometryInfo, &buildResources->pRangeInfo);
+
+    //block subsequent operations that may use the acceleration structure until building it finishes
+    if (!unsafe) {
+        //acceleration structure barrier
+        //TODO: Not sure if a buffer barrier on the underlying buffer would also work?
+        VkMemoryBarrier memoryBarrier{
+            .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+            .dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR
+        };
+        //ensure we aren't changing instance buffer while building acceleration structure
+        VkBufferMemoryBarrier bufferBarrier{
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR,
+            .dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT,
+            .buffer = instanceBuffer,
+            .size = VK_WHOLE_SIZE
+        };
+        context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
+            VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_DEPENDENCY_BY_REGION_BIT,
+            1, &memoryBarrier,
+            1, &bufferBarrier,
+            0, nullptr);
+    }
+}
+
+BuildAccelerationStructureCommand::BuildAccelerationStructureCommand(
+    const AccelerationStructure& accelerationStructure,
+    bool unsafe
+) : accelerationStructure(std::cref(accelerationStructure)), unsafe(unsafe)
+{}
+BuildAccelerationStructureCommand::~BuildAccelerationStructureCommand() = default;
 
 }

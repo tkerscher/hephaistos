@@ -12,6 +12,7 @@
 
 //code
 #include "shader/raytracing.h"
+#include "shader/tlas.h"
 
 using namespace hephaistos;
 
@@ -173,6 +174,148 @@ TEST_CASE("ray queries are available in shaders", "[raytracing]") {
         .Then(retrieveTensor(tensor, buffer))
         .Submit();
     
+    //check result
+    auto result = buffer.getMemory();
+    for (auto i = 0u; i < result.size(); ++i) {
+        REQUIRE(result[i].hit == 1);
+        REQUIRE(result[i].customIdx == customIdx[i]);
+        REQUIRE(result[i].instanceIdx == instanceIdx[i]);
+        REQUIRE_THAT(result[i].hitT, Catch::Matchers::WithinAbs(expectedT[i], eps));
+        REQUIRE_THAT(result[i].hitX, Catch::Matchers::WithinAbs(expectedX[i], eps));
+        REQUIRE_THAT(result[i].hitY, Catch::Matchers::WithinAbs(expectedY[i], eps));
+        REQUIRE_THAT(result[i].hitZ, Catch::Matchers::WithinAbs(expectedZ[i], eps));
+    }
+
+    //check validation errors
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
+TEST_CASE("Acceleration structure can be updated", "[raytracing]") {
+    //Check if we have the necessary hardware for this check
+    if (!isRaytracingSupported(getDevice(getContext())))
+        SKIP("No ray tracing hardware for testing available.");
+
+    //build geometries
+    GeometryStore store(getContext(), std::to_array<Mesh>({
+        { //triangle
+            .vertices = std::as_bytes(std::span<const float>(triangle_vertices))
+        },
+        { //square
+            .vertices = std::as_bytes(std::span<const float>(square_vertices)),
+            .indices = square_indices
+        }
+    }));
+    auto& triangle = store[0];
+    auto& square = store[1];
+    //create acceleration structure
+    GeometryInstance topInstance{
+        .blas_address = triangle.blas_address,
+        .transform = TopTransform,
+        .customIndex = customIdx[0]
+    };
+    GeometryInstance bottomInstance{
+        .blas_address = square.blas_address,
+        .transform = BottomTransform,
+        .customIndex = customIdx[1]
+    };
+    GeometryInstance leftInstance{
+        .blas_address = triangle.blas_address,
+        .transform = LeftTransform,
+        .customIndex = customIdx[2]
+    };
+    GeometryInstance rightInstance{
+        .blas_address = square.blas_address,
+        .transform = RightTransform,
+        .customIndex = customIdx[3]
+    };
+    GeometryInstance backInstance{
+        .blas_address = triangle.blas_address,
+        .transform = BackTransform,
+        .customIndex = customIdx[4]
+    };
+    GeometryInstance frontInstance{
+        .blas_address = square.blas_address,
+        .transform = FrontTransform,
+        .customIndex = customIdx[5]
+    };
+    auto instances = std::to_array<GeometryInstance>({
+        topInstance, bottomInstance,
+        leftInstance, rightInstance,
+        backInstance, frontInstance
+    });
+
+    AccelerationStructure tlas(getContext(), 10);
+    tlas.update(instances);
+
+    //create program
+    Buffer<Result> buffer(getContext(), 6);
+    Tensor<Result> tensor(getContext(), 6);
+    Program program(getContext(), raytracing_code);
+    program.bindParameterList(tlas, tensor);
+
+    //run program
+    Timeline timeline(getContext());
+    beginSequence(timeline)
+        .And(program.dispatch(6))
+        .Then(retrieveTensor(tensor, buffer))
+        .Submit();
+
+    //check result
+    auto result = buffer.getMemory();
+    for (auto i = 0u; i < result.size(); ++i) {
+        REQUIRE(result[i].hit == 1);
+        REQUIRE(result[i].customIdx == customIdx[i]);
+        REQUIRE(result[i].instanceIdx == instanceIdx[i]);
+        REQUIRE_THAT(result[i].hitT, Catch::Matchers::WithinAbs(expectedT[i], eps));
+        REQUIRE_THAT(result[i].hitX, Catch::Matchers::WithinAbs(expectedX[i], eps));
+        REQUIRE_THAT(result[i].hitY, Catch::Matchers::WithinAbs(expectedY[i], eps));
+        REQUIRE_THAT(result[i].hitZ, Catch::Matchers::WithinAbs(expectedZ[i], eps));
+    }
+
+    //check validation errors
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
+TEST_CASE("Acceleration structures can be defined on the GPU", "[raytracing]") {
+    //Check if we have the necessary hardware for this check
+    if (!isRaytracingSupported(getDevice(getContext())))
+        SKIP("No ray tracing hardware for testing available.");
+
+    //build geometries
+    GeometryStore store(getContext(), std::to_array<Mesh>({
+        { //triangle
+            .vertices = std::as_bytes(std::span<const float>(triangle_vertices))
+        },
+        { //square
+            .vertices = std::as_bytes(std::span<const float>(square_vertices)),
+            .indices = square_indices
+        }
+    }));
+    auto& triangle = store[0];
+    auto& square = store[1];
+    AccelerationStructure tlas(getContext(), 10);
+
+    //create programs
+    Buffer<Result> buffer(getContext(), 6);
+    Tensor<Result> tensor(getContext(), 6);
+    Program progTlas(getContext(), tlas_code);
+    Program progTrace(getContext(), raytracing_code);
+    progTrace.bindParameterList(tlas, tensor);
+    struct Push {
+        uint64_t instanceBufferAddress;
+        uint64_t triangleBlasAddress;
+        uint64_t squareBlasAddress;
+    };
+    Push push{ tlas.instanceBufferAddress(), triangle.blas_address, square.blas_address };
+    //run program
+    Timeline timeline(getContext());
+    beginSequence(timeline)
+        .And(progTlas.dispatch(push, 6))
+        .And(buildAccelerationStructure(tlas))
+        .And(progTrace.dispatch(6))
+        .Then(retrieveTensor(tensor, buffer))
+        .Submit();
+
     //check result
     auto result = buffer.getMemory();
     for (auto i = 0u; i < result.size(); ++i) {

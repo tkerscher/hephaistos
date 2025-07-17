@@ -4,6 +4,7 @@
 #include <span>
 
 #include "hephaistos/argument.hpp"
+#include "hephaistos/command.hpp"
 #include "hephaistos/context.hpp"
 #include "hephaistos/handles.hpp"
 
@@ -122,7 +123,7 @@ struct Geometry {
 */
 struct GeometryInstance {
     /**
-     * @brief Device memory address of BLAS
+     * @brief Device memory address of BLAS. Zero marks this instance as inactive.
     */
     uint64_t blas_address     = 0;
     /**
@@ -249,6 +250,42 @@ class HEPHAISTOS_API AccelerationStructure : public Argument, public Resource {
 public:
     void bindParameter(VkWriteDescriptorSet& binding) const final override;
 
+    /**
+     * @brief Returns the number of instances that can fit in the acceleration structure
+    */
+    [[nodiscard]] uint32_t capacity() const noexcept;
+    /**
+     * @brief Returns the current amount of instances in the acceleration structure
+     */
+    [[nodiscard]] uint32_t size() const noexcept;
+
+    /**
+     * @brief Device address containing the instance data
+     * 
+     * Returns the device buffer address of where the contiguous array of
+     * VkAccelerationStructureInstanceKHR elements used to build the
+     * acceleration structure is stored. Will throw if the acceleration
+     * structure is frozen.
+    */
+    [[nodiscard]] uint64_t instanceBufferAddress() const;
+    /**
+     * @brief Uses given instances to update acceleration structure.
+     * 
+     * Updates the acceleration structure using the given instances. Will throw
+     * if the instances exceed the acceleration structure's capacity or if it is
+     * frozen. Unused instances in the acceleration structure will become inactive.
+     */
+    void update(std::span<const GeometryInstance> instances);
+
+    /**
+     * @brief Whether the acceleration structure has been frozen.
+     * 
+     * Returns true, if the acceleration structure is frozen and cannot be
+     * altered, or false otherwise.
+     */
+    [[nodiscard]] bool frozen() const noexcept;
+    void freeze();
+
     AccelerationStructure(const AccelerationStructure&) = delete;
     AccelerationStructure& operator=(const AccelerationStructure&) = delete;
 
@@ -256,12 +293,20 @@ public:
     AccelerationStructure& operator=(AccelerationStructure&&);
 
     /**
+     * @brief Creates a new empty acceleration structure to be filled later
+     * 
+     * @param context Context on which to create the AccelerationStructure
+     * @param capacity Maximum amount of instances the AccelerationStructure will hold
+    */
+    AccelerationStructure(ContextHandle context, uint32_t capacity);
+    /**
      * @brief Creates a new acceleration structure
      * 
      * @param context Context on which to create the AccelerationStructure
      * @param instance GeometryInstance used to create the AccelerationStructure
+     * @param frozen If false, allows the acceleration structure to be modified
     */
-    AccelerationStructure(ContextHandle context, const GeometryInstance& instance);
+    AccelerationStructure(ContextHandle context, const GeometryInstance& instance, bool frozen = true);
     /**
      * @brief Creates a new acceleration structure
      * 
@@ -269,15 +314,62 @@ public:
      * @param instances List of GeometryInstance used to create the
      *                  AccelerationStructure
     */
-    AccelerationStructure(ContextHandle context, std::span<const GeometryInstance> instances);
+    AccelerationStructure(ContextHandle context, std::span<const GeometryInstance> instances, bool frozen = true);
     ~AccelerationStructure() override;
 
 protected:
     void onDestroy() override;
 
 private:
+    AccelerationStructure(ContextHandle context, const GeometryInstance* pInstances, size_t instanceCount, bool frozen);
+
+    struct BuildResources;
+    std::unique_ptr<BuildResources> buildResources;
+
     struct Parameter;
     std::unique_ptr<Parameter> param;
+
+    friend class BuildAccelerationStructureCommand;
 };
+
+/**
+ * @brief Command issuing the rebuild of the corresponding acceleration structure.
+ */
+class HEPHAISTOS_API BuildAccelerationStructureCommand : public Command {
+public:
+    /**
+     * @brief Acceleration structure to be updated
+     */
+    std::reference_wrapper<const AccelerationStructure> accelerationStructure;
+    /**
+     * @brief If true, omits barriers protecting read and write of associated buffers
+     */
+    bool unsafe;
+
+    virtual void record(vulkan::Command& cmd) const override;
+
+    BuildAccelerationStructureCommand(const BuildAccelerationStructureCommand& other);
+    BuildAccelerationStructureCommand& operator=(const BuildAccelerationStructureCommand& other);
+
+    BuildAccelerationStructureCommand(BuildAccelerationStructureCommand&& other) noexcept;
+    BuildAccelerationStructureCommand& operator=(BuildAccelerationStructureCommand&& other) noexcept;
+
+    /**
+     * @brief Creates a new BuildAccelerationStructureCommand
+     * 
+     * @param accelerationStructure AccelerationStructure to be updated
+     * @param unsafe Whether to omit memory protection barriers
+     */
+    BuildAccelerationStructureCommand(
+        const AccelerationStructure& accelerationStructure,
+        bool unsafe = false);
+    ~BuildAccelerationStructureCommand() override;
+};
+[[nodiscard]] inline BuildAccelerationStructureCommand buildAccelerationStructure(
+    const AccelerationStructure& accelerationStructure,
+    bool unsafe = false
+) {
+    return BuildAccelerationStructureCommand(accelerationStructure, unsafe);
+}
 
 }
