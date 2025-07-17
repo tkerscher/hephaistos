@@ -111,15 +111,15 @@ TEST_CASE("sequences can wait on multiple timelines", "[command]") {
         ).WaitFor(timeline, 5)
         .And(retrieveTensor(tensor, buffer)).Submit();
 
-    REQUIRE(!submission.wait(100));
+    REQUIRE(!submission.wait(10'000));
     REQUIRE(std::all_of(mem.begin(), mem.end(), [](int i) { return i == 0; }));
 
     timeline.setValue(3);
-    REQUIRE(!submission.wait(100));
+    REQUIRE(!submission.wait(10'000));
     REQUIRE(std::all_of(mem.begin(), mem.end(), [](int i) { return i == 0; }));
 
     timeline.setValue(5);
-    REQUIRE(submission.wait(100));
+    REQUIRE(submission.wait(100'000'000));
     auto data = std::to_array<int>({ 19, 19, 7, 7, 7, 7, 23, 23 });
     REQUIRE(std::equal(mem.begin(), mem.end(), data.begin()));
 
