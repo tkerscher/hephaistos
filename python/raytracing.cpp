@@ -117,7 +117,8 @@ void registerRaytracing(nb::module_& m) {
         .def_prop_rw("blas_address",
             [](const hp::GeometryInstance& i) -> uint64_t { return i.blas_address; },
             [](hp::GeometryInstance& i, uint64_t v) { i.blas_address = v; },
-            "device address of the referenced BLAS/geometry")
+            "Device address of the referenced BLAS/geometry. "
+            "A value of zero marks the instance as inactive.")
         .def_prop_rw("transform",
             [](hp::GeometryInstance& i) -> TransformArrayOut {
                 return TransformArrayOut(&i.transform, 2, TransformShape);
@@ -170,15 +171,40 @@ void registerRaytracing(nb::module_& m) {
     
     nb::class_<hp::AccelerationStructure, hp::Resource>(m, "AccelerationStructure",
             "Acceleration Structure used by programs to trace rays against a scene. "
-            "Consists of multiple instances of various Geometries."
+            "Consists of multiple instances of various Geometries.")
+        .def("__init__",
+            [](
+                hp::AccelerationStructure* as,
+                std::vector<hp::GeometryInstance> instances,
+                bool freeze
+            ) {
+                nb::gil_scoped_release release;
+                new (as) hp::AccelerationStructure(getCurrentContext(), instances);
+            }, "instances"_a, nb::kw_only(), "freeze"_a = false,
+            "Creates an acceleration structure for consumption in shaders from "
+            "the given geometry instances."
             "\n\nParameters\n---------\n"
             "instances: GeometryInstance[]\n"
             "    list of instances the structure consists of")
-        .def("__init__", [](hp::AccelerationStructure* as, std::vector<hp::GeometryInstance> instances) {
+        .def("__init__", [](hp::AccelerationStructure* as, uint32_t capacity) {
                 nb::gil_scoped_release release;
-                new (as) hp::AccelerationStructure(getCurrentContext(), instances);
-            }, "instances"_a,
-            "Creates an acceleration structure for consumption in shaders from the given geometry instances.")
+                new (as) hp::AccelerationStructure(getCurrentContext(), capacity);
+            }, "capacity"_a,
+            "Creates an acceleration structure with given capacity. "
+            "Each instance is initialzed as inactive."
+            "\n\nParameters\n---------\n"
+            "capacity: int\n"
+            "    Maximum amount of instances the acceleration structure can hold")
+        .def_prop_ro("capacity", &hp::AccelerationStructure::capacity,
+            "Number of instances that can fit in the acceleration structure")
+        .def_prop_ro("size", &hp::AccelerationStructure::size,  
+            "Current amount of instances in the acceleration structure")
+        .def_prop_ro("instanceBufferAddress", &hp::AccelerationStructure::instanceBufferAddress,
+            "Device buffer address of where the contiguous array of VkAccelerationStructureInstanceKHR "
+            "elements used to build the acceleration structure is stored. Will raise an exception if "
+            "the acceleration structure is frozen.")
+        .def_prop_ro("frozen", &hp::AccelerationStructure::frozen,
+            "Whether the acceleration structure is frozen and cannot be altered.")
         .def("bindParameter",
             [](const hp::AccelerationStructure& as, hp::Program& p, uint32_t b) {
                 as.bindParameter(p.getBinding(b));
@@ -188,5 +214,27 @@ void registerRaytracing(nb::module_& m) {
             [](const hp::AccelerationStructure& as, hp::Program& p, std::string_view b) {
                 as.bindParameter(p.getBinding(b));
             }, "program"_a, "binding"_a,
-            "Binds the acceleration structure to the program at the given binding");
+            "Binds the acceleration structure to the program at the given binding")
+        .def("freeze", &hp::AccelerationStructure::freeze,
+            "Freezes the acceleration structure preventing further alterations.")
+        .def("update", [](hp::AccelerationStructure& as, std::vector<hp::GeometryInstance> instances) {
+                nb::gil_scoped_release release;
+                as.update(instances);
+            }, "instances"_a,
+            "Updates the acceleration structure using the given instances. Unused capacity "
+            "will be filled with inactive instances. Will raise an exception if amount of "
+            "instances exceed the acceleration structure's capacity or if it is frozen.");
+    
+    nb::class_<hp::BuildAccelerationStructureCommand, hp::Command>(m, "BuildAccelerationStructureCommand",
+            "Command issuing a rebuild of the corresponding acceleration structure")
+        .def(nb::init<const hp::AccelerationStructure&, bool>(),
+            "accelerationStructure"_a, nb::kw_only(), "unsafe"_a=false);
+    m.def("buildAccelerationStructure", &hp::buildAccelerationStructure,
+        "accelerationStructure"_a, nb::kw_only(), "unsafe"_a=false,
+        "Creates a command issuing the rebuild of a given acceleration structure."
+        "\n\nParameters\n----------\n"
+        "accelerationStructure: AccelerationStructure\n"
+        "    Acceleration structure to be rebuild.\n"
+        "unsafe: bool, default=False\n"
+        "    Whether to skip memory barriers.");
 }
