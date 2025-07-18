@@ -877,6 +877,20 @@ void BuildAccelerationStructureCommand::record(vulkan::Command& cmd) const {
 }
 
 BuildAccelerationStructureCommand::BuildAccelerationStructureCommand(
+    const BuildAccelerationStructureCommand& other
+) = default;
+BuildAccelerationStructureCommand& BuildAccelerationStructureCommand::operator=(
+    const BuildAccelerationStructureCommand& other
+) = default;
+
+BuildAccelerationStructureCommand::BuildAccelerationStructureCommand(
+    BuildAccelerationStructureCommand&& other
+) noexcept = default;
+BuildAccelerationStructureCommand& BuildAccelerationStructureCommand::operator=(
+    BuildAccelerationStructureCommand&& other
+) noexcept = default;
+
+BuildAccelerationStructureCommand::BuildAccelerationStructureCommand(
     const AccelerationStructure& accelerationStructure,
     bool unsafe
 ) : accelerationStructure(std::cref(accelerationStructure)), unsafe(unsafe)

@@ -689,6 +689,9 @@ void FlushMemoryCommand::record(vulkan::Command& cmd) const {
 FlushMemoryCommand::FlushMemoryCommand(const FlushMemoryCommand&) = default;
 FlushMemoryCommand& FlushMemoryCommand::operator=(const FlushMemoryCommand&) = default;
 
+FlushMemoryCommand::FlushMemoryCommand(FlushMemoryCommand&&) noexcept = default;
+FlushMemoryCommand& FlushMemoryCommand::operator=(FlushMemoryCommand&&) noexcept = default;
+
 FlushMemoryCommand::FlushMemoryCommand(const ContextHandle& context)
     : context(*context)
 {}

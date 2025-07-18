@@ -365,6 +365,12 @@ public:
         bool unsafe = false);
     ~BuildAccelerationStructureCommand() override;
 };
+/**
+ * @brief Creates a BuildAccelerationStructureCommand
+ * 
+ * @param accelerationStructure Acceleration structure to be rebuild
+ * @param unsafe Whether to skip memory barriers
+ */
 [[nodiscard]] inline BuildAccelerationStructureCommand buildAccelerationStructure(
     const AccelerationStructure& accelerationStructure,
     bool unsafe = false

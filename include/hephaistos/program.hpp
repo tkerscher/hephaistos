@@ -550,6 +550,9 @@ public:
     FlushMemoryCommand(const FlushMemoryCommand&);
     FlushMemoryCommand& operator=(const FlushMemoryCommand&);
 
+    FlushMemoryCommand(FlushMemoryCommand&& other) noexcept;
+    FlushMemoryCommand& operator=(FlushMemoryCommand&& other) noexcept;
+
     /**
      * @brief Creates a new FlushMemoryCommand
      * 
