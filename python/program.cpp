@@ -215,6 +215,18 @@ void registerProgramModule(nb::module_& m) {
         .def("isBindingBound", [](const hp::Program& p, std::string_view name) {
                 return p.isBindingBound(name);
             }, "name"_a, "Checks wether the binding specified by its name is bound")
+        .def("bindParams", [](hp::Program& prog, nb::args params, nb::kwargs namedparams) {
+                auto self = nb::find(prog);
+                for (auto i = 0; i < params.size(); ++i)
+                   params[i].attr("bindParameter")(self, i);
+                for (auto kv : namedparams) {
+                    if (prog.hasBinding(nb::str(kv.first).c_str()))
+                        kv.second.attr("bindParameter")(self, kv.first);
+                }
+            },
+            "Binds the given parameters based on their index if passed as positional "
+            "argument or based on their name if passed as keyword argument. Named "
+            "parameters without a corresponding binding in the program are ignored.")
         .def("dispatch",
             [](const hp::Program& p, uint32_t x, uint32_t y, uint32_t z)
                 -> hp::DispatchCommand
