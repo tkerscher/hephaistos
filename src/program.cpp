@@ -349,6 +349,18 @@ const LocalSize& Program::getLocalSize() const noexcept {
     return program->localSize;
 }
 
+uint32_t Program::getBindingCount() const noexcept {
+    return bindingTraits.size();
+}
+
+bool Program::hasBinding(std::string_view name) const noexcept {
+    const auto& b = bindingTraits;
+    auto it = std::find_if(b.begin(), b.end(), [name](const BindingTraits& t) -> bool {
+        return t.name == name;
+    });
+    return it != b.end();
+}
+
 const BindingTraits& Program::getBindingTraits(uint32_t i) const {
     if (i >= bindingTraits.size())
         throw std::runtime_error("There is no binding point at specified number!");

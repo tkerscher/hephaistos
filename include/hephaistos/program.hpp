@@ -323,6 +323,19 @@ public:
     [[nodiscard]] const LocalSize& getLocalSize() const noexcept;
 
     /**
+     * @brief Returns the amount of bindings present in this program
+     * 
+     * @return Amount of bindings in this program
+    */
+    [[nodiscard]] uint32_t getBindingCount() const noexcept;
+    /**
+     * @brief Tests whether the program has a binding of the given name
+     * 
+     * @return True, if a binding of given name is present
+    */
+    [[nodiscard]] bool hasBinding(std::string_view name) const noexcept;
+
+    /**
      * @brief Returns the traits of the given binding
      * 
      * Reflects the binding specified by its binding number in the shader code.
