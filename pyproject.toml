@@ -29,6 +29,7 @@ minimum-version = "0.6"
 wheel.license-files = [
     "LICENSE",
     "external/glslang/LICENSE.txt",
+    "external/nanobind/LICENSE",
     "external/reflect/LICENSE",
     "external/reflect/patch.LICENSE",
     "external/stb/LICENSE",
