@@ -749,6 +749,7 @@ void AccelerationStructure::onDestroy() {
             context.device, param->tlas, nullptr);
         param.reset();
     }
+    buildResources.reset();
 }
 
 AccelerationStructure::AccelerationStructure(AccelerationStructure&&) noexcept = default;
