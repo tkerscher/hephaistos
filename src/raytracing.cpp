@@ -343,18 +343,11 @@ GeometryStore::GeometryStore(
     }
 
     //Create scratch buffer
-    auto scratchBuffer = vulkan::createBuffer(context, totalScratchSize,
+    auto scratchBuffer = vulkan::createBufferAligned(context,
+        totalScratchSize, scratchAlignment,
         VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         0);
-    VkDeviceAddress scratchAddress;
-    {
-        VkBufferDeviceAddressInfo addressInfo{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-            .buffer = scratchBuffer->buffer
-        };
-        scratchAddress = context->fnTable.vkGetBufferDeviceAddress(
-            context->device, &addressInfo);
-    }
+    auto scratchAddress = vulkan::getBufferDeviceAddress(scratchBuffer);
     //allocate buffer for acceleration structures
     auto blasBuffer = vulkan::createBuffer(context, blasTotalSize,
         VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
@@ -590,9 +583,10 @@ VkDeviceSize AccelerationStructure::BuildResources::init(
     uint32_t instanceCount
 ) {
     //create instance buffer
-    instanceBuffer = vulkan::createBuffer(
+    instanceBuffer = vulkan::createBufferAligned(
         context,
         instanceCount * sizeof(VkAccelerationStructureInstanceKHR),
+        16,
         INSTANCE_BUFFER_USAGE_FLAGS,
         INSTANCE_BUFFER_ALLOCATION_FLAGS
     );
@@ -649,10 +643,24 @@ VkDeviceSize AccelerationStructure::BuildResources::init(
         VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
         &tlasGeometryInfo, &instanceCount, &sizeInfo
     );
+    //query scratch buffer alignment
+    uint32_t scratchAlignment;
+    {
+        VkPhysicalDeviceAccelerationStructurePropertiesKHR accProps{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR
+        };
+        VkPhysicalDeviceProperties2 props{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+            .pNext = &accProps
+        };
+        vkGetPhysicalDeviceProperties2(context->physicalDevice, &props);
+        scratchAlignment = accProps.minAccelerationStructureScratchOffsetAlignment;
+    }
     //create scratch buffer
-    scratchBuffer = vulkan::createBuffer(
+    scratchBuffer = vulkan::createBufferAligned(
         context,
         sizeInfo.buildScratchSize,
+        scratchAlignment,
         SCRATCH_BUFFER_USAGE_FLAGS,
         0
     );
