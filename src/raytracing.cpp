@@ -26,6 +26,20 @@ constexpr auto DeviceExtensions = std::to_array({
     VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME
 });
 
+//util function querying the required scratch buffer alignment
+//TODO: Likely want to cache this value somewhere. Maybe put it in RaytracingExtension?
+uint32_t getScratchAlignment(const ContextHandle& context) {
+    VkPhysicalDeviceAccelerationStructurePropertiesKHR accProps{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR
+    };
+    VkPhysicalDeviceProperties2 props{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+        .pNext = &accProps
+    };
+    vkGetPhysicalDeviceProperties2(context->physicalDevice, &props);
+    return accProps.minAccelerationStructureScratchOffsetAlignment;
+}
+
 }
 
 bool isRaytracingSupported(const DeviceHandle& device) {
@@ -252,32 +266,10 @@ GeometryStore::GeometryStore(
     }
 
     //query buffer addresses
-    VkDeviceAddress vertexAddress, indexAddress = 0;
-    {
-        VkBufferDeviceAddressInfo addressInfo{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-            .buffer = dataBuffer->buffer
-        };
-        vertexAddress = context->fnTable.vkGetBufferDeviceAddress(
-            context->device, &addressInfo);
-        if (hasIndices) {
-            indexAddress = vertexAddress + total_vertices_size;
-        }
-    }
-
+    VkDeviceAddress vertexAddress = vulkan::getBufferDeviceAddress(dataBuffer);
+    VkDeviceAddress indexAddress = hasIndices ? vertexAddress + total_vertices_size : 0;
     //query scratch buffer alignment
-    uint32_t scratchAlignment;
-    {
-        VkPhysicalDeviceAccelerationStructurePropertiesKHR accProps{
-            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR
-        };
-        VkPhysicalDeviceProperties2 props{
-            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
-            .pNext = &accProps
-        };
-        vkGetPhysicalDeviceProperties2(context->physicalDevice, &props);
-        scratchAlignment = accProps.minAccelerationStructureScratchOffsetAlignment;
-    }
+    auto scratchAlignment = getScratchAlignment(context);
 
     //fill blas info
     VkDeviceSize blasTotalSize = 0;
@@ -643,24 +635,11 @@ VkDeviceSize AccelerationStructure::BuildResources::init(
         VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
         &tlasGeometryInfo, &instanceCount, &sizeInfo
     );
-    //query scratch buffer alignment
-    uint32_t scratchAlignment;
-    {
-        VkPhysicalDeviceAccelerationStructurePropertiesKHR accProps{
-            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR
-        };
-        VkPhysicalDeviceProperties2 props{
-            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
-            .pNext = &accProps
-        };
-        vkGetPhysicalDeviceProperties2(context->physicalDevice, &props);
-        scratchAlignment = accProps.minAccelerationStructureScratchOffsetAlignment;
-    }
     //create scratch buffer
     scratchBuffer = vulkan::createBufferAligned(
         context,
         sizeInfo.buildScratchSize,
-        scratchAlignment,
+        getScratchAlignment(context),
         SCRATCH_BUFFER_USAGE_FLAGS,
         0
     );
