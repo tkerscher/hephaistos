@@ -84,6 +84,12 @@ struct Timeline {
     uint64_t size,
     VkBufferUsageFlags usage,
     VmaAllocationCreateFlags flags);
+[[nodiscard]] BufferHandle createBufferAligned(
+    const ContextHandle& context,
+    uint64_t size,
+    uint64_t alignment,
+    VkBufferUsageFlags usage,
+    VmaAllocationCreateFlags flags);
 void destroyBuffer(Buffer* buffer);
 [[nodiscard]] inline BufferHandle createEmptyBuffer() {
     return { nullptr, destroyBuffer };

@@ -33,6 +33,36 @@ BufferHandle createBuffer(
 
     return result;
 }
+BufferHandle createBufferAligned(
+    const ContextHandle& context,
+    uint64_t size,
+    uint64_t alignment,
+    VkBufferUsageFlags usage,
+    VmaAllocationCreateFlags flags)
+{
+    BufferHandle result{ new Buffer({0,0,{},*context}), destroyBuffer };
+
+    VkBufferCreateInfo bufferInfo{
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = size,
+        .usage = usage,
+    };
+    VmaAllocationCreateInfo allocInfo{
+        .flags = flags,
+        .usage = VMA_MEMORY_USAGE_AUTO
+    };
+
+    checkResult(vmaCreateBufferWithAlignment(
+        context->allocator,
+        &bufferInfo,
+        &allocInfo,
+        alignment,
+        &result->buffer,
+        &result->allocation,
+        &result->allocInfo));
+
+    return result;
+}
 void destroyBuffer(Buffer* buffer) {
     if (!buffer)
         return;
