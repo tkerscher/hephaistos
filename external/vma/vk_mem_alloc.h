@@ -1820,20 +1820,20 @@ VMA_CALL_PRE void VMA_CALL_POST vmaGetHeapBudgets(
 */
 
 /**
-\brief Helps to find `memoryTypeIndex`, given `memoryTypeBits` and #VmaAllocationCreateInfo.
+\brief Helps to find memoryTypeIndex, given memoryTypeBits and VmaAllocationCreateInfo.
 
 This algorithm tries to find a memory type that:
 
-- Is allowed by `memoryTypeBits`.
-- Contains all the flags from `pAllocationCreateInfo->requiredFlags`.
+- Is allowed by memoryTypeBits.
+- Contains all the flags from pAllocationCreateInfo->requiredFlags.
 - Matches intended usage.
-- Has as many flags from `pAllocationCreateInfo->preferredFlags` as possible.
+- Has as many flags from pAllocationCreateInfo->preferredFlags as possible.
 
-\return Returns `VK_ERROR_FEATURE_NOT_PRESENT` if not found. Receiving such result
+\return Returns VK_ERROR_FEATURE_NOT_PRESENT if not found. Receiving such result
 from this function or any other allocating function probably means that your
 device doesn't support any memory type with requested features for the specific
 type of resource you want to use it for. Please check parameters of your
-resource, like image layout (`OPTIMAL` versus `LINEAR`) or mip level count.
+resource, like image layout (OPTIMAL versus LINEAR) or mip level count.
 */
 VMA_CALL_PRE VkResult VMA_CALL_POST vmaFindMemoryTypeIndex(
     VmaAllocator VMA_NOT_NULL allocator,
@@ -1842,10 +1842,10 @@ VMA_CALL_PRE VkResult VMA_CALL_POST vmaFindMemoryTypeIndex(
     uint32_t* VMA_NOT_NULL pMemoryTypeIndex);
 
 /**
-\brief Helps to find `memoryTypeIndex`, given `VkBufferCreateInfo` and #VmaAllocationCreateInfo.
+\brief Helps to find memoryTypeIndex, given VkBufferCreateInfo and VmaAllocationCreateInfo.
 
 It can be useful e.g. to determine value to be used as VmaPoolCreateInfo::memoryTypeIndex.
-It may need to internally create a temporary, dummy buffer that never has memory bound.
+It internally creates a temporary, dummy buffer that never has memory bound.
 */
 VMA_CALL_PRE VkResult VMA_CALL_POST vmaFindMemoryTypeIndexForBufferInfo(
     VmaAllocator VMA_NOT_NULL allocator,
@@ -1854,10 +1854,10 @@ VMA_CALL_PRE VkResult VMA_CALL_POST vmaFindMemoryTypeIndexForBufferInfo(
     uint32_t* VMA_NOT_NULL pMemoryTypeIndex);
 
 /**
-\brief Helps to find `memoryTypeIndex`, given `VkImageCreateInfo` and #VmaAllocationCreateInfo.
+\brief Helps to find memoryTypeIndex, given VkImageCreateInfo and VmaAllocationCreateInfo.
 
 It can be useful e.g. to determine value to be used as VmaPoolCreateInfo::memoryTypeIndex.
-It may need to internally create a temporary, dummy image that never has memory bound.
+It internally creates a temporary, dummy image that never has memory bound.
 */
 VMA_CALL_PRE VkResult VMA_CALL_POST vmaFindMemoryTypeIndexForImageInfo(
     VmaAllocator VMA_NOT_NULL allocator,
@@ -16845,7 +16845,7 @@ VMA_CALL_PRE VkResult VMA_CALL_POST vmaGetMemoryWin32Handle(VmaAllocator VMA_NOT
 #endif // VMA_IMPLEMENTATION
 
 /**
-\page faq Frequently asked questions
+\page faq Frequenty asked questions
 
 <b>What is VMA?</b>
 
@@ -18865,9 +18865,11 @@ vmaGetAllocationMemoryProperties(allocator, alloc, &memPropFlags);
 
 if(memPropFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
 {
-    // The Allocation ended up in a mappable memory.
-    // Calling vmaCopyMemoryToAllocation() does vmaMapMemory(), memcpy(), vmaUnmapMemory(), and vmaFlushAllocation().
-    result = vmaCopyMemoryToAllocation(allocator, myData, alloc, 0, myDataSize);
+    // Allocation ended up in a mappable memory and is already mapped - write to it directly.
+
+    // [Executed in runtime]:
+    memcpy(allocInfo.pMappedData, myData, myDataSize);
+    result = vmaFlushAllocation(allocator, alloc, 0, VK_WHOLE_SIZE);
     // Check result...
 
     VkBufferMemoryBarrier bufMemBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
@@ -18879,7 +18881,6 @@ if(memPropFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
     bufMemBarrier.offset = 0;
     bufMemBarrier.size = VK_WHOLE_SIZE;
 
-    // It's important to insert a buffer memory barrier here to ensure writing to the buffer has finished.
     vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
         0, 0, nullptr, 1, &bufMemBarrier, 0, nullptr);
 }
@@ -18902,8 +18903,9 @@ else
         &stagingBuf, &stagingAlloc, &stagingAllocInfo);
     // Check result...
 
-    // Calling vmaCopyMemoryToAllocation() does vmaMapMemory(), memcpy(), vmaUnmapMemory(), and vmaFlushAllocation().
-    result = vmaCopyMemoryToAllocation(allocator, myData, stagingAlloc, 0, myDataSize);
+    // [Executed in runtime]:
+    memcpy(stagingAllocInfo.pMappedData, myData, myDataSize);
+    result = vmaFlushAllocation(allocator, stagingAlloc, 0, VK_WHOLE_SIZE);
     // Check result...
 
     VkBufferMemoryBarrier bufMemBarrier = { VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER };
@@ -18915,7 +18917,6 @@ else
     bufMemBarrier.offset = 0;
     bufMemBarrier.size = VK_WHOLE_SIZE;
 
-    // Insert a buffer memory barrier to make sure writing to the staging buffer has finished.
     vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
         0, 0, nullptr, 1, &bufMemBarrier, 0, nullptr);
 
@@ -18936,7 +18937,6 @@ else
     bufMemBarrier2.offset = 0;
     bufMemBarrier2.size = VK_WHOLE_SIZE;
 
-    // Make sure copying from staging buffer to the actual buffer has finished by inserting a buffer memory barrier.
     vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
         0, 0, nullptr, 1, &bufMemBarrier2, 0, nullptr);
 }
