@@ -6,6 +6,7 @@ set(SRCROOT ${PROJECT_SOURCE_DIR}/src)
 set(PUBLIC_HEADERS
     ${INCROOT}/argument.hpp
     ${INCROOT}/atomic.hpp
+    ${INCROOT}/bindings.hpp
     ${INCROOT}/buffer.hpp
     ${INCROOT}/command.hpp
     ${INCROOT}/compiler.hpp
@@ -25,6 +26,7 @@ set(PUBLIC_HEADERS
 #Source
 set(SRC
     ${SRCROOT}/atomic.cpp
+    ${SRCROOT}/bindings.cpp
     ${SRCROOT}/buffer.cpp
     ${SRCROOT}/command.cpp
     ${SRCROOT}/compiler.cpp
@@ -37,6 +39,7 @@ set(SRC
     ${SRCROOT}/types.cpp
     ${SRCROOT}/version.cpp
 #vulkan
+    ${SRCROOT}/vk/reflection.cpp
     ${SRCROOT}/vk/result.hpp
     ${SRCROOT}/vk/instance.cpp
     ${SRCROOT}/vk/instance.hpp
