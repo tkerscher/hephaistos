@@ -111,6 +111,7 @@ public:
         int64Feat.pNext = pNext;
         return this->pNext;
     }
+    void finalize(const ContextHandle& context) override {}
 
     AtomicsExtension(const AtomicsProperties& props);
     virtual ~AtomicsExtension() = default;

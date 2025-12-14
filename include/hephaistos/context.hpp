@@ -51,6 +51,7 @@ public: //internal
     //of its chain end. This is passed to the next extension until the last
     //pointer is stored in the DeviceCreateInfo pNext
     virtual void* chain(void* pNext) = 0;
+    virtual void finalize(const ContextHandle& context) = 0;
     virtual ~Extension() = default;
 };
 

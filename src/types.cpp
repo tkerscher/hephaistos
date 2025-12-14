@@ -37,6 +37,7 @@ public:
 		//does not partake in chain -> skip
 		return pNext;
 	}
+	void finalize(const ContextHandle& context) {}
 
 	TypesExtension(const TypeSupport& types)
 		: requiredFlags(toBitFlags(types))

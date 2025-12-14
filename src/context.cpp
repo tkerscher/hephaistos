@@ -25,6 +25,7 @@ constexpr VkQueueFlags QueueFlags = VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT
 constexpr float QueuePriority = 1.0f;
 
 constexpr auto DeviceExtensions = std::to_array({
+    VK_KHR_MAINTENANCE_5_EXTENSION_NAME,
     VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
     //only needed for gpu printf, but widely supported
     VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME
@@ -83,26 +84,32 @@ bool isDeviceSuitable(const DeviceHandle& device, std::span<const ExtensionHandl
 
     //Check for features support
     {
+        VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_FEATURES_KHR
+        };
+        VkPhysicalDeviceVulkan13Features features13{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+            .pNext = &maintenance5
+        };
         VkPhysicalDeviceVulkan12Features features12{
-            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+            .pNext = &features13
         };
         VkPhysicalDeviceFeatures2 features{
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
             .pNext = &features12
         };
         vkGetPhysicalDeviceFeatures2(device->device, &features);
-        //timeline sempahore feature
-        if (!features12.timelineSemaphore)
+        if (
+            !maintenance5.maintenance5 ||
+            !features13.maintenance4 ||
+            !features12.timelineSemaphore ||
+            !features12.bufferDeviceAddress ||
+            !features12.hostQueryReset || //stopwatch
+            !features12.scalarBlockLayout
+        ) {
             return false;
-        //buffer device address
-        if (!features12.bufferDeviceAddress)
-            return false;
-        //host query reset (stopwatch)
-        if (!features12.hostQueryReset)
-            return false;
-        //scalar block layout
-        if (!features12.scalarBlockLayout)
-            return false;
+        }
     }
 
     //check for compute queue
@@ -293,9 +300,19 @@ ContextHandle createContext(
             .queueCount       = 1,
             .pQueuePriorities = &QueuePriority
         };
+        VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_FEATURES_KHR,
+            .pNext = pNext, //chain external extensions
+            .maintenance5 = VK_TRUE
+        };
+        VkPhysicalDeviceMaintenance4Features maintenance4{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES,
+            .pNext = &maintenance5,
+            .maintenance4 = VK_TRUE
+        };
         VkPhysicalDeviceTimelineSemaphoreFeatures timeline{
             .sType             = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
-            .pNext             = pNext, //chain external extensions
+            .pNext             = &maintenance4,
             .timelineSemaphore = VK_TRUE
         };
         VkPhysicalDeviceHostQueryResetFeatures hostQueryReset{
@@ -423,11 +440,15 @@ ContextHandle createContext(
             .device           = context->device,
             .pVulkanFunctions = &functions,
             .instance         = instance,
-            .vulkanApiVersion = VK_API_VERSION_1_2
+            .vulkanApiVersion = VK_API_VERSION_1_3
         };
 
         vulkan::checkResult(vmaCreateAllocator(&info, &context->allocator));
     }
+
+    //created context -> tell extensions
+    for (auto& ext : context->extensions)
+        ext->finalize(context);
 
     //Done
     return context;

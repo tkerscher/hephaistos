@@ -114,6 +114,7 @@ public:
         queryFeatures.pNext = pNext;
         return static_cast<void*>(&accelerationStructureFeatures);
     }
+    void finalize(const ContextHandle& context) override {}
 
     RaytracingExtension() = default;
     virtual ~RaytracingExtension() = default;

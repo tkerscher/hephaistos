@@ -116,7 +116,7 @@ VkInstance getInstance() {
         .applicationVersion = version,
         .pEngineName = "hephaistos",
         .engineVersion = version,
-        .apiVersion = VK_API_VERSION_1_2
+        .apiVersion = VK_API_VERSION_1_3
     };
     VkInstanceCreateInfo instInfo{
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
