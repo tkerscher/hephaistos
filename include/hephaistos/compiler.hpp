@@ -10,6 +10,19 @@
 namespace hephaistos {
 
 /**
+ * @brief Enumeration of shader stags
+*/
+enum class ShaderStage {
+    COMPUTE = 5,
+    RAYGEN = 6,
+    INTERSECT = 7,
+    ANY_HIT = 8,
+    CLOSEST_HIT = 9,
+    MISS = 10,
+    CALLABLE = 11
+};
+
+/**
  * @brief Compiler for GLSL shader code
 */
 class HEPHAISTOS_API Compiler {
@@ -55,7 +68,10 @@ public:
      * @param code GLSL source code
      * @return Compiled SPIR-V byte code
     */
-    [[nodiscard]] std::vector<uint32_t> compile(std::string_view code) const;
+    [[nodiscard]] std::vector<uint32_t> compile(
+        std::string_view code,
+        ShaderStage stage = ShaderStage::COMPUTE
+    ) const;
     /**
      * @brief Compiled the given GLSL source code
      * 
@@ -63,7 +79,11 @@ public:
      * @param headers Map of source code for resolving includes. Takes precedence
      * @return Compiled SPIR-V byte code
     */
-    [[nodiscard]] std::vector<uint32_t> compile(std::string_view code, const HeaderMap& headers) const;
+    [[nodiscard]] std::vector<uint32_t> compile(
+        std::string_view code,
+        const HeaderMap& headers,
+        ShaderStage stage = ShaderStage::COMPUTE
+    ) const;
 
     Compiler& operator=(Compiler&&) noexcept;
     Compiler(Compiler&&) noexcept;

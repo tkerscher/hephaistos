@@ -104,14 +104,14 @@ void compile_error(const char* reason, glslang_program_t* program) {
     throw std::runtime_error(sstream.str());
 }
 
-std::vector<uint32_t> compileImpl(std::string_view code, void* callbacks_ctx = nullptr) {
+std::vector<uint32_t> compileImpl(std::string_view code, ShaderStage stage, void* callbacks_ctx = nullptr) {
     glslang_input_t input = {
         .language = GLSLANG_SOURCE_GLSL,
-        .stage = GLSLANG_STAGE_COMPUTE,
+        .stage = static_cast<glslang_stage_t>(stage),
         .client = GLSLANG_CLIENT_VULKAN,
-        .client_version = GLSLANG_TARGET_VULKAN_1_2,
+        .client_version = GLSLANG_TARGET_VULKAN_1_3,
         .target_language = GLSLANG_TARGET_SPV,
-        .target_language_version = GLSLANG_TARGET_SPV_1_4,
+        .target_language_version = GLSLANG_TARGET_SPV_1_6,
         .code = code.data(),
         .default_version = 460,
         .default_profile = GLSLANG_NO_PROFILE,
@@ -155,13 +155,13 @@ std::vector<uint32_t> compileImpl(std::string_view code, void* callbacks_ctx = n
 
 }
 
-std::vector<uint32_t> Compiler::compile(std::string_view code) const {
+std::vector<uint32_t> Compiler::compile(std::string_view code, ShaderStage stage) const {
     CompilerContext context(nullptr, &includeDirs);
-    return compileImpl(code, &context);
+    return compileImpl(code, stage, &context);
 }
-std::vector<uint32_t> Compiler::compile(std::string_view code, const HeaderMap& headers) const {
+std::vector<uint32_t> Compiler::compile(std::string_view code, const HeaderMap& headers, ShaderStage stage) const {
     CompilerContext context(&headers, &includeDirs);
-    return compileImpl(code, &context);
+    return compileImpl(code, stage, &context);
 }
 
 void Compiler::addIncludeDir(std::filesystem::path path) {
