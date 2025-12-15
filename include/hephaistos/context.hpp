@@ -152,6 +152,18 @@ HEPHAISTOS_API void destroyAllResources(const ContextHandle& context);
 */
 [[nodiscard]] HEPHAISTOS_API bool isVulkanAvailable();
 /**
+ * @brief Queries extension support on the system
+ * 
+ * Checks whether there is any suitable device installed in the system
+ * supporting the given extensions.
+ * 
+ * @params extensions List of extensions to query support for
+ * @return True, if there is any device installed supporting all given extension,
+ *         false otherwise.
+*/
+[[nodiscard]] HEPHAISTOS_API bool isDeviceSuitable(
+    std::span<const ExtensionHandle> extension = {});
+/**
  * @brief Queries extension support by the given device
  * 
  * @param device Device to query support

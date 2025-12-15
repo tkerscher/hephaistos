@@ -76,6 +76,16 @@ DeviceInfo createInfo(VkPhysicalDevice device) {
 
 }
 
+bool isDeviceSuitable(std::span<const ExtensionHandle> extensions) {
+    auto devices = enumerateDevices();
+    return std::any_of(
+        devices.begin(),
+        devices.end(),
+        [&extensions](const DeviceHandle& device) -> bool {
+            return isDeviceSuitable(device, extensions);
+        });
+}
+
 bool isDeviceSuitable(const DeviceHandle& device, std::span<const ExtensionHandle> extensions) {
     //Check for the following things:
     //    - Compute queue
