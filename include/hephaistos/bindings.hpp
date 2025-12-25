@@ -207,6 +207,11 @@ protected: //internal
     [[nodiscard]] VkWriteDescriptorSet& getBinding(uint32_t i);
     [[nodiscard]] VkWriteDescriptorSet& getBinding(std::string_view name);
 
+    /**
+     * @brief Checks whether all bindings are bound and throws if not
+    */
+    void checkAllBindingsBound() const;
+
 protected:
     std::vector<BindingTraits> bindingTraits;
     std::vector<VkWriteDescriptorSet> boundParams;

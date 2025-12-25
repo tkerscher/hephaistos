@@ -1,13 +1,23 @@
 #include "hephaistos/bindings.hpp"
 
+#include <algorithm>
 #include <stdexcept>
 #include <sstream>
 
 #include "volk.h"
 
-#include "vk/descriptor.hpp"
-
 namespace hephaistos {
+
+namespace {
+
+bool isDescriptorSetEmpty(const VkWriteDescriptorSet& set) {
+    return set.pNext == nullptr &&
+        set.pImageInfo == nullptr &&
+        set.pBufferInfo == nullptr &&
+        set.pTexelBufferView == nullptr;
+}
+
+}
 
 uint32_t BindingTarget::getBindingCount() const noexcept {
 	return bindingTraits.size();
@@ -48,7 +58,7 @@ bool BindingTarget::isBindingBound(uint32_t i) const {
     if (i >= boundParams.size())
         throw std::runtime_error("There is no binding point at specified number!");
 
-    return !vulkan::isDescriptorSetEmpty(boundParams[i]);
+    return !isDescriptorSetEmpty(boundParams[i]);
 }
 
 bool BindingTarget::isBindingBound(std::string_view name) const {
@@ -63,12 +73,12 @@ bool BindingTarget::isBindingBound(std::string_view name) const {
         throw std::runtime_error("There is no binding point at specified location! Binding name: " + std::string(name));
 
     auto i = std::distance(bindingTraits.begin(), it);
-    return !vulkan::isDescriptorSetEmpty(boundParams[i]);
+    return !isDescriptorSetEmpty(boundParams[i]);
 }
 
 bool BindingTarget::allBindingsBound() const noexcept {
     for (const auto& param : boundParams) {
-        if (vulkan::isDescriptorSetEmpty(param))
+        if (isDescriptorSetEmpty(param))
             return false;
     }
 
@@ -99,6 +109,29 @@ VkWriteDescriptorSet& BindingTarget::getBinding(std::string_view name) {
 
     auto i = std::distance(bindingTraits.begin(), it);
     return boundParams[i];
+}
+
+void BindingTarget::checkAllBindingsBound() const {
+    if (std::any_of(
+        boundParams.begin(),
+        boundParams.end(),
+        isDescriptorSetEmpty)
+    ) {
+        std::ostringstream stream;
+        stream << "Cannot dispatch program due to unbound bindings:";
+        //collect all unbound bindings to make the error more usefull
+        for (auto i = 0u; i < boundParams.size(); ++i) {
+            if (!isDescriptorSetEmpty(boundParams[i]))
+                continue;
+
+            if (bindingTraits[i].name.empty())
+                stream << " " << i;
+            else
+                stream << " " << bindingTraits[i].name;
+        }
+
+        throw std::logic_error(stream.str());
+    }
 }
 
 }

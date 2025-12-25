@@ -10,7 +10,6 @@
 #include "volk.h"
 #include "spirv_reflect.h"
 
-#include "vk/descriptor.hpp"
 #include "vk/reflection.hpp"
 #include "vk/result.hpp"
 #include "vk/types.hpp"
@@ -144,10 +143,7 @@ DispatchCommand::DispatchCommand(
     , pushData(push)
     , program(std::cref(program))
     , params(params)
-{
-    //sanity check: all params are bound (will throw if not)
-    vulkan::checkAllBindingsBound(params);
-}
+{}
 DispatchCommand::~DispatchCommand() = default;
 
 void DispatchIndirectCommand::record(vulkan::Command& cmd) const {
@@ -221,10 +217,7 @@ DispatchIndirectCommand::DispatchIndirectCommand(
     , pushData(push)
     , program(std::cref(program))
     , params(params)
-{
-    //sanity check: all params are bound (will throw if not)
-    vulkan::checkAllBindingsBound(params);
-}
+{}
 DispatchIndirectCommand::~DispatchIndirectCommand() = default;
 
 /*********************************** PROGRAM **********************************/
@@ -234,6 +227,7 @@ const LocalSize& Program::getLocalSize() const noexcept {
 }
 
 DispatchCommand Program::dispatch(std::span<const std::byte> push, uint32_t x, uint32_t y, uint32_t z) const {
+    checkAllBindingsBound();
     return DispatchCommand(*program, boundParams, x, y, z, push);
 }
 DispatchCommand Program::dispatch(uint32_t x, uint32_t y, uint32_t z) const {
@@ -243,9 +237,11 @@ DispatchCommand Program::dispatch(uint32_t x, uint32_t y, uint32_t z) const {
 DispatchIndirectCommand Program::dispatchIndirect(
     std::span<const std::byte> push, const Tensor<std::byte>& tensor, uint64_t offset) const
 {
+    checkAllBindingsBound();
     return DispatchIndirectCommand(*program, boundParams, tensor, offset, push);
 }
 DispatchIndirectCommand Program::dispatchIndirect(const Tensor<std::byte>& tensor, uint64_t offset) const {
+    checkAllBindingsBound();
     return DispatchIndirectCommand(*program, boundParams, tensor, offset, {});
 }
 
@@ -258,6 +254,7 @@ void Program::onDestroy() {
 
         program.reset();
         bindingTraits.clear();
+        boundParams.clear();
     }
 }
 
