@@ -36,7 +36,7 @@ void main() {
     rayQueryInitializeEXT(
         rayQuery, tlas,
         gl_RayFlagsTerminateOnFirstHitEXT,
-        0xFF, start, 0.01, dir[idx], 4.0);
+        0xFF, start, 0.01, dir[idx], 99.0);
     rayQueryProceedEXT(rayQuery);
 
     if (rayQueryGetIntersectionTypeEXT(rayQuery, true) == gl_RayQueryCommittedIntersectionTriangleEXT) {

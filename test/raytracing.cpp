@@ -11,17 +11,36 @@
 #include "validation.hpp"
 
 //code
-#include "shader/raytracing.h"
-#include "shader/tlas.h"
+#include "shader/raytracing/rayquery.h"
+#include "shader/raytracing/tlas.h"
+#include "shader/raytracing/callable.h"
+#include "shader/raytracing/hit.h"
+#include "shader/raytracing/miss.h"
+#include "shader/raytracing/raygen.h"
 
 using namespace hephaistos;
 
 namespace {
 
+//UTIL
+
+template<class T>
+std::span<const std::byte> as_bytes(const T& t) {
+    return std::as_bytes(std::span<const T>{ std::addressof(t), 1});
+}
+
 //EXTENSION
 
+constexpr RayTracingFeatures RAY_TRACING_SUPPORT{
+    .query = true,
+    .pipeline = true,
+    .indirectDispatch = true,
+    .positionFetch = true,
+    //.invocationReorder = true
+};
+
 auto Extensions = std::to_array({
-    createRaytracingExtension()
+    createRayTracingExtension(RAY_TRACING_SUPPORT)
 });
 
 ContextHandle getContext() {
@@ -56,31 +75,31 @@ const auto square_indices = std::to_array<uint32_t>({
 const TransformMatrix TopTransform = {
     1.0f, 0.0f, 0.0f, 0.0f,
 	0.0f, 1.0f, 0.0f, 0.0f,
-	0.0f, 0.0f, 1.0f, 1.0f
+	0.0f, 0.0f, 1.0f, 5.0f
 };
 const TransformMatrix BottomTransform = {
     1.0f, 0.0f, 0.0f, 0.0f,
 	0.0f, 1.0f, 0.0f, 0.0f,
-	0.0f, 0.0f, 1.0f, -1.0f
+	0.0f, 0.0f, 1.0f, -5.0f
 };
 const TransformMatrix LeftTransform = {
-    0.0f, 0.0f, 1.0f, -1.0f,
+    0.0f, 0.0f, 1.0f, -5.0f,
     0.0f, 1.0f, 0.0f, 0.0f,
     -1.0f, 0.0f, 0.0f, 0.0f
 };
 const TransformMatrix RightTransform = {
-    0.0f, 0.0f, 1.0f, 1.0f,
+    0.0f, 0.0f, 1.0f, 5.0f,
     0.0f, 1.0f, 0.0f, 0.0f,
     -1.0f, 0.0f, 0.0f, 0.0f
 };
 const TransformMatrix BackTransform = {
     1.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 1.0f, 1.0f,
+    0.0f, 0.0f, 1.0f, 5.0f,
     0.0f, -1.0f, 0.0f, 0.0f
 };
 const TransformMatrix FrontTransform = {
     1.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 1.0f, -1.0f,
+    0.0f, 0.0f, 1.0f, -0.5f,
     0.0f, -1.0f, 0.0f, 0.0f
 };
 
@@ -98,17 +117,25 @@ struct Result{
 
 const auto customIdx = std::to_array<uint32_t>({ 17,4,21,15,4,31 });
 const auto instanceIdx = std::to_array<uint32_t>({ 0,1,2,3,4,5 });
-const auto expectedT = std::to_array<float>({ 1.f, 1.f, 1.f, 1.f, 1.f, 1.f });
-const auto expectedX = std::to_array<float>({ 0.f, 0.f, -1.f, 1.f, 0.f, 0.f });
-const auto expectedY = std::to_array<float>({ 0.f, 0.f, 0.f, 0.f, 1.f, -1.f });
-const auto expectedZ = std::to_array<float>({ 1.f, -1.f, 0.f, 0.f, 0.f, 0.f });
+const auto expectedT = std::to_array<float>({ 5.f, 5.f, 5.f, 5.f, 5.f, .5f });
+const auto expectedX = std::to_array<float>({ 0.f, 0.f, -5.f, 5.f, 0.f, 0.f });
+const auto expectedY = std::to_array<float>({ 0.f, 0.f, 0.f, 0.f, 5.f, -.5f });
+const auto expectedZ = std::to_array<float>({ 5.f, -5.f, 0.f, 0.f, 0.f, 0.f });
 const auto eps = 1e-5f;
+
+const int hitData_1 = 3;
+const int hitData_2 = 5;
+const auto pipelineResult = std::to_array<int32_t>({
+    3, 3, 3, -1, 3, -1, -1, -1, -1,
+    3, 3, 3, 3, 0, 5, -1, 5, -1,
+    3, 3, 3, -1, 5, -1, -1, -1, -1
+});
 
 }
 
 TEST_CASE("ray queries are available in shaders", "[raytracing]") {
     //Check if we have the necessary hardware for this check
-    if (!isRaytracingSupported(getDevice(getContext())))
+    if (!isRayTracingSupported(RAY_TRACING_SUPPORT))
         SKIP("No ray tracing hardware for testing available.");
     
     //build geometries
@@ -164,7 +191,7 @@ TEST_CASE("ray queries are available in shaders", "[raytracing]") {
     //create program
     Buffer<Result> buffer(getContext(), 6);
     Tensor<Result> tensor(getContext(), 6);
-    Program program(getContext(), raytracing_code);
+    Program program(getContext(), rayquery_code);
     program.bindParameterList(tlas, tensor);
 
     //run program
@@ -192,7 +219,7 @@ TEST_CASE("ray queries are available in shaders", "[raytracing]") {
 
 TEST_CASE("Acceleration structure can be updated", "[raytracing]") {
     //Check if we have the necessary hardware for this check
-    if (!isRaytracingSupported(getDevice(getContext())))
+    if (!isRayTracingSupported(RAY_TRACING_SUPPORT))
         SKIP("No ray tracing hardware for testing available.");
 
     //build geometries
@@ -250,7 +277,7 @@ TEST_CASE("Acceleration structure can be updated", "[raytracing]") {
     //create program
     Buffer<Result> buffer(getContext(), 6);
     Tensor<Result> tensor(getContext(), 6);
-    Program program(getContext(), raytracing_code);
+    Program program(getContext(), rayquery_code);
     program.bindParameterList(tlas, tensor);
 
     //run program
@@ -278,7 +305,7 @@ TEST_CASE("Acceleration structure can be updated", "[raytracing]") {
 
 TEST_CASE("Acceleration structures can be defined on the GPU", "[raytracing]") {
     //Check if we have the necessary hardware for this check
-    if (!isRaytracingSupported(getDevice(getContext())))
+    if (!isRayTracingSupported(RAY_TRACING_SUPPORT))
         SKIP("No ray tracing hardware for testing available.");
 
     //build geometries
@@ -299,7 +326,7 @@ TEST_CASE("Acceleration structures can be defined on the GPU", "[raytracing]") {
     Buffer<Result> buffer(getContext(), 6);
     Tensor<Result> tensor(getContext(), 6);
     Program progTlas(getContext(), tlas_code);
-    Program progTrace(getContext(), raytracing_code);
+    Program progTrace(getContext(), rayquery_code);
     progTrace.bindParameterList(tlas, tensor);
     struct Push {
         uint64_t instanceBufferAddress;
@@ -327,6 +354,195 @@ TEST_CASE("Acceleration structures can be defined on the GPU", "[raytracing]") {
         REQUIRE_THAT(result[i].hitY, Catch::Matchers::WithinAbs(expectedY[i], eps));
         REQUIRE_THAT(result[i].hitZ, Catch::Matchers::WithinAbs(expectedZ[i], eps));
     }
+
+    //check validation errors
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
+TEST_CASE("Ray tracing pipelines can trace rays", "[raytracing]") {
+    //Check if we have the necessary hardware for this check
+    if (!isRayTracingSupported(RAY_TRACING_SUPPORT))
+        SKIP("No ray tracing hardware for testing available.");
+
+    //build geometries
+    GeometryStore store(getContext(), std::to_array<Mesh>({
+        { //triangle
+            .vertices = std::as_bytes(std::span<const float>(triangle_vertices))
+        },
+        { //square
+            .vertices = std::as_bytes(std::span<const float>(square_vertices)),
+            .indices = square_indices
+        }
+        }));
+    auto& triangle = store[0];
+    auto& square = store[1];
+    //create acceleration structure
+    GeometryInstance topInstance{
+        .blas_address = triangle.blas_address,
+        .transform = TopTransform,
+        .instanceSBTOffset = 1
+    };
+    GeometryInstance bottomInstance{
+        .blas_address = square.blas_address,
+        .transform = BottomTransform,
+        .instanceSBTOffset = 0
+    };
+    GeometryInstance leftInstance{
+        .blas_address = triangle.blas_address,
+        .transform = LeftTransform,
+        .instanceSBTOffset = 0
+    };
+    GeometryInstance rightInstance{
+        .blas_address = square.blas_address,
+        .transform = RightTransform,
+        .instanceSBTOffset = 1
+    };
+    GeometryInstance backInstance{
+        .blas_address = triangle.blas_address,
+        .transform = BackTransform,
+        .instanceSBTOffset = 1
+    };
+    GeometryInstance frontInstance{
+        .blas_address = square.blas_address,
+        .transform = FrontTransform,
+        .instanceSBTOffset = 0
+    };
+    auto instances = std::to_array<GeometryInstance>({
+        topInstance, bottomInstance,
+        leftInstance, rightInstance,
+        backInstance, frontInstance
+        });
+    AccelerationStructure tlas(getContext(), instances);
+
+    //create ray tracing pipeline
+    RayTracingPipeline pipeline(getContext(),
+        std::to_array<RayTracingShader>({
+            { RayGenerateShader{ raygen_code } },
+            { RayMissShader{ miss_code } },
+            { RayHitShader{ hit_code } },
+            { CallableShader{ callable_code } }
+        })
+    );
+    //create resources
+    Buffer<int32_t> buffer(getContext(), 3 * 3 * 3);
+    Tensor<int32_t> tensor(getContext(), 3 * 3 * 3);
+    pipeline.bindParameterList(tlas, tensor);
+
+    //create sbt
+    auto rayGenTable = pipeline.createShaderBindingTable(0);
+    auto missTable = pipeline.createShaderBindingTable(
+        std::to_array<ShaderBindingTableEntry>({ {}, {1} })
+    );
+    auto hitTable = pipeline.createShaderBindingTable(
+        std::to_array<ShaderBindingTableEntry>({
+            { 2, as_bytes(hitData_1) },
+            { 2, as_bytes(hitData_2) }
+        })
+    );
+
+    //trace rays
+    beginSequence(getContext())
+        .And(pipeline.traceRays({ rayGenTable, missTable, hitTable }, { 3, 3, 3 }))
+        .Then(retrieveTensor(tensor, buffer))
+        .Submit();
+
+    //check results
+    REQUIRE(std::equal(pipelineResult.begin(), pipelineResult.end(), buffer.getMemory().begin()));
+
+    //check validation errors
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
+TEST_CASE("Ray tracing pipelines can trace rays indirectly", "[raytracing]") {
+    //Check if we have the necessary hardware for this check
+    if (!isRayTracingSupported(RAY_TRACING_SUPPORT))
+        SKIP("No ray tracing hardware for testing available.");
+
+    //build geometries
+    GeometryStore store(getContext(), std::to_array<Mesh>({
+        { //triangle
+            .vertices = std::as_bytes(std::span<const float>(triangle_vertices))
+        },
+        { //square
+            .vertices = std::as_bytes(std::span<const float>(square_vertices)),
+            .indices = square_indices
+        }
+        }));
+    auto& triangle = store[0];
+    auto& square = store[1];
+    //create acceleration structure
+    GeometryInstance topInstance{
+        .blas_address = triangle.blas_address,
+        .transform = TopTransform,
+        .instanceSBTOffset = 1
+    };
+    GeometryInstance bottomInstance{
+        .blas_address = square.blas_address,
+        .transform = BottomTransform,
+        .instanceSBTOffset = 0
+    };
+    GeometryInstance leftInstance{
+        .blas_address = triangle.blas_address,
+        .transform = LeftTransform,
+        .instanceSBTOffset = 0
+    };
+    GeometryInstance rightInstance{
+        .blas_address = square.blas_address,
+        .transform = RightTransform,
+        .instanceSBTOffset = 1
+    };
+    GeometryInstance backInstance{
+        .blas_address = triangle.blas_address,
+        .transform = BackTransform,
+        .instanceSBTOffset = 1
+    };
+    GeometryInstance frontInstance{
+        .blas_address = square.blas_address,
+        .transform = FrontTransform,
+        .instanceSBTOffset = 0
+    };
+    auto instances = std::to_array<GeometryInstance>({
+        topInstance, bottomInstance,
+        leftInstance, rightInstance,
+        backInstance, frontInstance
+        });
+    AccelerationStructure tlas(getContext(), instances);
+
+    //create ray tracing pipeline
+    RayTracingPipeline pipeline(getContext(),
+        std::to_array<RayTracingShader>({
+            { RayGenerateShader{ raygen_code } },
+            { RayMissShader{ miss_code } },
+            { RayHitShader{ hit_code } },
+            { CallableShader{ callable_code } }
+            })
+    );
+    //create resources
+    Buffer<int32_t> buffer(getContext(), 3 * 3 * 3);
+    Tensor<int32_t> tensor(getContext(), 3 * 3 * 3);
+    pipeline.bindParameterList(tlas, tensor);
+
+    //create sbt
+    auto rayGenTable = pipeline.createShaderBindingTable(0);
+    auto missTable = pipeline.createShaderBindingTable(
+        std::to_array<ShaderBindingTableEntry>({ {}, {1} })
+    );
+    auto hitTable = pipeline.createShaderBindingTable(
+        std::to_array<ShaderBindingTableEntry>({
+            { 2, as_bytes(hitData_1) },
+            { 2, as_bytes(hitData_2) }
+            })
+    );
+
+    //trace rays
+    auto countTensor = Tensor<uint32_t>(getContext(), std::to_array<uint32_t>({ 3, 3, 3 }));
+    beginSequence(getContext())
+        .And(pipeline.traceRaysIndirect({ rayGenTable, missTable, hitTable }, countTensor))
+        .Then(retrieveTensor(tensor, buffer))
+        .Submit();
+
+    //check results
+    REQUIRE(std::equal(pipelineResult.begin(), pipelineResult.end(), buffer.getMemory().begin()));
 
     //check validation errors
     REQUIRE(!hasValidationErrorOccurred());
