@@ -28,7 +28,7 @@ int main() {
     auto context = createEmptyContext();
     try {
         auto extensions = std::to_array({
-            createRaytracingExtension()
+            createRayTracingExtension({ .query = true })
         });
         context = createContext(extensions);
     }
