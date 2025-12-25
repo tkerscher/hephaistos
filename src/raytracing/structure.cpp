@@ -1,145 +1,15 @@
-#include "hephaistos/raytracing.hpp"
+#include "hephaistos/raytracing/structure.hpp"
 
-#include <algorithm>
 #include <array>
-#include <cstring>
 
 #include "volk.h"
 
 #include "vk/types.hpp"
-#include "vk/result.hpp"
 #include "vk/util.hpp"
 
+#include "raytracing/extension.hpp"
+
 namespace hephaistos {
-
-/********************************** EXTENSION *********************************/
-
-namespace {
-
-constexpr auto ExtensionName = "Raytracing";
-
-//! MUST BE SORTED FOR std::includes !//
-constexpr auto DeviceExtensions = std::to_array({
-    VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
-    VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
-    VK_KHR_RAY_QUERY_EXTENSION_NAME,
-    VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME
-});
-
-//util function querying the required scratch buffer alignment
-//TODO: Likely want to cache this value somewhere. Maybe put it in RaytracingExtension?
-uint32_t getScratchAlignment(const ContextHandle& context) {
-    VkPhysicalDeviceAccelerationStructurePropertiesKHR accProps{
-            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR
-    };
-    VkPhysicalDeviceProperties2 props{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
-        .pNext = &accProps
-    };
-    vkGetPhysicalDeviceProperties2(context->physicalDevice, &props);
-    return accProps.minAccelerationStructureScratchOffsetAlignment;
-}
-
-}
-
-bool isRaytracingSupported(const DeviceHandle& device) {
-    //We have to check two things:
-    // - Extensions supported
-    // - Features suppported
-
-    //nullcheck
-    if (!device)
-        return false;
-
-    //Check extension support
-    if (!std::includes(
-        device->supportedExtensions.begin(),
-        device->supportedExtensions.end(),
-        DeviceExtensions.begin(),
-        DeviceExtensions.end()))
-    {
-        return false;
-    }
-
-    //Query features
-    VkPhysicalDeviceRayTracingPositionFetchFeaturesKHR posFetchFeatures{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_POSITION_FETCH_FEATURES_KHR,
-    };
-    VkPhysicalDeviceRayQueryFeaturesKHR queryFeatures{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR,
-        .pNext = &posFetchFeatures
-    };
-    VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
-        .pNext = &queryFeatures
-    };
-    VkPhysicalDeviceFeatures2 features{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-        .pNext = &accelerationStructureFeatures
-    };
-    vkGetPhysicalDeviceFeatures2(device->device, &features);
-
-    //check features
-    if (!posFetchFeatures.rayTracingPositionFetch)
-        return false;
-    if (!queryFeatures.rayQuery)
-        return false;
-    if (!accelerationStructureFeatures.accelerationStructure)
-        return false;
-
-    //Everything checked
-    return true;
-}
-bool isRaytracingEnabled(const ContextHandle& context) {
-    //to shorten things
-    auto& ext = context->extensions;
-    return std::find_if(ext.begin(), ext.end(),
-        [](const ExtensionHandle& h) -> bool {
-            return h->getExtensionName() == ExtensionName;
-        }) != ext.end();
-}
-
-class RaytracingExtension : public Extension {
-public:
-    bool isDeviceSupported(const DeviceHandle& device) const override {
-        return isRaytracingSupported(device);
-    }
-    std::string_view getExtensionName() const override {
-        return ExtensionName;
-    }
-    std::span<const char* const> getDeviceExtensions() const override {
-        return DeviceExtensions;
-    }
-    void* chain(void* pNext) override {
-        queryFeatures.pNext = pNext;
-        return static_cast<void*>(&accelerationStructureFeatures);
-    }
-    void finalize(const ContextHandle& context) override {}
-
-    RaytracingExtension() = default;
-    virtual ~RaytracingExtension() = default;
-
-private:
-    VkPhysicalDeviceRayQueryFeaturesKHR queryFeatures{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR,
-        .rayQuery = VK_TRUE
-    };
-    VkPhysicalDeviceRayTracingPositionFetchFeaturesKHR positionFetchFeatures{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_POSITION_FETCH_FEATURES_KHR,
-        .pNext = &queryFeatures,
-        .rayTracingPositionFetch = VK_TRUE
-    };
-    VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
-        .pNext = &positionFetchFeatures,
-        .accelerationStructure = VK_TRUE
-    };
-};
-ExtensionHandle createRaytracingExtension() {
-    return std::make_unique<RaytracingExtension>();
-}
-
-/********************************* GEOMETRIES *********************************/
 
 struct GeometryStore::Imp {
     std::vector<Geometry> geometries{};
@@ -194,7 +64,8 @@ GeometryStore::GeometryStore(
     const Mesh& mesh,
     bool keepGeometryData)
     : GeometryStore(std::move(context), { &mesh, 1 }, keepGeometryData)
-{}
+{
+}
 GeometryStore::GeometryStore(
     ContextHandle _context,
     std::span<const Mesh> meshes,
@@ -202,6 +73,16 @@ GeometryStore::GeometryStore(
     : Resource(std::move(_context))
     , pImp(std::make_unique<Imp>())
 {
+    //look up scratch requirement
+    auto ext = getExtension<RayTracingExtension>(*getContext(), "RayTracing");
+    if (!ext) throw std::runtime_error("Ray tracing extension has not been enabled!");
+    auto scratchAlignment = ext->minAccelerationStructureScratchOffsetAlignment;
+    VkAccelerationStructureCreateFlagsKHR buildFlags =
+        VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR |
+        VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR;
+    if (ext->enabled.positionFetch)
+        buildFlags |= VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_DATA_ACCESS_BIT_KHR;
+
     auto& context = getContext();
     auto nMeshes = meshes.size();
     //Calculate how much memory we'll need for the geometry data
@@ -222,7 +103,7 @@ GeometryStore::GeometryStore(
     auto dataBuffer = vulkan::createBuffer(context,
         data_size,
         keepGeometryData ?
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT : 
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT :
         VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
         VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
         VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
@@ -261,7 +142,7 @@ GeometryStore::GeometryStore(
             };
             context->fnTable.vkCmdCopyBuffer(
                 cmd, dataBuffer->buffer, gpuBuffer->buffer, 1, &copyRegion);
-        });
+            });
         //replace dataBuffer
         dataBuffer = std::move(gpuBuffer);
     }
@@ -269,8 +150,6 @@ GeometryStore::GeometryStore(
     //query buffer addresses
     VkDeviceAddress vertexAddress = vulkan::getBufferDeviceAddress(dataBuffer);
     VkDeviceAddress indexAddress = hasIndices ? vertexAddress + total_vertices_size : 0;
-    //query scratch buffer alignment
-    auto scratchAlignment = getScratchAlignment(context);
 
     //fill blas info
     VkDeviceSize blasTotalSize = 0;
@@ -289,16 +168,16 @@ GeometryStore::GeometryStore(
         VkAccelerationStructureGeometryTrianglesDataKHR triangles{
             .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR,
             .vertexFormat = VK_FORMAT_R32G32B32_SFLOAT,
-            .vertexData = { .deviceAddress = pVertex },
+            .vertexData = {.deviceAddress = pVertex },
             .vertexStride = geometry.vertexStride,
             .maxVertex = vertex_count - 1,
             .indexType = hasIdx ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_NONE_KHR,
-            .indexData = { .deviceAddress = hasIdx ? pIndex : 0 }
+            .indexData = {.deviceAddress = hasIdx ? pIndex : 0 }
         };
         geometries[i] = {
             .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
             .geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR,
-            .geometry = { .triangles = triangles },
+            .geometry = {.triangles = triangles },
             .flags = VK_GEOMETRY_OPAQUE_BIT_KHR
         };
         //update addresses
@@ -309,9 +188,7 @@ GeometryStore::GeometryStore(
         buildInfo[i] = {
             .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
             .type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,
-            .flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR |
-                     VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR |
-                     VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_DATA_ACCESS_KHR,
+            .flags = buildFlags,
             .geometryCount = 1,
             .pGeometries = &geometries[i]
         };
@@ -398,7 +275,7 @@ GeometryStore::GeometryStore(
             pRanges.data());
         //memory barrier to ensure queries are valid
         VkMemoryBarrier barrier{
-            .sType           = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+            .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
             .srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
             .dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR
         };
@@ -411,7 +288,7 @@ GeometryStore::GeometryStore(
             nMeshes, accStructures.data(),
             VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR,
             queryPool, 0);
-    });
+        });
 
     //query compacted sizes
     std::vector<VkDeviceSize> compactSizes(nMeshes);
@@ -425,7 +302,7 @@ GeometryStore::GeometryStore(
         VK_QUERY_RESULT_WAIT_BIT);
     //destroy query pool
     context->fnTable.vkDestroyQueryPool(context->device, queryPool, nullptr);
-    
+
     //update blas buffer size
     blasTotalSize = 0;
     for (auto size : compactSizes) {
@@ -460,14 +337,14 @@ GeometryStore::GeometryStore(
     vulkan::oneTimeSubmit(*context, [&](VkCommandBuffer cmd) {
         VkCopyAccelerationStructureInfoKHR copyInfo{
             .sType = VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_INFO_KHR,
-            .mode  = VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_KHR
+            .mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_KHR
         };
         for (auto i = 0u; i < nMeshes; ++i) {
             copyInfo.src = accStructures[i];
             copyInfo.dst = compactAccStructures[i];
             context->fnTable.vkCmdCopyAccelerationStructureKHR(cmd, &copyInfo);
         }
-    });
+        });
     //destroy inital blas
     for (auto i = 0u; i < nMeshes; ++i) {
         context->fnTable.vkDestroyAccelerationStructureKHR(
@@ -510,26 +387,26 @@ GeometryStore::~GeometryStore() {
 
 namespace {
 
-constexpr VkBufferUsageFlags TLAS_BUFFER_USAGE_FLAGS =
-    VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
-    VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    constexpr VkBufferUsageFlags TLAS_BUFFER_USAGE_FLAGS =
+        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
+        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
-constexpr VkBufferUsageFlags INSTANCE_BUFFER_USAGE_FLAGS =
-    VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-    VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
-    // VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
-    // VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    constexpr VkBufferUsageFlags INSTANCE_BUFFER_USAGE_FLAGS =
+        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+        VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
+        // VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+        // VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 
-constexpr VmaAllocationCreateFlags INSTANCE_BUFFER_ALLOCATION_FLAGS =
-    VMA_ALLOCATION_CREATE_MAPPED_BIT |
-    VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+    constexpr VmaAllocationCreateFlags INSTANCE_BUFFER_ALLOCATION_FLAGS =
+        VMA_ALLOCATION_CREATE_MAPPED_BIT |
+        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 
-constexpr VkBufferUsageFlags SCRATCH_BUFFER_USAGE_FLAGS =
-    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-    VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    constexpr VkBufferUsageFlags SCRATCH_BUFFER_USAGE_FLAGS =
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
-const GeometryInstance defaultGeometryInstance = {};
+    const GeometryInstance defaultGeometryInstance = {};
 
 }
 
@@ -575,6 +452,15 @@ VkDeviceSize AccelerationStructure::BuildResources::init(
     const GeometryInstance* pInstances,
     uint32_t instanceCount
 ) {
+    //look up scratch requirement
+    auto ext = getExtension<RayTracingExtension>(*context, "RayTracing");
+    if (!ext) throw std::runtime_error("Ray tracing extension has not been enabled!");
+    auto scratchAlignment = ext->minAccelerationStructureScratchOffsetAlignment;
+    VkAccelerationStructureCreateFlagsKHR buildFlags =
+        VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+    if (ext->enabled.positionFetch)
+        buildFlags |= VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_DATA_ACCESS_BIT_KHR;
+
     //create instance buffer
     instanceBuffer = vulkan::createBufferAligned(
         context,
@@ -603,6 +489,7 @@ VkDeviceSize AccelerationStructure::BuildResources::init(
         pOut->mask = pInstance->mask;
         pOut->instanceShaderBindingTableRecordOffset = 0;
         pOut->flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+        pOut->instanceShaderBindingTableRecordOffset = pInstance->instanceSBTOffset;
         pOut->accelerationStructureReference = pInstance->blas_address;
     }
 
@@ -623,8 +510,7 @@ VkDeviceSize AccelerationStructure::BuildResources::init(
     tlasGeometryInfo = {
         .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
         .type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,
-        .flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR |
-                 VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_DATA_ACCESS_KHR,
+        .flags = buildFlags,
         .geometryCount = 1,
         .pGeometries = &tlasGeometry
     };
@@ -640,7 +526,7 @@ VkDeviceSize AccelerationStructure::BuildResources::init(
     scratchBuffer = vulkan::createBufferAligned(
         context,
         sizeInfo.buildScratchSize,
-        getScratchAlignment(context),
+        scratchAlignment,
         SCRATCH_BUFFER_USAGE_FLAGS,
         0
     );
@@ -652,7 +538,7 @@ VkDeviceSize AccelerationStructure::BuildResources::init(
 void AccelerationStructure::BuildResources::build(const ContextHandle& context) {
     vulkan::oneTimeSubmit(*context, [this, &context](VkCommandBuffer cmd) {
         context->fnTable.vkCmdBuildAccelerationStructuresKHR(cmd, 1, &tlasGeometryInfo, &pRangeInfo);
-    });
+        });
 }
 
 void AccelerationStructure::Parameter::init(
@@ -716,7 +602,7 @@ void AccelerationStructure::update(std::span<const GeometryInstance> instances) 
         throw std::runtime_error("Cannot update frozen acceleration structure!");
     if (instances.size() > buildResources->instances.size())
         throw std::runtime_error("Too many instances to fit in acceleration structure!");
-    
+
     //copy instances to buffer
     auto pOut = buildResources->instances.data();
     auto n = buildResources->instances.size();
@@ -763,10 +649,12 @@ AccelerationStructure::AccelerationStructure(ContextHandle context, uint32_t cap
 }
 AccelerationStructure::AccelerationStructure(ContextHandle context, const GeometryInstance& instance, bool frozen)
     : AccelerationStructure(std::move(context), &instance, 1, frozen)
-{}
+{
+}
 AccelerationStructure::AccelerationStructure(ContextHandle context, std::span<const GeometryInstance> instances, bool frozen)
     : AccelerationStructure(std::move(context), instances.data(), instances.size(), frozen)
-{}
+{
+}
 AccelerationStructure::AccelerationStructure(
     ContextHandle context,
     const GeometryInstance* pInstances,
@@ -824,7 +712,7 @@ void BuildAccelerationStructureCommand::record(vulkan::Command& cmd) const {
                 .buffer = instanceBuffer,
                 .size = VK_WHOLE_SIZE
             }
-        });
+            });
         context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
@@ -870,20 +758,21 @@ BuildAccelerationStructureCommand::BuildAccelerationStructureCommand(
 ) = default;
 BuildAccelerationStructureCommand& BuildAccelerationStructureCommand::operator=(
     const BuildAccelerationStructureCommand& other
-) = default;
+    ) = default;
 
 BuildAccelerationStructureCommand::BuildAccelerationStructureCommand(
     BuildAccelerationStructureCommand&& other
 ) noexcept = default;
 BuildAccelerationStructureCommand& BuildAccelerationStructureCommand::operator=(
     BuildAccelerationStructureCommand&& other
-) noexcept = default;
+    ) noexcept = default;
 
 BuildAccelerationStructureCommand::BuildAccelerationStructureCommand(
     const AccelerationStructure& accelerationStructure,
     bool unsafe
 ) : accelerationStructure(std::cref(accelerationStructure)), unsafe(unsafe)
-{}
+{
+}
 BuildAccelerationStructureCommand::~BuildAccelerationStructureCommand() = default;
 
 }

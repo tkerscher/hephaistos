@@ -22,6 +22,9 @@ set(PUBLIC_HEADERS
     ${INCROOT}/stopwatch.hpp
     ${INCROOT}/types.hpp
     ${INCROOT}/version.hpp
+    ${INCROOT}/raytracing/extension.hpp
+    ${INCROOT}/raytracing/pipeline.hpp
+    ${INCROOT}/raytracing/structure.hpp
 )
 #Source
 set(SRC
@@ -34,7 +37,6 @@ set(SRC
     ${SRCROOT}/debug.cpp     
     ${SRCROOT}/image.cpp
     ${SRCROOT}/program.cpp
-    ${SRCROOT}/raytracing.cpp
     ${SRCROOT}/stopwatch.cpp
     ${SRCROOT}/types.cpp
     ${SRCROOT}/version.cpp
@@ -47,6 +49,10 @@ set(SRC
     ${SRCROOT}/vk/types.hpp
     ${SRCROOT}/vk/util.hpp
     ${SRCROOT}/vk/vma.cpp
+# raytracing
+    ${SRCROOT}/raytracing/extension.cpp
+    ${SRCROOT}/raytracing/pipeline.cpp
+    ${SRCROOT}/raytracing/structure.cpp
 )
 
 #create library
