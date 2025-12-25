@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <queue>
 #include <string>
 #include <string_view>
@@ -78,6 +79,21 @@ struct Image {
 struct Timeline {
     VkSemaphore semaphore;
 };
+
+template<class Extension>
+const Extension* getExtension(const Context& context, const char* name) {
+    auto pExt = std::find_if(
+        context.extensions.begin(),
+        context.extensions.end(),
+        [name](const ExtensionHandle& h) -> bool {
+            return h->getExtensionName() == name;
+        }
+    );
+    if (pExt == context.extensions.end())
+        return nullptr;
+    else
+        return dynamic_cast<const Extension*>(pExt->get());
+}
 
 [[nodiscard]] BufferHandle createBuffer(
     const ContextHandle& handle,
