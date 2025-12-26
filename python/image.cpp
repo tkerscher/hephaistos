@@ -9,6 +9,7 @@
 #include <hephaistos/program.hpp>
 
 #include "context.hpp"
+#include "parameter.hpp"
 
 using namespace std::literals;
 
@@ -138,7 +139,7 @@ void registerImageModule(nb::module_& m) {
     m.def("getElementSize", &hp::getElementSize, "format"_a,
         "Returns the size of a single channel in bytes");
 
-    nb::class_<hp::Image, hp::Resource>(m, "Image",
+    auto image = nb::class_<hp::Image, hp::Resource>(m, "Image",
             "Allocates memory on the device using a memory layout it deems "
             "optimal for images presenting it inside programs as storage images "
             "thus allowing reads and writes to it."
@@ -173,19 +174,10 @@ void registerImageModule(nb::module_& m) {
             [](const hp::Image& img) -> uint64_t { return img.size_bytes(); },
             "Size the image takes in a linear/compact memory layout in bytes. "
             "This can differ from the actual size the image takes on the device "
-            "but can be useful to allocate buffers for transferring the image.")
-        .def("bindParameter",
-            [](const hp::Image& img, hp::Program& p, uint32_t b)
-                { img.bindParameter(p.getBinding(b)); },
-            "program"_a, "binding"_a,
-            "Binds the image to the program at the given binding")
-        .def("bindParameter",
-            [](const hp::Image& img, hp::Program& p, std::string_view b)
-                { img.bindParameter(p.getBinding(b)); },
-            "program"_a, "binding"_a,
-            "Binds the image to the program at the given binding");
+            "but can be useful to allocate buffers for transferring the image.");
+    registerArgument(image);
     
-    nb::class_<hp::Texture, hp::Resource>(m, "Texture",
+    auto texture = nb::class_<hp::Texture, hp::Resource>(m, "Texture",
             "Allocates memory on the device using a memory layout it deems "
             "optimal for images and presents it inside programs as texture "
             "allowing filtered lookups. The filter methods can specified"
@@ -234,17 +226,8 @@ void registerImageModule(nb::module_& m) {
             [](const hp::Texture& tex) -> uint64_t { return tex.size_bytes(); },
             "Size the texture takes in a linear/compact memory layout in bytes. "
             "This can differ from the actual size the texture takes on the device "
-            "but can be useful to allocate buffers for transferring the texture.")
-        .def("bindParameter",
-            [](const hp::Texture& tex, hp::Program& p, uint32_t b)
-                { tex.bindParameter(p.getBinding(b)); },
-            "program"_a, "binding"_a,
-            "Binds the texture to the program at the given binding")
-        .def("bindParameter",
-            [](const hp::Texture& tex, hp::Program& p, std::string_view b)
-                { tex.bindParameter(p.getBinding(b)); },
-            "program"_a, "binding"_a,
-            "Binds the texture to the program at the given binding");
+            "but can be useful to allocate buffers for transferring the texture.");
+    registerArgument(texture);
 
     nb::class_<hp::ImageBuffer, hp::Buffer<std::byte>>(m, "ImageBuffer",
             "Utility class allocating memory on the host side in linear memory "

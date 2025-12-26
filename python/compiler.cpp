@@ -11,6 +11,15 @@ namespace nb = nanobind;
 using namespace nb::literals;
 
 void registerCompilerModule(nb::module_& m) {
+    nb::enum_<hp::ShaderStage>(m, "ShaderStage")
+        .value("COMPUTE", hp::ShaderStage::COMPUTE)
+        .value("RAYGEN", hp::ShaderStage::RAYGEN)
+        .value("INTERSECT", hp::ShaderStage::INTERSECT)
+        .value("ANY_HIT", hp::ShaderStage::ANY_HIT)
+        .value("CLOSEST_HIT", hp::ShaderStage::CLOSEST_HIT)
+        .value("MISS", hp::ShaderStage::MISS)
+        .value("CALLABLE", hp::ShaderStage::CALLABLE);
+
     nb::bind_map<hp::Compiler::HeaderMap>(m, "HeaderMap",
         "Dict mapping filepaths to shader source code. "
         "Consumed by Compiler to resolve include directives.");
@@ -28,30 +37,35 @@ void registerCompilerModule(nb::module_& m) {
         .def("clearIncludeDir", &hp::Compiler::clearIncludeDir,
             "Clears the internal list of include directories")
         .def("compile",
-            [](const hp::Compiler& c, std::string_view code) -> nb::bytes {
+            [](
+                const hp::Compiler& c,
+                std::string_view code,
+                hp::ShaderStage stage
+            ) -> nb::bytes {
                 std::vector<uint32_t> result;
                 {
                     //release gil during compilation
                     nb::gil_scoped_release release;
-                    result = c.compile(code);
+                    result = c.compile(code, stage);
                 }
                 return nb::bytes((const char*)result.data(), result.size()*4);
-            }, "code"_a,
+            }, "code"_a, nb::kw_only(), "stage"_a = hp::ShaderStage::COMPUTE,
             "Compiles the given GLSL code and returns the SPIR-V code as bytes")
         .def("compile", [](
-                const hp::Compiler& c,
-                std::string_view code,
-                const hp::Compiler::HeaderMap& headers
+                    const hp::Compiler& c,
+                    std::string_view code,
+                    const hp::Compiler::HeaderMap& headers,
+                    hp::ShaderStage stage
                 ) -> nb::bytes {
                     std::vector<uint32_t> result;
                     {
                         //release GIL during compilation
                         nb::gil_scoped_release release;
-                        result = c.compile(code, headers);
+                        result = c.compile(code, headers, stage);
                     }
                     return nb::bytes((const char*)result.data(), result.size()*4);
                 },
-            "code"_a, "headers"_a,
+            "code"_a, "headers"_a, nb::kw_only(), "stage"_a = hp::ShaderStage::COMPUTE,
             "Compiles the given GLSL code using the provided header files "
             "and returns the SPIR-V code as bytes");
 }

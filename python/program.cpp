@@ -9,7 +9,9 @@
 #include <stdexcept>
 
 #include <hephaistos/program.hpp>
+
 #include "context.hpp"
+#include "parameter.hpp"
 
 namespace hp = hephaistos;
 namespace nb = nanobind;
@@ -18,42 +20,7 @@ using namespace nb::literals;
 namespace {
 
 hp::SubgroupProperties getSubgroupProperties(uint32_t i) {
-    auto& devices = getDevices();
-    if (i >= devices.size())
-        throw std::runtime_error("There is no device with the given id!");
-    
-    return hp::getSubgroupProperties(devices[i]);
-}
-
-void printBindingType(std::ostringstream& str, hp::ParameterType type) {
-    switch(type) {
-    case hp::ParameterType::COMBINED_IMAGE_SAMPLER:
-        str << "COMBINED_IMAGE_SAMPLER";
-        break;
-    case hp::ParameterType::STORAGE_IMAGE:
-        str << "STORAGE_IMAGE";
-        break;
-    case hp::ParameterType::UNIFORM_BUFFER:
-        str << "UNIFORM_BUFFER";
-        break;
-    case hp::ParameterType::STORAGE_BUFFER:
-        str << "STORAGE_BUFFER";
-        break;
-    case hp::ParameterType::ACCELERATION_STRUCTURE:
-        str << "ACCELERATION_STRUCTURE";
-        break;
-    default:
-        str << "UNKNOWN";
-        break;
-    }
-}
-
-void printBinding(std::ostringstream& str, const hp::BindingTraits& b) {
-    str << b.binding << ": " << b.name << " (";
-    printBindingType(str, b.type);
-    if (b.count > 1)
-        str << '[' << b.count << ']';
-    str << ")";
+    return hp::getSubgroupProperties(getDevice(i));
 }
 
 }
@@ -103,34 +70,7 @@ void registerProgramModule(nb::module_& m) {
         []() -> hp::SubgroupProperties { return hp::getSubgroupProperties(getCurrentContext()); },
         "Returns the properties specific to subgroups (waves).");
     m.def("getSubgroupProperties", &getSubgroupProperties,
-        "Returns the properties specific to subgroups (waves).");
-
-    nb::enum_<hp::ParameterType>(m, "ParameterType", "Type of parameter")
-        .value("COMBINED_IMAGE_SAMPLER", hp::ParameterType::COMBINED_IMAGE_SAMPLER)
-        .value("STORAGE_IMAGE", hp::ParameterType::STORAGE_IMAGE)
-        .value("UNIFORM_BUFFER", hp::ParameterType::UNIFORM_BUFFER)
-        .value("STORAGE_BUFFER", hp::ParameterType::STORAGE_BUFFER)
-        .value("ACCELERATION_STRUCTURE", hp::ParameterType::ACCELERATION_STRUCTURE);
-
-    nb::class_<hp::ImageBindingTraits>(m, "ImageBindingTraits",
-            "Properties a binding expects from a bound image")
-        .def_ro("format", &hp::ImageBindingTraits::format, "Expected image format")
-        .def_ro("dims", &hp::ImageBindingTraits::dims, "Image dimensions");
-    
-    nb::class_<hp::BindingTraits>(m, "BindingTraits",
-            "Properties of binding found in programs")
-        .def_ro("name", &hp::BindingTraits::name, "Name of the binding. Might be empty.")
-        .def_ro("binding", &hp::BindingTraits::binding, "Index of the binding")
-        .def_ro("type", &hp::BindingTraits::type, "Type of the binding")
-        .def_ro("imageTraits", &hp::BindingTraits::imageTraits,
-            "Properties of the image if one is expected")
-        .def_ro("count", &hp::BindingTraits::count,
-            "Number of elements in binding, i.e. array size")
-        .def("__repr__", [](const hp::BindingTraits& b){
-            std::ostringstream str;
-            printBinding(str, b);
-            return str.str();
-        });
+        "Returns the properties specific to subgroups (waves).");    
 
     nb::class_<hp::LocalSize>(m, "LocalSize",
             "Description if the local size, i.e. the number and arrangement of "
@@ -164,7 +104,7 @@ void registerProgramModule(nb::module_& m) {
         .def_rw("offset", &hp::DispatchIndirectCommand::offset,
             "Offset into the Tensor in bytes on where to start reading");
     
-    nb::class_<hp::Program, hp::Resource>(m, "Program",
+    auto program = nb::class_<hp::Program, hp::Resource>(m, "Program",
             "Encapsulates a shader program enabling introspection into its "
             "bindings as well as keeping track of the parameters currently bound "
             "to them. Execution happens trough commands.")
@@ -206,27 +146,6 @@ void registerProgramModule(nb::module_& m) {
         .def_prop_ro("localSize",
             [](const hp::Program& p) { return p.getLocalSize(); },
             "Returns the size of the local work group.")
-        .def_prop_ro("bindings",
-            [](const hp::Program& p){ return p.listBindings(); },
-            "Returns a list of all bindings.")
-        .def("isBindingBound", [](const hp::Program& p, uint32_t i){
-                return p.isBindingBound(i);
-            }, "i"_a, "Checks wether the i-th binding is bound")
-        .def("isBindingBound", [](const hp::Program& p, std::string_view name) {
-                return p.isBindingBound(name);
-            }, "name"_a, "Checks wether the binding specified by its name is bound")
-        .def("bindParams", [](hp::Program& prog, nb::args params, nb::kwargs namedparams) {
-                auto self = nb::find(prog);
-                for (auto i = 0; i < params.size(); ++i)
-                   params[i].attr("bindParameter")(self, i);
-                for (auto kv : namedparams) {
-                    if (prog.hasBinding(nb::str(kv.first).c_str()))
-                        kv.second.attr("bindParameter")(self, kv.first);
-                }
-            },
-            "Binds the given parameters based on their index if passed as positional "
-            "argument or based on their name if passed as keyword argument. Named "
-            "parameters without a corresponding binding in the program are ignored.")
         .def("dispatch",
             [](const hp::Program& p, uint32_t x, uint32_t y, uint32_t z)
                 -> hp::DispatchCommand
@@ -300,14 +219,15 @@ void registerProgramModule(nb::module_& m) {
             "    Tensor from which to read the amount of workgroups\n"
             "offset: int, default=0\n"
             "    Offset at which to start reading\n")
-        .def("__repr__", [](const hp::Program& p) {
+        .def("__str__", [](const hp::Program& p) {
             std::ostringstream str;
             auto& ls = p.getLocalSize();
             str << "Program (x: " << ls.x << ", y: " << ls.y << ", z: " << ls.z << ")\n";
             for (auto& b : p.listBindings())
-                printBinding(str, b);
+                detail::printBinding(str, b);
             return str.str();
         });
+    registerBindingTarget(program);
     
     nb::class_<hp::FlushMemoryCommand, hp::Command>(m, "FlushMemoryCommand",
             "Command for flushing memory writes")

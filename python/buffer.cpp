@@ -13,6 +13,7 @@
 #include <hephaistos/program.hpp>
 
 #include "context.hpp"
+#include "parameter.hpp"
 
 namespace hp = hephaistos;
 namespace nb = nanobind;
@@ -246,7 +247,7 @@ void registerBufferModule(nb::module_& m) {
             "Returns total number of items in the buffer or array.")
         .def("__repr__", &Buffer::print);
     
-    nb::class_<hp::Tensor<std::byte>, hp::Resource>(m, "Tensor",
+    auto tensor = nb::class_<hp::Tensor<std::byte>, hp::Resource>(m, "Tensor",
             "Tensor allocating memory on the device.")
         .def("__init__", [](hp::Tensor<std::byte>* t, size_t size, bool mapped) {
                 new (t) hp::Tensor<std::byte>(getCurrentContext(), size, mapped);
@@ -350,12 +351,6 @@ void registerBufferModule(nb::module_& m) {
             "size: int | None, default=None\n"
             "   Number of elements to invalidate starting at offset. "
                "If None, invalidates all remaining bytes")
-        .def("bindParameter", [](const hp::Tensor<std::byte>& t, hp::Program& p, uint32_t b)
-            { t.bindParameter(p.getBinding(b)); }, "program"_a, "binding"_a,
-            "Binds the tensor to the program at the given binding")
-        .def("bindParameter", [](const hp::Tensor<std::byte>& t, hp::Program& p, std::string_view b)
-            { t.bindParameter(p.getBinding(b)); }, "program"_a, "binding"_a,
-            "Binds the tensor to the program at the given binding")
         .def("__repr__", [](const hp::Tensor<std::byte>& t) {
             std::ostringstream str;
             str << "Tensor (";
@@ -367,6 +362,7 @@ void registerBufferModule(nb::module_& m) {
                 str << '\n';
             return str.str();
         });
+    registerArgument(tensor);
 
     //Register typed buffers
     registerTypedBuffer<DType::e_int8>(m, "CharBuffer");
