@@ -52,6 +52,7 @@ void registerProgramModule(nb::module_& m) {
             "Support for GL_EXT_maximal_reconvergence")
         .def("__repr__", [](const hp::SubgroupProperties& props) {
             std::ostringstream str;
+            str << std::boolalpha;
             str << "subgroupSize:            " << props.subgroupSize << '\n';
             str << "basicSupport:            " << props.basicSupport << '\n';
             str << "voteSupport:             " << props.voteSupport << '\n';
