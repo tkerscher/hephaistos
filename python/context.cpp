@@ -98,6 +98,14 @@ const std::vector<hp::DeviceHandle>& getDevices() {
     return handles;
 }
 
+const hp::DeviceHandle& getDevice(uint32_t id) {
+    auto& devices = getDevices();
+    if (id >= devices.size())
+        throw std::runtime_error("There is no device with the selected id!");
+    
+    return devices[id];
+}
+
 void addExtension(hp::ExtensionHandle extension, bool force) {
     //check if the extension was already added
     auto name = extension->getExtensionName();

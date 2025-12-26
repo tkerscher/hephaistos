@@ -70,10 +70,7 @@ void registerAtomicModule(nb::module_& m) {
         });
     
     m.def("getAtomicsProperties", [](uint32_t id) -> hp::AtomicsProperties {
-        auto& devices = getDevices();
-        if (id >= devices.size())
-            throw std::runtime_error("There is no device with the selected id!");
-        return hp::getAtomicsProperties(devices[id]);
+        return hp::getAtomicsProperties(getDevice(id));
     }, "id"_a, "Returns the atomic capabilities of the device given by its id");
     m.def("getEnabledAtomics", []() -> hp::AtomicsProperties {
         return hp::getEnabledAtomics(getCurrentContext());

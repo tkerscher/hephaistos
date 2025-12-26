@@ -35,9 +35,7 @@ void registerTypeModule(nb::module_& m) {
     m.def("getSupportedTypes", [](std::optional<uint32_t> id) {
         //check if device was provided
         if (id) {
-            uint32_t idx = id.value();
-            auto& devices = getDevices();
-            return hp::getSupportedTypes(devices[idx]);
+            return hp::getSupportedTypes(getDevice(*id));
         }
         else {
             //query with current context
