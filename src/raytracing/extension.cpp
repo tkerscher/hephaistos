@@ -11,12 +11,7 @@ namespace hephaistos {
 
 namespace {
 
-constexpr auto ExtensionName = "RayTracing";
-
-constexpr auto RequiredExtensions = std::to_array({
-    VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
-    VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME
-});
+constexpr auto RayTracing_ExtensionName = "RayTracing";
 
 }
 
@@ -139,7 +134,7 @@ RayTracingProperties getRayTracingProperties(const DeviceHandle& device) {
     return result;
 }
 
-const RayTracingProperties& getCurrentRayTracingProperties(const ContextHandle& context) {
+RayTracingProperties getCurrentRayTracingProperties(const ContextHandle& context) {
     auto ext = getExtension<RayTracingExtension>(*context, "RayTracing");
     if (!ext)
         return {};
@@ -156,7 +151,7 @@ RayTracingFeatures getEnabledRayTracing(const ContextHandle& context) {
         context->extensions.begin(),
         context->extensions.end(),
         [](const ExtensionHandle& h) -> bool {
-            return h->getExtensionName() == ExtensionName;
+            return h->getExtensionName() == RayTracing_ExtensionName;
         }
     );
     if (pExt == context->extensions.end())
@@ -172,7 +167,7 @@ bool RayTracingExtension::isDeviceSupported(const DeviceHandle& device) const {
 }
 
 std::string_view RayTracingExtension::getExtensionName() const {
-    return ExtensionName;
+    return RayTracing_ExtensionName;
 }
 
 std::span<const char* const> RayTracingExtension::getDeviceExtensions() const {

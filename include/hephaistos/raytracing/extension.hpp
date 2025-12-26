@@ -75,7 +75,7 @@ RayTracingProperties getRayTracingProperties(const DeviceHandle& device);
  * @brief Queries the ray tracing properties of the device the given context belongs to
  */
 [[nodiscard]] HEPHAISTOS_API
-const RayTracingProperties& getCurrentRayTracingProperties(const ContextHandle& context);
+RayTracingProperties getCurrentRayTracingProperties(const ContextHandle& context);
 
 /**
  * @brief Creates an extension handle enabling the given ray tracing features

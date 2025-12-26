@@ -133,6 +133,41 @@ const auto pipelineResult = std::to_array<int32_t>({
 
 }
 
+TEST_CASE("can query ray tracing support and properties", "[raytracing]") {
+    if (!isRayTracingSupported(RAY_TRACING_SUPPORT))
+        SKIP("No ray tracing hardware for testing available.");
+
+    //query properties of first device
+    auto devices = enumerateDevices();
+    auto& device = devices.front();
+    auto features = getRayTracingFeatures(device);
+    auto props = getRayTracingProperties(device);
+    
+    auto context = getContext();
+    //check enabled features are the same
+    auto enabledFeatures = getEnabledRayTracing(context);
+    bool same =
+        enabledFeatures.query == RAY_TRACING_SUPPORT.query &&
+        enabledFeatures.pipeline == RAY_TRACING_SUPPORT.pipeline &&
+        enabledFeatures.indirectDispatch == RAY_TRACING_SUPPORT.indirectDispatch &&
+        enabledFeatures.positionFetch == RAY_TRACING_SUPPORT.positionFetch &&
+        enabledFeatures.hitObjects == RAY_TRACING_SUPPORT.hitObjects;
+    REQUIRE(same);
+    //sensible properties?
+    auto enabledProps = getCurrentRayTracingProperties(context);
+    bool sensible =
+        enabledProps.maxGeometryCount > 0 &&
+        enabledProps.maxInstanceCount > 0 &&
+        enabledProps.maxPrimitiveCount > 0 &&
+        enabledProps.maxAccelerationStructures > 0 &&
+        enabledProps.maxRayRecursionDepth > 0 &&
+        enabledProps.maxRayDispatchCount > 0 &&
+        enabledProps.maxShaderRecordSize;
+    REQUIRE(sensible);
+
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
 TEST_CASE("ray queries are available in shaders", "[raytracing]") {
     //Check if we have the necessary hardware for this check
     if (!isRayTracingSupported(RAY_TRACING_SUPPORT))
