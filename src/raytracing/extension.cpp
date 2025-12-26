@@ -20,7 +20,7 @@ constexpr auto RequiredExtensions = std::to_array({
 
 }
 
-RayTracingFeatures getRayTracingSupport(const DeviceHandle& device) {
+RayTracingFeatures getRayTracingFeatures(const DeviceHandle& device) {
 	//null check
 	if (!device) return {};
 
@@ -75,7 +75,7 @@ bool isRayTracingSupported(RayTracingFeatures features) {
 }
 
 bool isRayTracingSupported(const DeviceHandle& device, RayTracingFeatures features) {
-    auto supports = getRayTracingSupport(device);
+    auto supports = getRayTracingFeatures(device);
 
     //check if ray tracing is supported at all
     if (!supports.pipeline || !supports.query)
@@ -89,9 +89,9 @@ bool isRayTracingSupported(const DeviceHandle& device, RayTracingFeatures featur
         (!features.hitObjects || supports.hitObjects);
 }
 
-RayTracingProperties getRayTracingLimits(const DeviceHandle& device) {
+RayTracingProperties getRayTracingProperties(const DeviceHandle& device) {
     //is ray tracing even supported?
-    auto supports = getRayTracingSupport(device);
+    auto supports = getRayTracingFeatures(device);
 
     //query properties
     VkPhysicalDeviceRayTracingInvocationReorderPropertiesEXT reorderProps{
@@ -139,7 +139,7 @@ RayTracingProperties getRayTracingLimits(const DeviceHandle& device) {
     return result;
 }
 
-const RayTracingProperties& getCurrentRayTracingLimits(const ContextHandle& context) {
+const RayTracingProperties& getCurrentRayTracingProperties(const ContextHandle& context) {
     auto ext = getExtension<RayTracingExtension>(*context, "RayTracing");
     if (!ext)
         return {};

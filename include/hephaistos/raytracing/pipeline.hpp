@@ -58,6 +58,12 @@ public:
 
     operator ShaderBindingTable() const;
 
+    ShaderBindingTable(const ShaderBindingTable&) = delete;
+    ShaderBindingTable& operator=(const ShaderBindingTable&) = delete;
+
+    ShaderBindingTable(ShaderBindingTable&&) noexcept;
+    ShaderBindingTable& operator=(ShaderBindingTable&&) noexcept;
+
     virtual ~ShaderBindingTable();
 
 public: //internal
@@ -288,7 +294,7 @@ public:
      * @param count Count of shader groups in the range
      */
     [[nodiscard]] ShaderBindingTable createShaderBindingTable(
-        uint32_t firstGroupIdx, uint32_t count = 1);
+        uint32_t firstGroupIdx, uint32_t count = 1) const;
     /**
      * @brief Creates a new shader binding table
      * 
@@ -298,7 +304,7 @@ public:
      * @param entries Entries making up the shader binding table
      */
     [[nodiscard]] ShaderBindingTable createShaderBindingTable(
-        std::span<const ShaderBindingTableEntry> entries);
+        std::span<const ShaderBindingTableEntry> entries) const;
 
     /**
      * @brief Traces the given amounts of rays

@@ -41,6 +41,9 @@ void ShaderBindingTable::onDestroy() {
 	region = {};
 }
 
+ShaderBindingTable::ShaderBindingTable(ShaderBindingTable&&) noexcept = default;
+ShaderBindingTable& ShaderBindingTable::operator=(ShaderBindingTable&&) noexcept = default;
+
 ShaderBindingTable::ShaderBindingTable(
 	ContextHandle context, BufferHandle buffer,
 	uint32_t stride, uint32_t count
@@ -88,7 +91,7 @@ struct PipelineBuilder {
 	std::vector<VkPipelineShaderStageCreateInfo> stages;
 	std::vector<VkRayTracingShaderGroupCreateInfoKHR> groups;
 
-	VkSpecializationInfo specInfo;
+	VkSpecializationInfo specInfo = {};
 
 	void operator()(const RayGenerateShader& shader);
 	void operator()(const RayMissShader& shader);
@@ -186,7 +189,7 @@ inline uint32_t align(uint32_t value, uint32_t alignment) {
 
 ShaderBindingTable RayTracingPipeline::createShaderBindingTable(
 	uint32_t firstGroupIdx, uint32_t count
-) {
+) const {
 	//range check
 	if (firstGroupIdx + count >= handleCount)
 		throw std::runtime_error("Requested range outside available shader range");
@@ -222,7 +225,7 @@ ShaderBindingTable RayTracingPipeline::createShaderBindingTable(
 
 ShaderBindingTable RayTracingPipeline::createShaderBindingTable(
 	std::span<const ShaderBindingTableEntry> entries
-) {
+) const {
 	//we only have one common stride for our SBT
 	//it will be determined by the largest block of data we want to store
 	//in between, rounded up to alignment
@@ -313,6 +316,9 @@ TraceRaysIndirectCommand RayTracingPipeline::traceRaysIndirect(
 	return TraceRaysIndirectCommand(*pipeline, boundParams, bindings, tensor, offset, push);
 }
 
+RayTracingPipeline::RayTracingPipeline(RayTracingPipeline&&) noexcept = default;
+RayTracingPipeline& RayTracingPipeline::operator=(RayTracingPipeline&&) noexcept = default;
+
 RayTracingPipeline::RayTracingPipeline(
 	ContextHandle context,
 	std::span<const RayTracingShader> shader,
@@ -334,6 +340,8 @@ RayTracingPipeline::RayTracingPipeline(
 	auto ext = getExtension<RayTracingExtension>(*getContext(), "RayTracing");
 
 	//check limits
+	if (!ext->enabled.pipeline)
+		throw std::runtime_error("Ray tracing pipeline features has not been enabled!");
 	if (maxRecursionDepth > ext->props.maxRayRecursionDepth)
 		throw std::runtime_error("Specified max recursion depth exceeds device limit");
 
