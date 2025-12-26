@@ -2,10 +2,10 @@
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/bind_vector.h>
 #include <nanobind/stl/optional.h>
+#include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
 #include <nanobind/stl/variant.h>
 
-#include <locale>
 #include <sstream>
 
 #include <hephaistos/program.hpp>
@@ -21,11 +21,6 @@ using namespace nb::literals;
 /********************************* EXTENSION **********************************/
 
 namespace {
-
-struct thousand_separator : std::numpunct<char> {
-    char do_thousands_sep() const { return ','; }
-    std::string do_grouping() const { return "\3"; }
-};
 
 void initRayTracingFeatures(
     hp::RayTracingFeatures* features,
@@ -101,8 +96,6 @@ void registerRayTracingExtension(nb::module_& m) {
         .def_rw("canReorder", &hp::RayTracingProperties::canReorder)
         .def("__str__", [](const hp::RayTracingProperties& p) {
             std::ostringstream str;
-            thousand_separator sep;
-            str.imbue(std::locale(str.getloc(), &sep));
             str << std::boolalpha;
 
             str << "maxGeometryCount:          " << p.maxGeometryCount << '\n';
