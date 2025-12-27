@@ -71,6 +71,45 @@ TEST_CASE("compiler can compile GLSL code to SPIR-V", "[compiler]") {
 	REQUIRE(!hasValidationErrorOccurred());
 }
 
+TEST_CASE("Compiler can compile stages from ray tracing pipeline", "[compiler]") {
+	auto source = R"(
+		#version 460
+		#extension GL_EXT_ray_tracing : enable
+
+		layout(binding = 0) uniform accelerationStructureEXT tlas;
+		layout(binding = 1, rgba8) uniform image2D outImage;
+
+		layout(location = 0) rayPayloadEXT vec3 hitValue;
+
+		void main() {
+			vec2 size = vec2(imageSize(outImage));
+			vec2 pos = vec2(gl_LaunchIDEXT.xy);
+			vec2 coord = pos / size * 2 - vec2(1.0, 1.0);
+
+			//to things a bit more simple, we render orthogonal in y direction
+			//image is in the xz plane; flip y as usual
+			vec3 start = vec3(coord.x, -2.0, -coord.y);
+			vec3 dir = vec3(0.0, 1.0, 0.0);
+
+			traceRayEXT(
+				tlas,
+				gl_RayFlagsOpaqueEXT, 0xFF,
+				0, 0, 0,
+				start, 0.0,
+				dir, 4.0,
+				0
+			);
+
+			imageStore(outImage, ivec2(gl_LaunchIDEXT.xy), vec4(hitValue, 1.0));
+		}
+	)";
+
+	Compiler compiler;
+	std::vector<uint32_t> code;
+	REQUIRE_NOTHROW(code = compiler.compile(source, ShaderStage::RAYGEN));
+	REQUIRE(code.size() > 0);
+}
+
 TEST_CASE("compiler can include files from header map", "[compiler]") {
 	Compiler::HeaderMap headers = {
 		{ "foo.glsl", "int foo(int a, int b) {\n\treturn 2 * a + b;\n}\n" },
