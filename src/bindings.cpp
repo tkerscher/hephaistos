@@ -30,7 +30,7 @@ bool BindingTarget::hasBinding(std::string_view name) const noexcept {
         [name](const BindingTraits& t) -> bool {
             return t.name == name;
         });
-    return it == bindingTraits.end();
+    return it != bindingTraits.end();
 }
 
 const BindingTraits& BindingTarget::getBindingTraits(uint32_t i) const {

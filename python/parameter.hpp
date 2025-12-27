@@ -69,7 +69,7 @@ void registerArgument(nb::class_<T, hp::Resource>& c) {
         }, "pipeline"_a, "binding"_a,
         "Binds this at the given binding as parameter");
     c.def("bindParameter",
-        [](const T& t, hp::RayTracingPipeline& p, uint32_t b) {
+        [](const T& t, hp::RayTracingPipeline& p, std::string_view b) {
             p.bindParameter(t, b);
         }, "pipeline"_a, "binding"_a,
         "Binds this at the given binding as parameter");
@@ -80,6 +80,9 @@ void registerBindingTarget(nb::class_<T, hp::Resource>& c) {
     c.def_prop_ro("bindings",
         [](const T& t) { return t.listBindings(); },
         "List of all bindings");
+    c.def("hasBinding",
+        [](const T& t, std::string_view name) { return t.hasBinding(name); },
+        "name"_a, "Checks whether a binding with the given name exists");
     c.def("isBindingBound",
         [](const T& t, uint32_t i) { return t.isBindingBound(i); },
         "i"_a, "Checks whether the i-th binding is bound");
