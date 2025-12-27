@@ -191,7 +191,7 @@ ShaderBindingTable RayTracingPipeline::createShaderBindingTable(
 	uint32_t firstGroupIdx, uint32_t count
 ) const {
 	//range check
-	if (firstGroupIdx + count >= handleCount)
+	if (firstGroupIdx + count > handleCount)
 		throw std::runtime_error("Requested range outside available shader range");
 
 	//fetch alignments
