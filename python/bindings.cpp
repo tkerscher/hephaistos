@@ -1,4 +1,5 @@
 #include <nanobind/nanobind.h>
+#include <nanobind/stl/string.h>
 
 #include <hephaistos/bindings.hpp>
 

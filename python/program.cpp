@@ -221,13 +221,15 @@ void registerProgramModule(nb::module_& m) {
             "offset: int, default=0\n"
             "    Offset at which to start reading\n")
         .def("__str__", [](const hp::Program& p) {
-            std::ostringstream str;
-            auto& ls = p.getLocalSize();
-            str << "Program (x: " << ls.x << ", y: " << ls.y << ", z: " << ls.z << ")\n";
-            for (auto& b : p.listBindings())
-                detail::printBinding(str, b);
-            return str.str();
-        });
+                std::ostringstream str;
+                auto& ls = p.getLocalSize();
+                str << "Program (x: " << ls.x << ", y: " << ls.y << ", z: " << ls.z << ")";
+                for (auto& b : p.listBindings()){
+                    str << '\n';
+                    detail::printBinding(str, b);
+                }
+                return str.str();
+            });
     registerBindingTarget(program);
     
     nb::class_<hp::FlushMemoryCommand, hp::Command>(m, "FlushMemoryCommand",

@@ -56,6 +56,18 @@ hp::RayTracingProperties getRayTracingProperties(std::optional<uint32_t> id) {
     }
 }
 
+template<class T>
+T dict_pop(nb::dict& dict, const char* key, T _default) {
+    if (dict.contains(key)) {
+        T result = nb::cast<T>(dict[key]);
+        nb::del(dict[key]);
+        return result;
+    }
+    else {
+        return _default;
+    }
+}
+
 }
 
 void registerRayTracingExtension(nb::module_& m) {
@@ -123,9 +135,37 @@ void registerRayTracingExtension(nb::module_& m) {
     m.def("getEnabledRayTracing", []() -> hp::RayTracingFeatures {
             return hp::getEnabledRayTracing(getCurrentContext());
         }, "Returns the currently enabled ray tracing features");
-    m.def("enableRayTracing", [](hp::RayTracingFeatures features, bool force) {
+    m.def("enableRayTracing",
+        [](
+            nb::object o,
+            bool force,
+            nb::kwargs kwargs
+        ) {
+            //either accept a hp::RayTracingFeature object or build it from kwargs
+            hp::RayTracingFeatures features{};
+            if (nb::isinstance<hp::RayTracingFeatures>(o)) {
+                features = nb::cast<hp::RayTracingFeatures>(o);
+            }
+            else if (o.is_none()) {
+                features = {
+                    .query = dict_pop(kwargs, "query", false),
+                    .pipeline = dict_pop(kwargs, "pipeline", false),
+                    .indirectDispatch = dict_pop(kwargs, "indirectDispatch", false),
+                    .positionFetch = dict_pop(kwargs, "positionFetch", false),
+                    .hitObjects = dict_pop(kwargs, "hitObjects", false)
+                };
+                if (kwargs.size() != 0)
+                    throw std::runtime_error("Unexpected kwargs argument");
+            }
+            else {
+                throw std::runtime_error("Argument has unexpected type");
+            }
             addExtension(hp::createRayTracingExtension(features), force);
-        }, "features"_a, "force"_a = false,
+        },
+        "features"_a.none() = nb::none(),
+        nb::kw_only(),
+        "force"_a = false,
+        "options"_a,
         "Enabled the given ray tracing features. Set `force` to `True`, if an "
         "existing context should be destroyed.");
 }
@@ -340,6 +380,9 @@ hp::RayTracingShader castShader(nb::handle h) {
 }
 
 hp::ShaderBindingTableEntry castSBTEntry(nb::handle h) {
+    if (h.is_none()) {
+        return { ~0u };
+    }
     if (nb::isinstance<nb::tuple>(h)) {
         auto t = nb::cast<nb::tuple>(h);
         if (t.size() != 2)
@@ -703,9 +746,11 @@ void registerRayTracingPipeline(nb::module_& m) {
             "   Optional callable shaders")
         .def("__str__", [](const hp::RayTracingPipeline& pipeline) {
             std::ostringstream str;
-            str << "Ray Tracing Pipeline\n";
-            for (auto& b : pipeline.listBindings())
+            str << "Ray Tracing Pipeline";
+            for (auto& b : pipeline.listBindings()) {
+                str << '\n';
                 detail::printBinding(str, b);
+            }
             return str.str();
         });
     registerBindingTarget(pipeline);
