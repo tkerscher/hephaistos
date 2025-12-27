@@ -105,9 +105,10 @@ void compile_error(const char* reason, glslang_program_t* program) {
 }
 
 std::vector<uint32_t> compileImpl(std::string_view code, ShaderStage stage, void* callbacks_ctx = nullptr) {
+    auto glsl_stage = static_cast<glslang_stage_t>(stage);
     glslang_input_t input = {
         .language = GLSLANG_SOURCE_GLSL,
-        .stage = static_cast<glslang_stage_t>(stage),
+        .stage = glsl_stage,
         .client = GLSLANG_CLIENT_VULKAN,
         .client_version = GLSLANG_TARGET_VULKAN_1_3,
         .target_language = GLSLANG_TARGET_SPV,
@@ -145,7 +146,7 @@ std::vector<uint32_t> compileImpl(std::string_view code, ShaderStage stage, void
     glslang_spv_options_t spv_options{
         .optimize_size = true
     };
-    glslang_program_SPIRV_generate_with_options(program, GLSLANG_STAGE_COMPUTE, &spv_options);
+    glslang_program_SPIRV_generate_with_options(program, glsl_stage, &spv_options);
     auto size = glslang_program_SPIRV_get_size(program);
     std::vector<uint32_t> result(size);
     glslang_program_SPIRV_get(program, result.data());
