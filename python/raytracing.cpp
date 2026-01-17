@@ -132,8 +132,8 @@ void registerRayTracingExtension(nb::module_& m) {
         "id"_a = nb::none(),
         "Queries the ray tracing properties of the device specified by its id "
         "or of the current context if no id is given");
-    m.def("getEnabledRayTracing", []() -> hp::RayTracingFeatures {
-            return hp::getEnabledRayTracing(getCurrentContext());
+    m.def("getEnabledRayTracingFeatures", []() -> hp::RayTracingFeatures {
+            return hp::getEnabledRayTracingFeatures(getCurrentContext());
         }, "Returns the currently enabled ray tracing features");
     m.def("enableRayTracing",
         [](

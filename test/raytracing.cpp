@@ -145,7 +145,7 @@ TEST_CASE("can query ray tracing support and properties", "[raytracing]") {
     
     auto context = getContext();
     //check enabled features are the same
-    auto enabledFeatures = getEnabledRayTracing(context);
+    auto enabledFeatures = getEnabledRayTracingFeatures(context);
     bool same =
         enabledFeatures.query == RAY_TRACING_SUPPORT.query &&
         enabledFeatures.pipeline == RAY_TRACING_SUPPORT.pipeline &&

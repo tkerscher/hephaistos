@@ -87,6 +87,6 @@ ExtensionHandle createRayTracingExtension(RayTracingFeatures features);
  * @brief Returns the enabled ray tracing features in the given context.
  */
 [[nodiscard]] HEPHAISTOS_API
-RayTracingFeatures getEnabledRayTracing(const ContextHandle& context);
+RayTracingFeatures getEnabledRayTracingFeatures(const ContextHandle& context);
 
 }

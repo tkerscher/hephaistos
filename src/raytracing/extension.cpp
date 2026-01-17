@@ -146,7 +146,7 @@ ExtensionHandle createRayTracingExtension(RayTracingFeatures enabled) {
     return std::make_unique<RayTracingExtension>(enabled);
 }
 
-RayTracingFeatures getEnabledRayTracing(const ContextHandle& context) {
+RayTracingFeatures getEnabledRayTracingFeatures(const ContextHandle& context) {
     auto pExt = std::find_if(
         context->extensions.begin(),
         context->extensions.end(),
