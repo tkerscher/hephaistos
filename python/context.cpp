@@ -73,6 +73,13 @@ void selectDevice(uint32_t id, bool force) {
     selectedDeviceId = id;
 }
 
+std::optional<uint32_t> getSelectedDeviceId() {
+    if (selectedDeviceId == MaxId)
+        return std::nullopt;
+    else
+        return selectedDeviceId;
+}
+
 } //end namespace
 
 const hp::ContextHandle& getCurrentContext() {
@@ -155,6 +162,9 @@ void registerContextModule(nb::module_& m) {
     m.def("selectDevice", &selectDevice, "id"_a, "force"_a = false,
         "Sets the device on which the context will be initialized. "
         "Set force=True if an existing context should be destroyed.");
+    m.def("getSelectedDeviceId", &getSelectedDeviceId,
+        "Returns the currently selected device id, or `None` if no specific "
+        "device has been selected so far.");
     
     m.def("isDeviceSuitable", [](uint32_t id) {
         //range check
