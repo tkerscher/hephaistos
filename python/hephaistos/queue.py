@@ -500,7 +500,7 @@ class QueueTensor(ByteTensor):
 
     def __repr__(self) -> str:
         name, cap = self.item.__name__, self.capacity
-        return f"QueueBuffer: {name}[{cap}] ({printSize(self.nbytes)})"
+        return f"QueueTensor: {name}[{cap}] ({printSize(self.nbytes)})"
 
 
 def clearQueue(
