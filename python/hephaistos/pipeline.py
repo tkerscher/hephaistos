@@ -187,7 +187,7 @@ class PipelineStage(ABC):
         """
         pass
 
-    def _bindParams(self, program: Program, i: int) -> None:
+    def bindParams(self, program: Program, i: int) -> None:
         """Binds the i-th configuration to the given program"""
         program.bindParams(**self._device[i])
 
@@ -251,13 +251,6 @@ class SourceCodeMixin(PipelineStage):
     def sourceCode(self) -> str:
         """Source code this mixin manages"""
         pass
-
-    def bindParams(self, program: Program, i: int) -> None:
-        """
-        Binds params used by this mixin to the given program using the i-th
-        configuration.
-        """
-        self._bindParams(program, i)
 
     def run(self, i: int) -> List[Command]:
         # Most mixin won't add any logic besides the source code
