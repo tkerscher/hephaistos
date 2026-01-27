@@ -427,7 +427,7 @@ void RetrieveImageCommand::record(vulkan::Command& cmd) const {
         .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
     };
     context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+        context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
         VK_PIPELINE_STAGE_TRANSFER_BIT,
         VK_DEPENDENCY_BY_REGION_BIT,
         0, nullptr,
@@ -511,7 +511,7 @@ void UpdateImageCommand::record(vulkan::Command& cmd) const {
         .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
     };
     context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+        context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
         VK_PIPELINE_STAGE_TRANSFER_BIT,
         VK_DEPENDENCY_BY_REGION_BIT,
         0, nullptr,
@@ -541,7 +541,7 @@ void UpdateImageCommand::record(vulkan::Command& cmd) const {
     };
     context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
         VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+        context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
         VK_DEPENDENCY_BY_REGION_BIT,
         0, nullptr,
         0, nullptr,
@@ -588,7 +588,7 @@ void UpdateTextureCommand::record(vulkan::Command& cmd) const {
         .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
     };
     context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        context->computeStages,
         VK_PIPELINE_STAGE_TRANSFER_BIT,
         VK_DEPENDENCY_BY_REGION_BIT,
         0, nullptr,
@@ -618,7 +618,7 @@ void UpdateTextureCommand::record(vulkan::Command& cmd) const {
     };
     context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
         VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        context->computeStages,
         VK_DEPENDENCY_BY_REGION_BIT,
         0, nullptr,
         0, nullptr,

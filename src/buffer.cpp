@@ -269,7 +269,7 @@ void RetrieveTensorCommand::record(vulkan::Command& cmd) const {
             }
         };
         context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+            context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_DEPENDENCY_BY_REGION_BIT,
             0, nullptr,
@@ -363,7 +363,7 @@ void UpdateTensorCommand::record(vulkan::Command& cmd) const {
             .size = size
         };
         context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+            context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_DEPENDENCY_BY_REGION_BIT,
             0, nullptr,
@@ -409,7 +409,7 @@ void UpdateTensorCommand::record(vulkan::Command& cmd) const {
         };
         context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
             VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+            context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_DEPENDENCY_BY_REGION_BIT,
             0, nullptr,
             1, &barrier,
@@ -456,7 +456,7 @@ void ClearTensorCommand::record(vulkan::Command& cmd) const {
             .size = VK_WHOLE_SIZE
         };
         context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+            context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_DEPENDENCY_BY_REGION_BIT,
             0, nullptr,
@@ -479,7 +479,7 @@ void ClearTensorCommand::record(vulkan::Command& cmd) const {
         };
         context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
             VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+            context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_DEPENDENCY_BY_REGION_BIT,
             0, nullptr,
             1, &barrier,

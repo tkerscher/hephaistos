@@ -331,10 +331,12 @@ const VkMemoryBarrier memoryBarrier {
 }
 
 void FlushMemoryCommand::record(vulkan::Command& cmd) const {
-    cmd.stage |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    auto compStages = context.get().computeStages;
+
+    cmd.stage |= compStages;
     context.get().fnTable.vkCmdPipelineBarrier(cmd.buffer,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        compStages,
+        compStages,
         VK_DEPENDENCY_BY_REGION_BIT,
         1, &memoryBarrier,
         0, nullptr,

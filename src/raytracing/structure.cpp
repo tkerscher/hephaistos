@@ -714,7 +714,7 @@ void BuildAccelerationStructureCommand::record(vulkan::Command& cmd) const {
             }
             });
         context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+            context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
             VK_DEPENDENCY_BY_REGION_BIT,
             1, &memoryBarrier,
@@ -745,7 +745,7 @@ void BuildAccelerationStructureCommand::record(vulkan::Command& cmd) const {
         };
         context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
             VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            context->computeStages,
             VK_DEPENDENCY_BY_REGION_BIT,
             1, &memoryBarrier,
             1, &bufferBarrier,

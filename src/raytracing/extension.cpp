@@ -266,6 +266,9 @@ void RayTracingExtension::finalize(const ContextHandle& context) {
         auto handleSize = pipelineProps.shaderGroupHandleSize;
         auto groupStride = pipelineProps.maxShaderGroupStride;
         props.maxShaderRecordSize = groupStride - handleSize;
+
+        //tell synchronization commands to also wait for ray tracing operations
+        context->computeStages |= VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
     }
     if (enabled.hitObjects) {
         props.canReorder =

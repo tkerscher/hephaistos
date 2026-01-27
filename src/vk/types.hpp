@@ -46,6 +46,15 @@ struct Context {
     VkCommandBuffer oneTimeSubmitBuffer;
     VkFence oneTimeSubmitFence;
 
+    //for synchronization operations like the ones needed for copy
+    //commands we also want to include ray tracing operations.
+    //However, the spec only allows us to include that stage if
+    //ray tracing pipelines have been enabled. Since we do not want
+    //to cluster the code with checks for ray tracing support, we
+    //instead have save the correct stage flags here
+    VkPipelineStageFlags computeStages =
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+
     //looks like a hack, but this is the only one we need to change
     //would be a bit drastic to remove const Context because of this
     mutable std::queue<VkCommandPool> sequencePool;
