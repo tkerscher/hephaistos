@@ -1,8 +1,6 @@
 #include <nanobind/nanobind.h>
-#include <nanobind/stl/string.h>
-#include <nanobind/stl/string_view.h>
 
-#include <sstream>
+#include <stdexcept>
 
 #include <hephaistos/atomic.hpp>
 
@@ -12,101 +10,238 @@ namespace hp = hephaistos;
 namespace nb = nanobind;
 using namespace nb::literals;
 
-void registerAtomicModule(nb::module_& m) {
-    nb::class_<hp::AtomicsProperties>(m, "AtomicsProperties",
-            "List of atomic functions a device supports or are enabled")
-        .def_ro("bufferInt64Atomics", &hp::AtomicsProperties::bufferInt64Atomics)
-        .def_ro("bufferFloat16Atomics", &hp::AtomicsProperties::bufferFloat16Atomics)
-        .def_ro("bufferFloat16AtomicAdd", &hp::AtomicsProperties::bufferFloat16AtomicAdd)
-        .def_ro("bufferFloat16AtomicMinMax", &hp::AtomicsProperties::bufferFloat16AtomicMinMax)
-        .def_ro("bufferFloat32Atomics", &hp::AtomicsProperties::bufferFloat32Atomics)
-        .def_ro("bufferFloat32AtomicAdd", &hp::AtomicsProperties::bufferFloat32AtomicAdd)
-        .def_ro("bufferFloat32AtomicMinMax", &hp::AtomicsProperties::bufferFloat32AtomicMinMax)
-        .def_ro("bufferFloat64Atomics", &hp::AtomicsProperties::bufferFloat64Atomics)
-        .def_ro("bufferFloat64AtomicAdd", &hp::AtomicsProperties::bufferFloat64AtomicAdd)
-        .def_ro("bufferFloat64AtomicMinMax", &hp::AtomicsProperties::bufferFloat64AtomicMinMax)
-        .def_ro("sharedInt64Atomics", &hp::AtomicsProperties::sharedInt64Atomics)
-        .def_ro("sharedFloat16Atomics", &hp::AtomicsProperties::sharedFloat16Atomics)
-        .def_ro("sharedFloat16AtomicAdd", &hp::AtomicsProperties::sharedFloat16AtomicAdd)
-        .def_ro("sharedFloat16AtomicMinMax", &hp::AtomicsProperties::sharedFloat16AtomicMinMax)
-        .def_ro("sharedFloat32Atomics", &hp::AtomicsProperties::sharedFloat32Atomics)
-        .def_ro("sharedFloat32AtomicAdd", &hp::AtomicsProperties::sharedFloat32AtomicAdd)
-        .def_ro("sharedFloat32AtomicMinMax", &hp::AtomicsProperties::sharedFloat32AtomicMinMax)
-        .def_ro("sharedFloat64Atomics", &hp::AtomicsProperties::sharedFloat64Atomics)
-        .def_ro("sharedFloat64AtomicAdd", &hp::AtomicsProperties::sharedFloat64AtomicAdd)
-        .def_ro("sharedFloat64AtomicMinMax", &hp::AtomicsProperties::sharedFloat64AtomicMinMax)
-        .def_ro("imageInt64Atomics", &hp::AtomicsProperties::imageInt64Atomics)
-        .def_ro("imageFloat32Atomics", &hp::AtomicsProperties::imageFloat32Atomics)
-        .def_ro("imageFloat32AtomicAdd", &hp::AtomicsProperties::imageFloat32AtomicAdd)
-        .def_ro("imageFloat32AtomicMinMax", &hp::AtomicsProperties::imageFloat32AtomicMinMax)
-        .def("__repr__", [](const hp::AtomicsProperties& p){
-            std::ostringstream str;
-            str << std::boolalpha;
-            str << "bufferInt64Atomics:        " << !!p.bufferInt64Atomics << '\n';
-            str << "bufferFloat16Atomics:      " << !!p.bufferFloat16Atomics << '\n';
-            str << "bufferFloat16AtomicAdd:    " << !!p.bufferFloat16AtomicAdd << '\n';
-            str << "bufferFloat16AtomicMinMax: " << !!p.bufferFloat16AtomicMinMax << '\n';
-            str << "bufferFloat32Atomics:      " << !!p.bufferFloat32Atomics << '\n';
-            str << "bufferFloat32AtomicAdd:    " << !!p.bufferFloat32AtomicAdd << '\n';
-            str << "bufferFloat32AtomicMinMax: " << !!p.bufferFloat32AtomicMinMax << '\n';
-            str << "bufferFloat64Atomics:      " << !!p.bufferFloat64Atomics << '\n';
-            str << "bufferFloat64AtomicAdd:    " << !!p.bufferFloat64AtomicAdd << '\n';
-            str << "bufferFloat64AtomicMinMax: " << !!p.bufferFloat64AtomicMinMax << '\n';
-            str << "sharedInt64Atomics:        " << !!p.sharedInt64Atomics << '\n';
-            str << "sharedFloat16Atomics:      " << !!p.sharedFloat16Atomics << '\n';
-            str << "sharedFloat16AtomicAdd:    " << !!p.sharedFloat16AtomicAdd << '\n';
-            str << "sharedFloat16AtomicMinMax: " << !!p.sharedFloat16AtomicMinMax << '\n';
-            str << "sharedFloat32Atomics:      " << !!p.sharedFloat32Atomics << '\n';
-            str << "sharedFloat32AtomicAdd:    " << !!p.sharedFloat32AtomicAdd << '\n';
-            str << "sharedFloat32AtomicMinMax: " << !!p.sharedFloat32AtomicMinMax << '\n';
-            str << "sharedFloat64Atomics:      " << !!p.sharedFloat64Atomics << '\n';
-            str << "sharedFloat64AtomicAdd:    " << !!p.sharedFloat64AtomicAdd << '\n';
-            str << "sharedFloat64AtomicMinMax: " << !!p.sharedFloat64AtomicMinMax << '\n';
-            str << "imageInt64Atomics:         " << !!p.imageInt64Atomics << '\n';
-            str << "imageFloat32Atomics:       " << !!p.imageFloat32Atomics << '\n';
-            str << "imageFloat32AtomicAdd:     " << !!p.imageFloat32AtomicAdd << '\n';
-            str << "imageFloat32AtomicMinMax:  " << !!p.imageFloat32AtomicMinMax;
-            return str.str();
-        });
-    
-    m.def("getAtomicsProperties", [](uint32_t id) -> hp::AtomicsProperties {
-        return hp::getAtomicsProperties(getDevice(id));
-    }, "id"_a, "Returns the atomic capabilities of the device given by its id");
-    m.def("getEnabledAtomics", []() -> hp::AtomicsProperties {
-        return hp::getEnabledAtomics(getCurrentContext());
-    }, "Returns the in the current context enabled atomic features");
+namespace {
 
-    m.def("enableAtomics", [](const nb::set& flags, bool force) {
-        //build atomic properties
-        hp::AtomicsProperties props{
-            .bufferInt64Atomics = flags.contains("bufferInt64Atomics"),
-            .bufferFloat16Atomics = flags.contains("bufferFloat16Atomics"),
-            .bufferFloat16AtomicAdd = flags.contains("bufferFloat16AtomicAdd"),
-            .bufferFloat16AtomicMinMax = flags.contains("bufferFloat16AtomicMinMax"),
-            .bufferFloat32Atomics = flags.contains("bufferFloat32Atomics"),
-            .bufferFloat32AtomicAdd = flags.contains("bufferFloat32AtomicAdd"),
-            .bufferFloat32AtomicMinMax = flags.contains("bufferFloat32AtomicMinMax"),
-            .bufferFloat64Atomics = flags.contains("bufferFloat64Atomics"),
-            .bufferFloat64AtomicAdd = flags.contains("bufferFloat64AtomicAdd"),
-            .bufferFloat64AtomicMinMax = flags.contains("bufferFloat64AtomicMinMax"),
-            .sharedInt64Atomics = flags.contains("sharedInt64Atomics"),
-            .sharedFloat16Atomics = flags.contains("sharedFloat16Atomics"),
-            .sharedFloat16AtomicAdd = flags.contains("sharedFloat16AtomicAdd"),
-            .sharedFloat16AtomicMinMax = flags.contains("sharedFloat16AtomicMinMax"),
-            .sharedFloat32Atomics = flags.contains("sharedFloat32Atomics"),
-            .sharedFloat32AtomicAdd = flags.contains("sharedFloat32AtomicAdd"),
-            .sharedFloat32AtomicMinMax = flags.contains("sharedFloat32AtomicMinMax"),
-            .sharedFloat64Atomics = flags.contains("sharedFloat64Atomics"),
-            .sharedFloat64AtomicAdd = flags.contains("sharedFloat64AtomicAdd"),
-            .sharedFloat64AtomicMinMax = flags.contains("sharedFloat64AtomicMinMax"),
-            .imageInt64Atomics = flags.contains("imageInt64Atomics"),
-            .imageFloat32Atomics = flags.contains("imageFloat32Atomics"),
-            .imageFloat32AtomicAdd = flags.contains("imageFloat32AtomicAdd"),
-            .imageFloat32AtomicMinMax = flags.contains("imageFloat32AtomicMinMax")
-        };
-        //add extension
-        addExtension(hp::createAtomicsExtension(props), force);
-    }, "flags"_a, nb::kw_only(), "force"_a = false,
-    "Enables the atomic features contained in the given set by their name. "
-    "Set force=True if an existing context should be destroyed.");
+enum class Atomics {
+    BufferInt64,
+    BufferFloat16LoadStore,
+    BufferFloat16Add,
+    BufferFloat16MinMax,
+    BufferFloat32LoadStore,
+    BufferFloat32Add,
+    BufferFloat32MinMax,
+    BufferFloat64LoadStore,
+    BufferFloat64Add,
+    BufferFloat64MinMax,
+    SharedInt64,
+    SharedFloat16LoadStore,
+    SharedFloat16Add,
+    SharedFloat16MinMax,
+    SharedFloat32LoadStore,
+    SharedFloat32Add,
+    SharedFloat32MinMax,
+    SharedFloat64LoadStore,
+    SharedFloat64Add,
+    SharedFloat64MinMax,
+    ImageInt64,
+    ImageFloat32LoadStore,
+    ImageFloat32Add,
+    ImageFloat32MinMax
+};
+
+nb::set castAtomicPropertiesToSet(const hp::AtomicsProperties& props) {
+    nb::set result{};
+
+    if (props.bufferInt64Atomics) result.add(Atomics::BufferInt64);
+
+    if (props.bufferFloat16AtomicLoadStore) result.add(Atomics::BufferFloat16LoadStore);
+    if (props.bufferFloat16AtomicAdd) result.add(Atomics::BufferFloat16Add);
+    if (props.bufferFloat16AtomicMinMax) result.add(Atomics::BufferFloat16MinMax);
+
+    if (props.bufferFloat32AtomicLoadStore) result.add(Atomics::BufferFloat32LoadStore);
+    if (props.bufferFloat32AtomicAdd) result.add(Atomics::BufferFloat32Add);
+    if (props.bufferFloat32AtomicMinMax) result.add(Atomics::BufferFloat32MinMax);
+
+    if (props.bufferFloat64Atomics) result.add(Atomics::BufferFloat64LoadStore);
+    if (props.bufferFloat64AtomicAdd) result.add(Atomics::BufferFloat64Add);
+    if (props.bufferFloat64AtomicMinMax) result.add(Atomics::BufferFloat64MinMax);
+
+    if (props.sharedInt64Atomics) result.add(Atomics::SharedInt64);
+
+    if (props.sharedFloat16AtomicLoadStore) result.add(Atomics::SharedFloat16LoadStore);
+    if (props.sharedFloat16AtomicAdd) result.add(Atomics::SharedFloat16Add);
+    if (props.sharedFloat16AtomicMinMax) result.add(Atomics::SharedFloat16MinMax);
+
+    if (props.sharedFloat32AtomicLoadStore) result.add(Atomics::SharedFloat32LoadStore);
+    if (props.sharedFloat32AtomicAdd) result.add(Atomics::SharedFloat32Add);
+    if (props.sharedFloat32AtomicMinMax) result.add(Atomics::SharedFloat32MinMax);
+
+    if (props.sharedFloat64Atomics) result.add(Atomics::SharedFloat64LoadStore);
+    if (props.sharedFloat64AtomicAdd) result.add(Atomics::SharedFloat64Add);
+    if (props.sharedFloat64AtomicMinMax) result.add(Atomics::SharedFloat64MinMax);
+
+    if (props.imageInt64Atomics) result.add(Atomics::ImageInt64);
+
+    if (props.imageFloat32AtomicLoadStore) result.add(Atomics::ImageFloat32LoadStore);
+    if (props.imageFloat32AtomicAdd) result.add(Atomics::ImageFloat32Add);
+    if (props.imageFloat32AtomicMinMax) result.add(Atomics::ImageFloat32MinMax);
+
+    return result;
+}
+
+hp::AtomicsProperties castSetToAtomicProperties(const nb::set& set) {
+    hp::AtomicsProperties props{};
+    for (nb::handle h : set) {
+        auto flag = nb::cast<Atomics>(h);
+        switch (flag)
+        {
+        case Atomics::BufferInt64:
+            props.bufferInt64Atomics = true;
+            break;
+        case Atomics::BufferFloat16LoadStore:
+            props.bufferFloat16AtomicLoadStore = true;
+            break;
+        case Atomics::BufferFloat16Add:
+            props.bufferFloat16AtomicAdd = true;
+            break;
+        case Atomics::BufferFloat16MinMax:
+            props.bufferFloat16AtomicMinMax = true;
+            break;
+        case Atomics::BufferFloat32LoadStore:
+            props.bufferFloat32AtomicLoadStore = true;
+            break;
+        case Atomics::BufferFloat32Add:
+            props.bufferFloat32AtomicAdd = true;
+            break;
+        case Atomics::BufferFloat32MinMax:
+            props.bufferFloat32AtomicMinMax = true;
+            break;
+        case Atomics::BufferFloat64LoadStore:
+            props.bufferFloat64Atomics = true;
+            break;
+        case Atomics::BufferFloat64Add:
+            props.bufferFloat64AtomicAdd = true;
+            break;
+        case Atomics::BufferFloat64MinMax:
+            props.bufferFloat64AtomicMinMax = true;
+            break;
+        case Atomics::SharedInt64:
+            props.sharedInt64Atomics = true;
+            break;
+        case Atomics::SharedFloat16LoadStore:
+            props.sharedFloat16AtomicLoadStore = true;
+            break;
+        case Atomics::SharedFloat16Add:
+            props.sharedFloat16AtomicAdd = true;
+            break;
+        case Atomics::SharedFloat16MinMax:
+            props.sharedFloat16AtomicMinMax = true;
+            break;
+        case Atomics::SharedFloat32LoadStore:
+            props.sharedFloat32AtomicLoadStore = true;
+            break;
+        case Atomics::SharedFloat32Add:
+            props.sharedFloat32AtomicAdd = true;
+            break;
+        case Atomics::SharedFloat32MinMax:
+            props.sharedFloat32AtomicMinMax = true;
+            break;
+        case Atomics::SharedFloat64LoadStore:
+            props.sharedFloat64Atomics = true;
+            break;
+        case Atomics::SharedFloat64Add:
+            props.sharedFloat64AtomicAdd = true;
+            break;
+        case Atomics::SharedFloat64MinMax:
+            props.sharedFloat64AtomicMinMax = true;
+            break;
+        case Atomics::ImageInt64:
+            props.imageInt64Atomics = true;
+            break;
+        case Atomics::ImageFloat32LoadStore:
+            props.imageFloat32AtomicLoadStore = true;
+            break;
+        case Atomics::ImageFloat32Add:
+            props.imageFloat32AtomicAdd = true;
+            break;
+        case Atomics::ImageFloat32MinMax:
+            props.imageFloat32AtomicMinMax = true;
+            break;
+        default:
+            throw std::logic_error("Unexpected atomic flag!");
+        }
+    }
+    return props;
+}
+
+nb::set getSupportedAtomics(uint32_t id) {
+    auto caps = hp::getAtomicsProperties(getDevice(id));
+    return castAtomicPropertiesToSet(caps);
+}
+
+nb::set getEnabledAtomics() {
+    auto& caps = hp::getEnabledAtomics(getCurrentContext());
+    return castAtomicPropertiesToSet(caps);
+}
+
+void enableAtomics(const nb::set& set, bool force) {
+    auto props = castSetToAtomicProperties(set);
+    addExtension(hp::createAtomicsExtension(props), force);
+}
+
+}
+
+void registerAtomicModule(nb::module_& m) {
+    nb::enum_<Atomics>(m, "Atomics", "Enumeration of atomic capabilities")
+        .value("BufferInt64", Atomics::BufferInt64,
+            "Atomic operations using 64 bit integers stored in buffers.")
+        .value("BufferFloat16LoadStore", Atomics::BufferFloat16LoadStore,
+            "Atomic load, store and exchange using 16 bit floats stored in buffers.")
+        .value("BufferFloat16Add", Atomics::BufferFloat16Add,
+            "Atomic add using 16 bit floats stored in buffers.")
+        .value("BufferFloat16MinMax", Atomics::BufferFloat16MinMax,
+            "Atomic min and max using 16 bit floats stored in buffers.")
+        .value("BufferFloat32LoadStore", Atomics::BufferFloat32LoadStore,
+            "Atomic load, store and exchange using 32 bit floats stored in buffers.")
+        .value("BufferFloat32Add", Atomics::BufferFloat32Add,
+            "Atomic add using 32 bit floats stored in buffers.")
+        .value("BufferFloat32MinMax", Atomics::BufferFloat32MinMax,
+            "Atomic min and max using 32 bit floats stored in buffers.")
+        .value("BufferFloat64LoadStore", Atomics::BufferFloat64LoadStore,
+            "Atomic load, store and exchange using 64 bit floats stored in buffers.")
+        .value("BufferFloat64Add", Atomics::BufferFloat64Add,
+            "Atomic add using 64 bit floats stored in buffers.")
+        .value("BufferFloat64MinMax", Atomics::BufferFloat64MinMax,
+            "Atomic min and max using 64 bit floats stored in buffers.")
+        .value("SharedInt64", Atomics::SharedInt64,
+            "Atomic operations using 64 bit integers stored in shared memory.")
+        .value("SharedFloat16LoadStore", Atomics::SharedFloat16LoadStore,
+            "Atomic load, store and exchange using 16 bit floats stored in shared memory.")
+        .value("SharedFloat16Add", Atomics::SharedFloat16Add,
+            "Atomic add using 16 bit floats stored in shared memory.")
+        .value("SharedFloat16MinMax", Atomics::SharedFloat16MinMax,
+            "Atomic min and max using 16 bit floats stored in shared memory.")
+        .value("SharedFloat32LoadStore", Atomics::SharedFloat32LoadStore,
+            "Atomic load, store and exchange using 32 bit floats stored in shared memory.")
+        .value("SharedFloat32Add", Atomics::SharedFloat32Add,
+            "Atomic add using 32 bit floats stored in shared memory.")
+        .value("SharedFloat32MinMax", Atomics::SharedFloat32MinMax,
+            "Atomic min and max using 32 bit floats stored in shared memory.")
+        .value("SharedFloat64LoadStore", Atomics::SharedFloat64LoadStore,
+            "Atomic load, store and exchange using 64 bit floats stored in shared memory.")
+        .value("SharedFloat64Add", Atomics::SharedFloat64Add,
+            "Atomic add using 64 bit floats stored in shared memory.")
+        .value("SharedFloat64MinMax", Atomics::SharedFloat64MinMax,
+            "Atomic min and max using 64 bit floats stored in shared memory.")
+        .value("ImageInt64", Atomics::ImageInt64,
+            "Atomic operations using 64 bit integers stored in images.")
+        .value("ImageFloat32LoadStore", Atomics::ImageFloat32LoadStore,
+            "Atomic load, store and exchange using 32 bit floats stored in images.")
+        .value("ImageFloat32Add", Atomics::ImageFloat32Add,
+            "Atomic add using 32 bit floats stored in images.")
+        .value("ImageFloat32MinMax", Atomics::ImageFloat32MinMax,
+            "Atomic min and max using 32 bit floats stored in images.");
+
+    m.def("getSupportedAtomics", &getSupportedAtomics, "id"_a,
+        nb::sig("def getSupportedAtomics(id: int) -> set[Atomics]"),
+        "Returns a set of all supported atomic capabilites supported by the "
+        "device specified by its id.");
+    m.def("getEnabledAtomics", &getEnabledAtomics,
+        nb::sig("def getEnabledAtomics() -> set[Atomics]"),
+        "Returns the set of enabled atomic capabilities in the current context.");
+    m.def("enableAtomics", &enableAtomics,
+        "atomics"_a, nb::kw_only(), "force"_a = false,
+        nb::sig("def enableAtomics(atomics: set[Atomics], *, force: bool = False) -> None"),
+        "Enables the atomic capabilites specified in the given set by their name. "
+        "Set `force=True` if an existing context should be destroyed.");
 }

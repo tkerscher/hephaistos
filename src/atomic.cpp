@@ -20,11 +20,11 @@ constexpr uint32_t toBitFlags(const AtomicsProperties& props) {
 
     v += props.bufferInt64Atomics << 0;
 
-    v += props.bufferFloat16Atomics << 1;
+    v += props.bufferFloat16AtomicLoadStore << 1;
     v += props.bufferFloat16AtomicAdd << 2;
     v += props.bufferFloat16AtomicMinMax << 3;
 
-    v += props.bufferFloat32Atomics << 4;
+    v += props.bufferFloat32AtomicLoadStore << 4;
     v += props.bufferFloat32AtomicAdd << 5;
     v += props.bufferFloat32AtomicMinMax << 6;
 
@@ -34,11 +34,11 @@ constexpr uint32_t toBitFlags(const AtomicsProperties& props) {
 
     v += props.sharedInt64Atomics << 10;
 
-    v += props.sharedFloat16Atomics << 11;
+    v += props.sharedFloat16AtomicLoadStore << 11;
     v += props.sharedFloat16AtomicAdd << 12;
     v += props.sharedFloat16AtomicMinMax << 13;
 
-    v += props.sharedFloat32Atomics << 14;
+    v += props.sharedFloat32AtomicLoadStore << 14;
     v += props.sharedFloat32AtomicAdd << 15;
     v += props.sharedFloat32AtomicMinMax << 16;
 
@@ -48,7 +48,7 @@ constexpr uint32_t toBitFlags(const AtomicsProperties& props) {
 
     v += props.imageInt64Atomics << 20;
 
-    v += props.imageFloat32Atomics << 21;
+    v += props.imageFloat32AtomicLoadStore << 21;
     v += props.imageFloat32AtomicAdd << 22;
     v += props.imageFloat32AtomicMinMax << 23;
 
@@ -64,24 +64,24 @@ constexpr auto int64ExtFlags = toBitFlags({
     .sharedInt64Atomics = true
 });
 constexpr auto floatExt1Flags = toBitFlags({
-    .bufferFloat32Atomics = true,
+    .bufferFloat32AtomicLoadStore = true,
     .bufferFloat32AtomicAdd = true,
     .bufferFloat64Atomics = true,
     .bufferFloat64AtomicAdd = true,
-    .sharedFloat32Atomics = true,
+    .sharedFloat32AtomicLoadStore = true,
     .sharedFloat32AtomicAdd = true,
     .sharedFloat64Atomics = true,
     .sharedFloat64AtomicAdd = true,
-    .imageFloat32Atomics = true,
+    .imageFloat32AtomicLoadStore = true,
     .imageFloat32AtomicAdd = true
 });
 constexpr auto floatExt2Flags = toBitFlags({
-    .bufferFloat16Atomics = true,
+    .bufferFloat16AtomicLoadStore = true,
     .bufferFloat16AtomicAdd = true,
     .bufferFloat16AtomicMinMax = true,
     .bufferFloat32AtomicMinMax = true,
     .bufferFloat64AtomicMinMax = true,
-    .sharedFloat16Atomics = true,
+    .sharedFloat16AtomicLoadStore = true,
     .sharedFloat16AtomicAdd = true,
     .sharedFloat16AtomicMinMax = true,
     .sharedFloat32AtomicMinMax = true,
@@ -234,15 +234,15 @@ AtomicsExtension::AtomicsExtension(const AtomicsProperties& props)
     floatFeat = VkPhysicalDeviceShaderAtomicFloatFeaturesEXT{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_FEATURES_EXT,
         .pNext = pNext,
-        .shaderBufferFloat32Atomics = props.bufferFloat32Atomics,
+        .shaderBufferFloat32Atomics = props.bufferFloat32AtomicLoadStore,
         .shaderBufferFloat32AtomicAdd = props.bufferFloat32AtomicAdd,
         .shaderBufferFloat64Atomics = props.bufferFloat64Atomics,
         .shaderBufferFloat64AtomicAdd = props.bufferFloat64AtomicAdd,
-        .shaderSharedFloat32Atomics = props.sharedFloat32Atomics,
+        .shaderSharedFloat32Atomics = props.sharedFloat32AtomicLoadStore,
         .shaderSharedFloat32AtomicAdd = props.sharedFloat32AtomicAdd,
         .shaderSharedFloat64Atomics = props.sharedFloat64Atomics,
         .shaderSharedFloat64AtomicAdd = props.sharedFloat64AtomicAdd,
-        .shaderImageFloat32Atomics = props.imageFloat32Atomics,
+        .shaderImageFloat32Atomics = props.imageFloat32AtomicLoadStore,
         .shaderImageFloat32AtomicAdd = props.imageFloat32AtomicAdd
     };
     if (floatExt)
@@ -250,12 +250,12 @@ AtomicsExtension::AtomicsExtension(const AtomicsProperties& props)
     float2Feat = VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_2_FEATURES_EXT,
         .pNext = pNext,
-        .shaderBufferFloat16Atomics = props.bufferFloat16Atomics,
+        .shaderBufferFloat16Atomics = props.bufferFloat16AtomicLoadStore,
         .shaderBufferFloat16AtomicAdd = props.bufferFloat16AtomicAdd,
         .shaderBufferFloat16AtomicMinMax = props.bufferFloat16AtomicMinMax,
         .shaderBufferFloat32AtomicMinMax = props.bufferFloat32AtomicMinMax,
         .shaderBufferFloat64AtomicMinMax = props.bufferFloat64AtomicMinMax,
-        .shaderSharedFloat16Atomics = props.sharedFloat16Atomics,
+        .shaderSharedFloat16Atomics = props.sharedFloat16AtomicLoadStore,
         .shaderSharedFloat16AtomicAdd = props.sharedFloat16AtomicAdd,
         .shaderSharedFloat16AtomicMinMax = props.sharedFloat16AtomicMinMax,
         .shaderSharedFloat32AtomicMinMax = props.sharedFloat32AtomicMinMax,
