@@ -6,163 +6,162 @@
 #include <stdexcept>
 #include <string.h>
 
-#include <glslang/Include/glslang_c_interface.h>
-#include <glslang/Public/resource_limits_c.h>
+#include <glslang/Public/ShaderLang.h>
+#include <glslang/Public/ResourceLimits.h>
+#include <SPIRV/GlslangToSpv.h>
 
 namespace hephaistos {
 
 namespace {
 
-using CompilerContext = std::pair<const Compiler::HeaderMap*, const std::vector<std::filesystem::path>* >;
+//default empty header map
+const HeaderMap EmptyHeaderMap{};
 
-using Shader = std::unique_ptr<glslang_shader_t, decltype(&glslang_shader_delete)>;
-using Program = std::unique_ptr<glslang_program_t, decltype(&glslang_program_delete)>;
-
-glsl_include_result_t* resolve_include_map(
-    void* context,
-    const char* header_name,
-    const char* includer_name,
-    size_t include_depth
-) {
-    auto headers = static_cast<CompilerContext*>(context)->first;
-    if (!headers)
-        return nullptr;
-    auto pHeader = headers->find(header_name);
-    if (pHeader != headers->end()) {
-        auto result = new glsl_include_result_t;
-        result->header_name = pHeader->first.c_str();
-        result->header_data = pHeader->second.c_str();
-        result->header_length = pHeader->second.size();
-        return result;
-    }
-    else {
-        return nullptr;
-    }
-}
-
-glsl_include_result_t* resolve_include_dirs(
-    void* context,
-    const char* header_name,
-    const char* includer_name,
-    size_t include_depth
-) {
-    auto& dirs = *static_cast<CompilerContext*>(context)->second;
-    //check all directories
-    for (auto& dir : dirs) {
-        auto path = dir / header_name;
-        if (std::filesystem::exists(path) && std::filesystem::is_regular_file(path)) {
-            auto result = new glsl_include_result_t;
-            size_t size = std::filesystem::file_size(path);
-            auto data = new char[size];
-            //load data
-            std::ifstream file(path, std::ios::binary);
-            if (file.read(data, size)) {
-                result->header_name = strdup(header_name);
-                result->header_length = size;
-                result->header_data = data;
-                return result;
+class Includer : public glslang::TShader::Includer {
+public:
+    IncludeResult* includeSystem(
+        const char* headerName,
+        const char* includerName,
+        size_t inclusionDepth
+    ) override {
+        //check all directories
+        for (auto& dir : includeDirs) {
+            auto path = dir / headerName;
+            if (std::filesystem::exists(path) && std::filesystem::is_regular_file(path)) {
+                //read file into string
+                size_t size = std::filesystem::file_size(path);
+                std::ifstream file(path, std::ios::binary);
+                auto data = new char[size];
+                auto name = new std::string(headerName);
+                if (file.read(data, size)) {
+                    return new IncludeResult(*name, data, size, name);
+                }
+                else {
+                    //error -> clean up
+                    delete name;
+                    delete[] data;
+                    //actually we should return an error saying we failed to load the file
+                    //as nullptr means "not found", but it'll do for now
+                    return nullptr;
+                }
             }
-            else {
-                //error -> clean up
-                delete[] data;
-                return result;
-            }
+        }
+
+        //nothing found
+        return nullptr;
+    }
+
+    IncludeResult* includeLocal(
+        const char* headerName,
+        const char* includerName,
+        size_t inclusionDepth
+    ) override {
+        auto pHeader = headers.find(headerName);
+        if (pHeader != headers.end()) {
+            return new IncludeResult(
+                pHeader->first,
+                pHeader->second.c_str(),
+                pHeader->second.size(),
+                nullptr
+            );
+        }
+        else {
+            return nullptr;
         }
     }
 
-    //nothing found
-    return nullptr;
-}
+    void releaseInclude(IncludeResult* result) override {
+        if (!result) return;
 
-int free_include_result(void* context, glsl_include_result_t* result) {
-    //check if local or loaded from disk
-    auto headers = static_cast<CompilerContext*>(context)->first;
-    if (!headers || !headers->contains(result->header_name)) {
-        //from disk -> free resources allocated in result
-        delete[] result->header_name;
-        delete[] result->header_data;
+        if (result->userData) {
+            //result stems from includeSystem
+            delete static_cast<std::string*>(result->userData);
+            delete[] result->headerData;
+        }
+
+        delete result;
     }
-    delete result;
-    return 0;
-}
 
-const glsl_include_callbacks_t includeCallbacks{
-    .include_system = resolve_include_dirs,
-    .include_local = resolve_include_map,
-    .free_include_result = free_include_result
+    Includer(const std::vector<std::filesystem::path>& includeDirs, const HeaderMap& headers)
+        : includeDirs(includeDirs)
+        , headers(headers)
+    {}
+
+private:
+    const std::vector<std::filesystem::path>& includeDirs;
+    const HeaderMap& headers;
 };
 
-void compile_error(const char* reason, glslang_shader_t* shader) {
+void compileError(const char* reason, glslang::TShader& shader) {
     std::stringstream sstream;
-    sstream << reason << '\n' << glslang_shader_get_info_log(shader) << '\n' << glslang_shader_get_info_debug_log(shader);
+    sstream << reason << '\n' << shader.getInfoLog() << '\n' << shader.getInfoDebugLog();
     throw std::runtime_error(sstream.str());
 }
 
-void compile_error(const char* reason, glslang_program_t* program) {
+void compileError(const char* reason, glslang::TProgram& program) {
     std::stringstream sstream;
-    sstream << reason << '\n' << glslang_program_get_info_log(program) << '\n' << glslang_program_get_info_debug_log(program);
+    sstream << reason << '\n' << program.getInfoLog() << '\n' << program.getInfoDebugLog();
     throw std::runtime_error(sstream.str());
 }
 
-std::vector<uint32_t> compileImpl(std::string_view code, ShaderStage stage, void* callbacks_ctx = nullptr) {
-    auto glsl_stage = static_cast<glslang_stage_t>(stage);
-    glslang_input_t input = {
-        .language = GLSLANG_SOURCE_GLSL,
-        .stage = glsl_stage,
-        .client = GLSLANG_CLIENT_VULKAN,
-        .client_version = GLSLANG_TARGET_VULKAN_1_3,
-        .target_language = GLSLANG_TARGET_SPV,
-        .target_language_version = GLSLANG_TARGET_SPV_1_6,
-        .code = code.data(),
-        .default_version = 460,
-        .default_profile = GLSLANG_NO_PROFILE,
-        .force_default_version_and_profile = false,
-        .forward_compatible = false,
-        .messages = GLSLANG_MSG_DEFAULT_BIT,
-        .resource = glslang_default_resource(),
-        .callbacks = includeCallbacks,
-        .callbacks_ctx = callbacks_ctx
+std::vector<uint32_t> compileImpl(
+    std::string_view code,
+    ShaderStage stage,
+    const std::vector<std::filesystem::path>& includeDirs,
+    const HeaderMap& headers = EmptyHeaderMap
+) {
+    auto language = static_cast<EShLanguage>(stage);
+    glslang::TShader shader(language);
+    auto cstr_code = code.data();
+    shader.setStrings(&cstr_code, 1);
+
+    shader.setEnvInput(glslang::EShSourceGlsl, language, glslang::EShClientVulkan, 100);
+    shader.setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_3);
+    shader.setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_6);
+    shader.setAutoMapBindings(true);
+
+    std::string preprocessedGLSL;
+    Includer includer(includeDirs, headers);
+    auto success = shader.preprocess(
+        GetDefaultResources(),
+        460, ENoProfile,
+        false, false,
+        EShMsgDefault,
+        &preprocessedGLSL,
+        includer);
+    if (!success) compileError("GLSL preprocessing failed!", shader);
+    auto preprocessedCStr = preprocessedGLSL.c_str();
+    shader.setStrings(&preprocessedCStr, 1);
+
+    if (!shader.parse(GetDefaultResources(), 460, false, EShMsgDefault))
+        compileError("GLSL parsing failed!", shader);
+
+    glslang::TProgram program;
+    program.addShader(&shader);
+    if (!program.link(EShMsgDefault))
+        compileError("GLSL linking failed!", program);
+
+    if (!program.mapIO())
+        compileError("GLSL binding remapping failed!", program);
+
+    glslang::SpvOptions spvOptions{
+        .optimizeSize = true,
+        .validate = true
     };
-    Shader shaderHandle{ glslang_shader_create(&input), glslang_shader_delete };
-    auto shader = shaderHandle.get();
+    std::vector<uint32_t> spirv;
+    const auto intermediate = program.getIntermediate(language);
+    glslang::GlslangToSpv(*intermediate, spirv, &spvOptions);
 
-    glslang_shader_set_options(shader, GLSLANG_SHADER_AUTO_MAP_BINDINGS);
-
-    if (!glslang_shader_preprocess(shader, &input))
-        compile_error("GLSL Preprocessing failed!", shader);
-    if (!glslang_shader_parse(shader, &input))
-        compile_error("GLSL Parsing failed!", shader);
-
-    Program programHandle{ glslang_program_create(), glslang_program_delete };
-    auto program = programHandle.get();
-    glslang_program_add_shader(program, shader);
-
-    if (!glslang_program_link(program, GLSLANG_MSG_SPV_RULES_BIT | GLSLANG_MSG_VULKAN_RULES_BIT))
-        compile_error("GLSL Linking failed!", program);
-
-    if (!glslang_program_map_io(program))
-        compile_error("GLSL binding remapping failed!", program);
-
-    glslang_spv_options_t spv_options{
-        .optimize_size = true
-    };
-    glslang_program_SPIRV_generate_with_options(program, glsl_stage, &spv_options);
-    auto size = glslang_program_SPIRV_get_size(program);
-    std::vector<uint32_t> result(size);
-    glslang_program_SPIRV_get(program, result.data());
-
-    return result;
+    return spirv;
 }
 
 }
 
 std::vector<uint32_t> Compiler::compile(std::string_view code, ShaderStage stage) const {
-    CompilerContext context(nullptr, &includeDirs);
-    return compileImpl(code, stage, &context);
+    return compileImpl(code, stage, includeDirs);
 }
 std::vector<uint32_t> Compiler::compile(std::string_view code, const HeaderMap& headers, ShaderStage stage) const {
-    CompilerContext context(&headers, &includeDirs);
-    return compileImpl(code, stage, &context);
+    return compileImpl(code, stage, includeDirs, headers);
 }
 
 void Compiler::addIncludeDir(std::filesystem::path path) {
@@ -178,13 +177,12 @@ void Compiler::clearIncludeDir() {
 Compiler& Compiler::operator=(Compiler&&) noexcept = default;
 Compiler::Compiler(Compiler&&) noexcept = default;
 
-Compiler::Compiler()
-{
-    glslang_initialize_process();
+Compiler::Compiler() {
+    glslang::InitializeProcess();
 }
 
 Compiler::~Compiler() {
-    glslang_finalize_process();
+    glslang::FinalizeProcess();
 }
 
 }

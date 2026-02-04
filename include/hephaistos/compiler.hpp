@@ -9,6 +9,31 @@
 
 namespace hephaistos {
 
+namespace detail {
+
+//heterogenous string hash
+struct string_hash {
+    using hash_type = std::hash<std::string_view>;
+    using is_transparent = void;
+
+    [[nodiscard]] std::size_t operator()(const char* str) const {
+        return hash_type{}(str);
+    }
+    [[nodiscard]] std::size_t operator()(std::string_view str) const {
+        return hash_type{}(str);
+    }
+    [[nodiscard]] std::size_t operator()(const std::string& str) const {
+        return hash_type{}(str);
+    }
+};
+
+}
+
+/**
+ * @brief Maps include paths to source code
+*/
+using HeaderMap = std::unordered_map<std::string, std::string, detail::string_hash, std::equal_to<>>;
+
 /**
  * @brief Enumeration of shader stags
 */
@@ -26,28 +51,6 @@ enum class ShaderStage {
  * @brief Compiler for GLSL shader code
 */
 class HEPHAISTOS_API Compiler {
-public:
-    //heterogenous string hash
-    struct string_hash {
-        using hash_type = std::hash<std::string_view>;
-        using is_transparent = void;
-
-        [[nodiscard]] std::size_t operator()(const char* str) const {
-            return hash_type{}(str);
-        }
-        [[nodiscard]] std::size_t operator()(std::string_view str) const {
-            return hash_type{}(str);
-        }
-        [[nodiscard]] std::size_t operator()(const std::string& str) const {
-            return hash_type{}(str);
-        }
-    };
-
-    /**
-     * @brief Maps include paths to source code
-    */
-    using HeaderMap = std::unordered_map<std::string, std::string, string_hash, std::equal_to<>>;
-
 public:
     /**
      * @brief Add directory to list of paths used to resolve includes

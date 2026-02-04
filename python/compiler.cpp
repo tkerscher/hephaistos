@@ -20,7 +20,7 @@ void registerCompilerModule(nb::module_& m) {
         .value("MISS", hp::ShaderStage::MISS)
         .value("CALLABLE", hp::ShaderStage::CALLABLE);
 
-    nb::bind_map<hp::Compiler::HeaderMap>(m, "HeaderMap",
+    nb::bind_map<hp::HeaderMap>(m, "HeaderMap",
         "Dict mapping filepaths to shader source code. "
         "Consumed by Compiler to resolve include directives.");
 
@@ -54,7 +54,7 @@ void registerCompilerModule(nb::module_& m) {
         .def("compile", [](
                     const hp::Compiler& c,
                     std::string_view code,
-                    const hp::Compiler::HeaderMap& headers,
+                    const hp::HeaderMap& headers,
                     hp::ShaderStage stage
                 ) -> nb::bytes {
                     std::vector<uint32_t> result;

@@ -111,7 +111,7 @@ TEST_CASE("Compiler can compile stages from ray tracing pipeline", "[compiler]")
 }
 
 TEST_CASE("compiler can include files from header map", "[compiler]") {
-	Compiler::HeaderMap headers = {
+	HeaderMap headers = {
 		{ "foo.glsl", "int foo(int a, int b) {\n\treturn 2 * a + b;\n}\n" },
 		{ "bar.glsl", "#include \"foo.glsl\"\n\nint bar(int a, int b) {\n\treturn foo(a,b);\n}\n" }
 	};
