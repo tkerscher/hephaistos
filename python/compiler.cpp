@@ -36,6 +36,10 @@ void registerCompilerModule(nb::module_& m) {
             "Removes the last added include dir from the internal list")
         .def("clearIncludeDir", &hp::Compiler::clearIncludeDir,
             "Clears the internal list of include directories")
+        .def("createSession",
+            [](const hp::Compiler& c) -> hp::CompilerSession {
+                return hp::CompilerSession(c);
+            }, "Creates a new compiler session")
         .def("compile",
             [](
                 const hp::Compiler& c,
@@ -53,6 +57,43 @@ void registerCompilerModule(nb::module_& m) {
             "Compiles the given GLSL code and returns the SPIR-V code as bytes")
         .def("compile", [](
                     const hp::Compiler& c,
+                    std::string_view code,
+                    const hp::HeaderMap& headers,
+                    hp::ShaderStage stage
+                ) -> nb::bytes {
+                    std::vector<uint32_t> result;
+                    {
+                        //release GIL during compilation
+                        nb::gil_scoped_release release;
+                        result = c.compile(code, headers, stage);
+                    }
+                    return nb::bytes((const char*)result.data(), result.size()*4);
+                },
+            "code"_a, "headers"_a, nb::kw_only(), "stage"_a = hp::ShaderStage::COMPUTE,
+            "Compiles the given GLSL code using the provided header files "
+            "and returns the SPIR-V code as bytes");
+    
+    nb::class_<hp::CompilerSession>(m, "CompilerSession",
+            "Ensures code compiled within a single session share the same pipeline layout. "
+            "That is, bindings with the same name will be assigned the same binding point "
+            "across all compilations.")
+        .def("compile",
+            [](
+                hp::CompilerSession& c,
+                std::string_view code,
+                hp::ShaderStage stage
+            ) -> nb::bytes {
+                std::vector<uint32_t> result;
+                {
+                    //release gil during compilation
+                    nb::gil_scoped_release release;
+                    result = c.compile(code, stage);
+                }
+                return nb::bytes((const char*)result.data(), result.size()*4);
+            }, "code"_a, nb::kw_only(), "stage"_a = hp::ShaderStage::COMPUTE,
+            "Compiles the given GLSL code and returns the SPIR-V code as bytes")
+        .def("compile", [](
+                    hp::CompilerSession& c,
                     std::string_view code,
                     const hp::HeaderMap& headers,
                     hp::ShaderStage stage

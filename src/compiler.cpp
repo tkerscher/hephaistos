@@ -4,11 +4,13 @@
 #include <memory>
 #include <sstream>
 #include <stdexcept>
-#include <string.h>
+#include <unordered_set>
 
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/Public/ResourceLimits.h>
 #include <SPIRV/GlslangToSpv.h>
+
+#include <spirv_reflect.h>
 
 namespace hephaistos {
 
@@ -155,6 +157,45 @@ std::vector<uint32_t> compileImpl(
     return spirv;
 }
 
+//TODO: duplicate code from vk/reflection.cpp -> extract into common file
+
+#define STR(c) case SPV_REFLECT_RESULT_##c: return "Reflect: "#c;
+
+inline auto printSpvResult(SpvReflectResult result) {
+    switch (result) {
+        STR(SUCCESS)
+        STR(NOT_READY)
+        STR(ERROR_PARSE_FAILED)
+        STR(ERROR_ALLOC_FAILED)
+        STR(ERROR_RANGE_EXCEEDED)
+        STR(ERROR_NULL_POINTER)
+        STR(ERROR_INTERNAL_ERROR)
+        STR(ERROR_COUNT_MISMATCH)
+        STR(ERROR_ELEMENT_NOT_FOUND)
+        STR(ERROR_SPIRV_INVALID_CODE_SIZE)
+        STR(ERROR_SPIRV_INVALID_MAGIC_NUMBER)
+        STR(ERROR_SPIRV_UNEXPECTED_EOF)
+        STR(ERROR_SPIRV_INVALID_ID_REFERENCE)
+        STR(ERROR_SPIRV_SET_NUMBER_OVERFLOW)
+        STR(ERROR_SPIRV_INVALID_STORAGE_CLASS)
+        STR(ERROR_SPIRV_RECURSION)
+        STR(ERROR_SPIRV_INVALID_INSTRUCTION)
+        STR(ERROR_SPIRV_UNEXPECTED_BLOCK_DATA)
+        STR(ERROR_SPIRV_INVALID_BLOCK_MEMBER_REFERENCE)
+        STR(ERROR_SPIRV_INVALID_ENTRY_POINT)
+        STR(ERROR_SPIRV_INVALID_EXECUTION_MODE)
+    default:
+        return "Unknown result code";
+    }
+}
+
+#undef STR
+
+void spvCheckResult(SpvReflectResult result) {
+    if (result != SPV_REFLECT_RESULT_SUCCESS)
+        throw std::runtime_error(printSpvResult(result));
+}
+
 }
 
 std::vector<uint32_t> Compiler::compile(std::string_view code, ShaderStage stage) const {
@@ -184,5 +225,145 @@ Compiler::Compiler() {
 Compiler::~Compiler() {
     glslang::FinalizeProcess();
 }
+
+struct CompilerSession::Imp {
+    const Compiler& compiler;
+    std::unordered_map<std::string, uint32_t> bindings;
+    std::unordered_set<uint32_t> slots;
+
+    void process(std::vector<uint32_t>& code);
+
+    Imp(const Compiler& compiler)
+        : compiler(compiler)
+        , bindings()
+    {}
+};
+
+void CompilerSession::Imp::process(std::vector<uint32_t>& code) {
+    //reflect code
+    SpvReflectShaderModule reflectModule;
+    spvCheckResult(spvReflectCreateShaderModule2(
+        SPV_REFLECT_MODULE_FLAG_NO_COPY,
+        4 * code.size(),
+        code.data(),
+        &reflectModule
+    ));
+
+    //we only support a single descriptor set
+    if (reflectModule.descriptor_set_count > 1)
+        throw std::runtime_error("Only a single descriptor set is supported!");
+    if (reflectModule.descriptor_set_count == 0) {
+        //nothing to fix
+        spvReflectDestroyShaderModule(&reflectModule);
+        return;
+    }
+
+    //this will later contain bindings we have to update
+    std::unordered_map<uint32_t, uint32_t> updates;
+
+    //update common program layout
+    auto& set = reflectModule.descriptor_sets[0];
+    auto pBinding = set.bindings[0];
+    auto pBindingEnd = pBinding + set.binding_count;
+    for (; pBinding != pBindingEnd; ++pBinding) {
+        //skip unused bindings. auto mapping assign binding zero to these.
+        if (!pBinding->accessed) continue;
+
+        if (pBinding->count == 0)
+            throw std::runtime_error("Unbound arrays are not supported!");
+
+        //fetch binding name
+        auto binding = pBinding->binding;
+        auto name = pBinding->name ? pBinding->name : nullptr;
+        constexpr auto blockType =
+            SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER |
+            SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        if ((pBinding->descriptor_type & blockType) != 0) {
+            if (pBinding->type_description->type_name)
+                name = pBinding->type_description->type_name;
+            else
+                name = nullptr;
+        }
+        //we cant ensure a common pipeline layout without names
+        if (!name)
+            throw std::runtime_error(std::format("Binding {} has no name!", binding));
+
+        //check if encountered that name already
+        const auto pMap = bindings.find(name);
+        if (pMap != bindings.end()) {
+            //and if so, if it matches the expected binding
+            if (pMap->second != binding) {
+                //at the corresponding binding to the todo list
+                updates.emplace(binding, pMap->second);
+            }
+        }
+        else {
+            //new name. check if the assigned binding is actually free
+            if (slots.contains(binding)) {
+                //find next free slot
+                uint32_t newBinding = 0u;
+                while (slots.contains(newBinding)) ++newBinding;                
+                //mark to update
+                updates.emplace(binding, newBinding);
+                binding = newBinding;
+            }
+            //a new name -> write it down for later retrieval
+            bindings.emplace(name, binding);
+            slots.insert(binding);
+        }
+    }
+
+    //by now we are finished with reflecting
+    spvReflectDestroyShaderModule(&reflectModule);
+
+    //anything to do?
+    if (updates.empty()) return;
+
+    //SPIR-V is surprisingly easy to traverse
+    //to make our lifes easier, we simply rewrite all OpDecorate Bindings
+    //with a binding number we want to replace
+    auto pCode = code.data();
+    auto pCodeEnd = pCode + code.size();
+    pCode += 5; //first 20 bytes (5 words) are header
+    while (pCode < pCodeEnd) {
+        //decode instruction
+        uint32_t length = *pCode >> 16;
+        uint32_t opCode = *pCode & 0xFFFFu;
+        //check for OpDecorate and DecorateBinding
+        if (opCode == 0x47u && *(pCode + 2) == 0x21u) {
+            auto oldBinding = *(pCode + 3);
+            auto pUpdate = updates.find(oldBinding);
+            if (pUpdate != updates.end())
+                *(pCode + 3) = pUpdate->second;
+        }
+        //go to next op
+        pCode += length;
+    }
+}
+
+std::vector<uint32_t> CompilerSession::compile(
+    std::string_view code,
+    ShaderStage stage
+) {
+    return compile(code, EmptyHeaderMap, stage);
+}
+
+std::vector<uint32_t> CompilerSession::compile(
+    std::string_view source,
+    const HeaderMap& headers,
+    ShaderStage stage
+) {
+    auto code = compileImpl(source, stage, pImp->compiler.includeDirs, headers);
+    pImp->process(code);
+    return code;
+}
+
+CompilerSession::CompilerSession(CompilerSession&&) noexcept = default;
+CompilerSession& CompilerSession::operator=(CompilerSession&&) noexcept = default;
+
+CompilerSession::CompilerSession(const Compiler& compiler)
+    : pImp(std::make_unique<Imp>(compiler))
+{}
+CompilerSession::~CompilerSession() = default;
 
 }

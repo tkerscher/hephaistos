@@ -102,6 +102,51 @@ public:
 
 private:
     std::vector<std::filesystem::path> includeDirs;
+    friend class CompilerSession;
+};
+
+/**
+ * Similar to Compiler, but shaders compiled in the same compiler session will
+ * share the same pipeline layout. That is, bindings with the same name will be
+ * assigned the same binding point across all compilations.
+*/
+class HEPHAISTOS_API CompilerSession {
+public:
+    /**
+     * @brief Compiles the given GLSL source code
+     *
+     * @param code GLSL source code
+     * @return Compiled SPIR-V byte code
+    */
+    [[nodiscard]] std::vector<uint32_t> compile(
+        std::string_view code,
+        ShaderStage stage = ShaderStage::COMPUTE
+    );
+    /**
+     * @brief Compiled the given GLSL source code
+     *
+     * @param code GLSL source code
+     * @param headers Map of source code for resolving includes. Takes precedence
+     * @return Compiled SPIR-V byte code
+    */
+    [[nodiscard]] std::vector<uint32_t> compile(
+        std::string_view code,
+        const HeaderMap& headers,
+        ShaderStage stage = ShaderStage::COMPUTE
+    );
+
+    CompilerSession(CompilerSession&&) noexcept;
+    CompilerSession& operator=(CompilerSession&&) noexcept;
+
+    CompilerSession(const CompilerSession&) = delete;
+    CompilerSession& operator=(const CompilerSession&) = delete;
+
+    explicit CompilerSession(const Compiler& compiler);
+    ~CompilerSession();
+
+private:
+    struct Imp;
+    std::unique_ptr<Imp> pImp;
 };
 
 }

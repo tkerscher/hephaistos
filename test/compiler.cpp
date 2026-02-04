@@ -222,3 +222,72 @@ TEST_CASE("compiler can fetch headers from disk", "[compiler]") {
 
 	REQUIRE(!hasValidationErrorOccurred());
 }
+
+TEST_CASE("compiler sessions ensure a common pipeline layout", "[compiler]") {
+	auto source1 = R"(
+		#version 460
+		readonly buffer TensorA { int a[]; };
+		readonly buffer TensorC { int c[]; };
+		writeonly buffer TensorX { int x[]; };
+		void main() {
+			uint i = gl_GlobalInvocationID.x;
+			x[i] = a[i] + c[i];
+		}
+	)";
+	auto source2 = R"(
+		#version 460
+		readonly buffer TensorB { int b[]; };
+		writeonly buffer TensorY { int y[]; };
+		readonly buffer TensorC { int c[]; };
+		readonly buffer TensorD { int d[]; };
+		void main() {
+			uint i = gl_GlobalInvocationID.x;
+			y[i] = b[i] + c[i];
+		}
+	)";
+
+	Compiler compiler;
+	CompilerSession session(compiler);
+	std::vector<uint32_t> code1, code2;
+	REQUIRE_NOTHROW(code1 = session.compile(source1));
+	REQUIRE_NOTHROW(code2 = session.compile(source2));
+	//we do not expose reflection (yet)
+	// -> use the implicit reflection via Program
+	std::unique_ptr<Program> program1, program2;
+	REQUIRE_NOTHROW(program1 = std::make_unique<Program>(getContext(), code1));
+	REQUIRE_NOTHROW(program2 = std::make_unique<Program>(getContext(), code2));
+
+	//check bindings
+	REQUIRE(program1->hasBinding("TensorA"));
+	REQUIRE(program1->hasBinding("TensorC"));
+	REQUIRE(program1->hasBinding("TensorX"));
+	REQUIRE(program2->hasBinding("TensorB"));
+	REQUIRE(program2->hasBinding("TensorC"));
+	REQUIRE(program2->hasBinding("TensorY"));
+	REQUIRE(program1->getBindingTraits("TensorC").binding == program2->getBindingTraits("TensorC").binding);
+	std::unordered_set<uint32_t> bindings;
+	for (auto& b : program1->listBindings())
+		bindings.insert(b.binding);
+	for (auto& b : program2->listBindings())
+		bindings.insert(b.binding);
+	REQUIRE(bindings.size() == 5);
+
+	//to be on the safe side, let's check our modifed code actually works
+	auto dataB = std::to_array<int32_t>({ 12, 5, 6, 7, 8, 9, 15, 8 });
+	auto dataC = std::to_array<int32_t>({ 9, 13, 4, 17, 8, 3, 1, 4 });
+	auto dataY = std::to_array<int32_t>({ 21, 18, 10, 24, 16, 12, 16, 12 });
+	Tensor<int32_t> tensorB(getContext(), dataB), tensorC(getContext(), dataC), tensorY(getContext(), 8);
+	Buffer<int32_t> buffer(getContext(), 8);
+	program2->bindParameter(tensorB, "TensorB");
+	program2->bindParameter(tensorC, "TensorC");
+	program2->bindParameter(tensorY, "TensorY");
+
+	beginSequence(getContext())
+		.And(program2->dispatch(8))
+		.Then(retrieveTensor(tensorY, buffer))
+		.Submit();
+
+	REQUIRE(std::equal(dataY.begin(), dataY.end(), buffer.getMemory().begin()));
+
+	REQUIRE(!hasValidationErrorOccurred());
+}
