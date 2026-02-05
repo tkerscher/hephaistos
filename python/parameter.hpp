@@ -1,6 +1,7 @@
 #pragma once
 
 #include <nanobind/nanobind.h>
+#include <nanobind/stl/vector.h>
 
 #include <sstream>
 

@@ -421,7 +421,7 @@ public:
     );
     ~RayTracingPipeline() override;
 
-public: //internal
+protected: //internal
     void onDestroy() override;
 
 private:

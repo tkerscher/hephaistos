@@ -10,6 +10,7 @@ import warnings
 from hephaistos import (
     Command,
     Program,
+    RayTracingPipeline,
     Buffer,
     Submission,
     Subroutine,
@@ -187,7 +188,7 @@ class PipelineStage(ABC):
         """
         pass
 
-    def bindParams(self, program: Program, i: int) -> None:
+    def bindParams(self, program: Union[Program, RayTracingPipeline], i: int) -> None:
         """Binds the i-th configuration to the given program"""
         program.bindParams(**self._device[i])
 

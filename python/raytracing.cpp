@@ -193,6 +193,10 @@ struct NumpyMesh : public hp::Mesh {
     
 }
 
+NB_MAKE_OPAQUE(std::vector<NumpyMesh>);
+NB_MAKE_OPAQUE(std::vector<hp::Geometry>)
+NB_MAKE_OPAQUE(std::vector<hp::GeometryInstance>);
+
 void registerRayTracingStructure(nb::module_& m) {
     nb::bind_vector<std::vector<NumpyMesh>>(m,
         "MeshVector", "List of meshes");
