@@ -574,8 +574,10 @@ void registerRayTracingPipeline(nb::module_& m) {
             }, "entries"_a,
             "Creates a new shader binding table containing the specified entries. "
             "Each entry is either the index of the referenced shader or a tuple "
-            "consisting of the group index and a bytes object containing the "
-            "optional shader record data to be accessed in the shader.")
+            "consisting of the shader index and a bytes object containing the "
+            "optional shader record data to be accessed in the shader. The index "
+            "matches the order of the shaders during creation of the ray tracing "
+            "pipeline. The index can also be `None` to specify an empty binding.")
         .def("createShaderBindingTableRange",
             [](
                 const hp::RayTracingPipeline& pipeline,
@@ -585,9 +587,9 @@ void registerRayTracingPipeline(nb::module_& m) {
                 return pipeline.createShaderBindingTable(firstGroupIdx, count);
             },
             "firstGroupIdx"_a, "count"_a = 1,
-            "Creates a new shader binding table consisting of the `count`shader "
-            "groups starting at `firstGroupIdx` using the same order as during "
-            "creation of the ray tracing pipeline")
+            "Creates a new shader binding table consisting of the `count` shaders "
+            "starting at `firstGroupIdx` using the same order as during creation "
+            "of the ray tracing pipeline")
         .def("traceRays",
             [](
                 const hp::RayTracingPipeline& pipeline,

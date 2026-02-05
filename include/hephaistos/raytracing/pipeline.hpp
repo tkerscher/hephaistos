@@ -37,11 +37,14 @@ struct ShaderBindingTableRegion {
  */
 struct ShaderBindingTableEntry {
     /**
-     * @brief Index of the referenced group as passed to the ray tracing pipeline
+     * @brief Index of the referenced shader
+     *
+     * Index of the referenced shader as passed to the ray tracing pipeline
+     * or ~0u for an empty entry.
      */
     uint32_t groupIndex;
     /**
-     * @brief Optional additional data accessible by the shader
+     * @brief Optional additional data accessible by the shader as shader record.
      */
     std::span<const std::byte> shaderRecord = {};
 };
@@ -55,8 +58,6 @@ struct ShaderBindingTableEntry {
 class HEPHAISTOS_API ShaderBindingTable : public Resource {
 public:
     operator ShaderBindingTableRegion() const;
-
-    operator ShaderBindingTable() const;
 
     ShaderBindingTable(const ShaderBindingTable&) = delete;
     ShaderBindingTable& operator=(const ShaderBindingTable&) = delete;
