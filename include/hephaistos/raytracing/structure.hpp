@@ -113,7 +113,7 @@ struct GeometryInstance {
     */
     uint32_t mask        : 8  = 0xFF;
     /**
-     * @brief Offset used in calculating the hit shader shader binding table index
+     * @brief Offset into the SBT when calculating hit shader index
      * 
      * Can be used as additional data when using ray queries.
     */

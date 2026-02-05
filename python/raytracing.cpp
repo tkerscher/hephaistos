@@ -264,7 +264,12 @@ void registerRayTracingStructure(nb::module_& m) {
         .def_prop_rw("mask",
             [](hp::GeometryInstance& gi) -> uint8_t { return gi.mask; },
             [](hp::GeometryInstance& gi, uint8_t m) { gi.mask = m; },
-            "Mask of this instance used for masking ray traces.");
+            "Mask of this instance used for masking ray traces.")
+        .def_prop_rw("instanceSBTOffset",
+            [](const hp::GeometryInstance& gi) -> uint32_t { return gi.instanceSBTOffset; },
+            [](hp::GeometryInstance& gi, uint32_t o) { gi.instanceSBTOffset = o; },
+            "Offset into the SBT when calculating hit shader index. "
+            "Can be used as additional data storage when using ray queries.");
     
     nb::class_<hp::GeometryStore, hp::Resource>(m, "GeometryStore",
             "Handles the creation of Geometries using Meshes and their lifetime "
