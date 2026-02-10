@@ -3,6 +3,7 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/vector.h>
 
+#include <format>
 #include <sstream>
 
 #include <hephaistos/program.hpp>
@@ -96,8 +97,17 @@ void registerBindingTarget(nb::class_<T, hp::Resource>& c) {
             for (auto i = 0; i < params.size(); ++i)
                 params[i].attr("bindParameter")(self, i);
             for (auto kv : namedparams) {
-                if (t.hasBinding(nb::str(kv.first).c_str()))
-                    kv.second.attr("bindParameter")(self, kv.first);
+                if (kv.first.is_none())
+                    continue;
+                if (t.hasBinding(nb::str(kv.first).c_str())) {
+                    if (nb::hasattr(kv.second, "bindParameter"))
+                        kv.second.attr("bindParameter")(self, kv.first);
+                    else
+                        throw nb::attribute_error(std::format(
+                            "Value passed to binding \"{}\" has no attribute \"bindParameter\"",
+                            nb::str(kv.first).c_str()
+                        ).c_str());
+                }
             }
         },
         "Binds the given parameters based on their index if passed as positional "
