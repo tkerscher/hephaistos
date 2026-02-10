@@ -435,6 +435,8 @@ struct AccelerationStructure::Parameter {
     VkAccelerationStructureKHR tlas = 0;
     VkWriteDescriptorSetAccelerationStructureKHR descriptorInfo{};
 
+    uint64_t address = 0;
+
     uint32_t capacity = 0;
     uint32_t instanceCount = 0;
 
@@ -574,6 +576,13 @@ void AccelerationStructure::Parameter::init(
         .accelerationStructureCount = 1,
         .pAccelerationStructures = &tlas
     };
+    //fetch memory address of tlas
+    VkAccelerationStructureDeviceAddressInfoKHR addressInfo{
+        .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
+        .accelerationStructure = tlas
+    };
+    address = context->fnTable.vkGetAccelerationStructureDeviceAddressKHR(
+        context->device, &addressInfo);
 }
 
 void AccelerationStructure::bindParameter(VkWriteDescriptorSet& binding) const {
@@ -581,6 +590,10 @@ void AccelerationStructure::bindParameter(VkWriteDescriptorSet& binding) const {
     binding.pBufferInfo = nullptr;
     binding.pImageInfo = nullptr;
     binding.pTexelBufferView = nullptr;
+}
+
+uint64_t AccelerationStructure::address() const noexcept {
+    return param->address;
 }
 
 uint32_t AccelerationStructure::capacity() const noexcept {

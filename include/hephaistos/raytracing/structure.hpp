@@ -231,6 +231,11 @@ public:
     void bindParameter(VkWriteDescriptorSet& binding) const final override;
 
     /**
+     * @brief Device address at which the acceleration structure is stored
+     */
+    [[nodiscard]] uint64_t address() const noexcept;
+
+    /**
      * @brief Returns the number of instances that can fit in the acceleration structure
     */
     [[nodiscard]] uint32_t capacity() const noexcept;

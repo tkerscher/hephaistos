@@ -330,6 +330,8 @@ void registerRayTracingStructure(nb::module_& m) {
             "\n\nParameters\n---------\n"
             "capacity: int\n"
             "    Maximum amount of instances the acceleration structure can hold")
+        .def_prop_ro("address", &hp::AccelerationStructure::address,
+            "Device address at which the acceleration structure is stored")
         .def_prop_ro("capacity", &hp::AccelerationStructure::capacity,
             "Number of instances that can fit in the acceleration structure")
         .def_prop_ro("size", &hp::AccelerationStructure::size,  
