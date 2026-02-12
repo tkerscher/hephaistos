@@ -97,7 +97,7 @@ void registerBindingTarget(nb::class_<T, hp::Resource>& c) {
             for (auto i = 0; i < params.size(); ++i)
                 params[i].attr("bindParameter")(self, i);
             for (auto kv : namedparams) {
-                if (kv.first.is_none())
+                if (kv.second.is_none())
                     continue;
                 if (t.hasBinding(nb::str(kv.first).c_str())) {
                     if (nb::hasattr(kv.second, "bindParameter"))
