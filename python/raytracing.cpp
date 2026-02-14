@@ -564,6 +564,8 @@ void registerRayTracingPipeline(nb::module_& m) {
             }, "shaders"_a, nb::kw_only(),
             "maxRecursionDepth"_a = 1, "specialization"_a = nb::bytes(nullptr, 0),
             "Creates a new ray tracing pipeline using the specified shaders")
+        .def_prop_ro("shaderCount", &hp::RayTracingPipeline::shaderCount,
+            "Total amount of shaders in this pipeline")
         .def("createShaderBindingTable",
             [](
                 const hp::RayTracingPipeline& pipeline,

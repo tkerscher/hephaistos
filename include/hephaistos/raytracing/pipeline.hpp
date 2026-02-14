@@ -285,7 +285,12 @@ private:
  * parameterize the referenced shaders.
  */
 class HEPHAISTOS_API RayTracingPipeline : public Resource, public BindingTarget {
-public:    
+public:
+    /**
+     * @brief Returns total amount of shaders in this pipeline.
+     */
+    [[nodiscard]] uint32_t shaderCount() const noexcept;
+
     /**
      * @brief Creates a new shader binding table
      * 

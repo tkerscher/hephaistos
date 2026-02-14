@@ -187,6 +187,10 @@ inline uint32_t align(uint32_t value, uint32_t alignment) {
 
 }
 
+uint32_t RayTracingPipeline::shaderCount() const noexcept {
+	return handleCount;
+}
+
 ShaderBindingTable RayTracingPipeline::createShaderBindingTable(
 	uint32_t firstGroupIdx, uint32_t count
 ) const {
@@ -257,7 +261,7 @@ ShaderBindingTable RayTracingPipeline::createShaderBindingTable(
 		//process entry
 		if (entry.groupIndex == ~0u) //null handle?
 			std::memset(pData, 0, handleSize);
-		else if (entry.groupIndex >= handleStorage.size())
+		else if (entry.groupIndex >= handleCount)
 			throw std::runtime_error("Referenced group out of range");
 		else
 			std::memcpy(pData, pStorage + (entry.groupIndex * handleSize), handleSize);
