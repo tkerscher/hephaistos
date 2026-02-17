@@ -226,4 +226,14 @@ HEPHAISTOS_API void destroyAllResources(const ContextHandle& context);
     return ContextHandle{ nullptr, [](vulkan::Context*) {} };
 }
 
+/**
+ * @brief Checks the device health
+ * 
+ * Checks whether the context and the corresponding device are still in a
+ * healthy state by performing a small task with known result. Success does
+ * not guarantee that the device is actually healthy, but is a strong indicator.
+ * Throws if device is unhealthy.
+*/
+HEPHAISTOS_API void checkDeviceHealth(const ContextHandle& context);
+
 }

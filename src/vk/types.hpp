@@ -22,6 +22,31 @@ struct Buffer {
     const Context& context;
 };
 
+[[nodiscard]] BufferHandle createBuffer(
+    const ContextHandle& handle,
+    uint64_t size,
+    VkBufferUsageFlags usage,
+    VmaAllocationCreateFlags flags);
+[[nodiscard]] BufferHandle createBufferAligned(
+    const ContextHandle& context,
+    uint64_t size,
+    uint64_t alignment,
+    VkBufferUsageFlags usage,
+    VmaAllocationCreateFlags flags);
+void destroyBuffer(Buffer* buffer);
+[[nodiscard]] inline BufferHandle createEmptyBuffer() {
+    return { nullptr, destroyBuffer };
+}
+
+[[nodiscard]] VkDeviceAddress getBufferDeviceAddress(const BufferHandle& buffer);
+
+[[nodiscard]] ImageHandle createImage(
+    const ContextHandle& context,
+    VkFormat format,
+    uint32_t width, uint32_t height, uint32_t depth,
+    VkImageUsageFlags usage);
+void destroyImage(Image* image);
+
 struct Command {
     VkCommandBuffer buffer;
     //specifies which stage the commands used so the semaphores
@@ -45,6 +70,16 @@ struct Context {
     VkCommandPool oneTimeSubmitPool;
     VkCommandBuffer oneTimeSubmitBuffer;
     VkFence oneTimeSubmitFence;
+
+    //Vulkan provides no means to test for device health.
+    //Unfortunately, wait operations are not required to report lost
+    //devices. To test whether an operation was successfull or the
+    //device was lost inbetween, we try to copy back our canary
+    //holding known data. If it is successfull and matches the
+    //expected data, we can be reasonable confident that the device
+    //is still alive. At least that's the best we can do.
+    BufferHandle canaryDevice = createEmptyBuffer();
+    BufferHandle canaryHost = createEmptyBuffer();
 
     //for synchronization operations like the ones needed for copy
     //commands we also want to include ray tracing operations.
@@ -103,30 +138,5 @@ const Extension* getExtension(const Context& context, const char* name) {
     else
         return dynamic_cast<const Extension*>(pExt->get());
 }
-
-[[nodiscard]] BufferHandle createBuffer(
-    const ContextHandle& handle,
-    uint64_t size,
-    VkBufferUsageFlags usage,
-    VmaAllocationCreateFlags flags);
-[[nodiscard]] BufferHandle createBufferAligned(
-    const ContextHandle& context,
-    uint64_t size,
-    uint64_t alignment,
-    VkBufferUsageFlags usage,
-    VmaAllocationCreateFlags flags);
-void destroyBuffer(Buffer* buffer);
-[[nodiscard]] inline BufferHandle createEmptyBuffer() {
-    return { nullptr, destroyBuffer };
-}
-
-[[nodiscard]] VkDeviceAddress getBufferDeviceAddress(const BufferHandle& buffer);
-
-[[nodiscard]] ImageHandle createImage(
-    const ContextHandle& context,
-    VkFormat format,
-    uint32_t width, uint32_t height, uint32_t depth,
-    VkImageUsageFlags usage);
-void destroyImage(Image* image);
 
 }

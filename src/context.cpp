@@ -9,6 +9,7 @@
 #include "vk/instance.hpp"
 #include "vk/result.hpp"
 #include "vk/types.hpp"
+#include "vk/util.hpp"
 
 namespace hephaistos {
 
@@ -208,7 +209,20 @@ constexpr auto VmaAllocatorFlags =
     // VMA_ALLOCATOR_CREATE_EXT_MEMORY_PRIORITY_BIT |
     VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 
+constexpr auto canaryData = std::to_array<uint32_t>({
+    0xC37B06D0u,
+    0xAFFF400Cu,
+    0x90DB0AAFu,
+    0xEC4C8EB5u,
+    0xE616E6F8u,
+    0x580C43DEu,
+    0xBD07EC42u,
+    0x903616EDu
+});
+
 void destroyContext(vulkan::Context* context) {
+    context->canaryDevice.reset();
+    context->canaryHost.reset();
     if (context->allocator)
         vmaDestroyAllocator(context->allocator);
     context->fnTable.vkDestroyPipelineCache(context->device, context->cache, nullptr);
@@ -469,6 +483,32 @@ ContextHandle createContext(
     for (auto& ext : context->extensions)
         ext->finalize(context);
 
+    //create canary for device health check
+    {
+        //allocate buffers
+        context->canaryDevice = vulkan::createBuffer(
+            context, 32,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            0
+        );
+        context->canaryHost = vulkan::createBuffer(
+            context, 32,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT
+        );
+
+        //init canary on device
+        std::memcpy(context->canaryHost->allocInfo.pMappedData, canaryData.data(), 32);
+        auto upload = [&context](VkCommandBuffer cmdBuf) {
+            VkBufferCopy copy{ 0, 0, 32 };
+            context->fnTable.vkCmdCopyBuffer(cmdBuf,
+                context->canaryHost->buffer,
+                context->canaryDevice->buffer,
+                1, &copy);
+        };
+        vulkan::oneTimeSubmit(*context, upload);
+    }
+
     //Done
     return context;
 }
@@ -516,6 +556,28 @@ ContextHandle createContext(
 
     //new ref
     return createContext(vulkan::getInstance(), device->device, extensions);
+}
+
+void checkDeviceHealth(const ContextHandle& context) {
+    //clear host canary
+    std::memset(context->canaryHost->allocInfo.pMappedData, 0, 32);
+    //try copying back from device
+    auto fetch = [&context](VkCommandBuffer cmdBuf) {
+        VkBufferCopy copy{ 0, 0, 32 };
+        context->fnTable.vkCmdCopyBuffer(cmdBuf,
+            context->canaryDevice->buffer,
+            context->canaryHost->buffer,
+            1, &copy);
+    };
+    vulkan::oneTimeSubmit(*context, fetch);
+    //check for expected data
+    if (!std::equal(
+        canaryData.begin(),
+        canaryData.end(),
+        static_cast<uint32_t*>(context->canaryHost->allocInfo.pMappedData)
+    )) {
+        throw std::runtime_error("canary data mismatch");
+    }
 }
 
 /*********************************** RESOURCE ********************************/

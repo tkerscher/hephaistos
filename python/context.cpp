@@ -165,6 +165,9 @@ void registerContextModule(nb::module_& m) {
     m.def("getSelectedDeviceId", &getSelectedDeviceId,
         "Returns the currently selected device id, or `None` if no specific "
         "device has been selected so far.");
+    m.def("checkCurrentDeviceHealth", []() { hp::checkDeviceHealth(getCurrentContext()); },
+        "Checks whether the current device is still healthy by performing a small task. "
+        "Raises an exception if the device is unhealthy.");
     
     m.def("isDeviceSuitable", [](uint32_t id) {
         //range check

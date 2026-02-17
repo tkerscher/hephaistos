@@ -101,3 +101,7 @@ TEST_CASE("ResourceSnapshot can destroy newly created resources", "[context]") {
 
     REQUIRE(!hasValidationErrorOccurred());
 }
+
+TEST_CASE("checkDeviceHealth works", "[context]") {
+    REQUIRE_NOTHROW(checkDeviceHealth(getContext()));
+}
