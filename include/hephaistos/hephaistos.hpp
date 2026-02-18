@@ -4,6 +4,7 @@
 #include "hephaistos/command.hpp"
 #include "hephaistos/compiler.hpp"
 #include "hephaistos/context.hpp"
+#include "hephaistos/exception.hpp"
 #include "hephaistos/handles.hpp"
 #include "hephaistos/image.hpp"
 #include "hephaistos/program.hpp"

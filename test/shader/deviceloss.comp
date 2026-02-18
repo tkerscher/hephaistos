@@ -1,0 +1,16 @@
+#version 460
+
+#extension GL_EXT_buffer_reference2 : require
+#extension GL_EXT_buffer_reference_uvec2 : require
+
+layout(local_size_x = 32) in;
+
+layout(buffer_reference) buffer Buffer {
+    int data;
+};
+
+void main() {
+    //write to null pointer to provoke crash
+    Buffer b = Buffer(uvec2(0));
+    b.data = 0xDEAD;
+}

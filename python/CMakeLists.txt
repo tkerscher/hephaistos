@@ -10,6 +10,7 @@ set(SRC
     ${PYROOT}/compiler.cpp
     ${PYROOT}/context.cpp
     ${PYROOT}/debug.cpp
+    ${PYROOT}/exception.cpp
     ${PYROOT}/image.cpp
     ${PYROOT}/program.cpp
     ${PYROOT}/pyhephaistos.cpp

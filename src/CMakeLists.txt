@@ -13,6 +13,7 @@ set(PUBLIC_HEADERS
     ${INCROOT}/config.hpp
     ${INCROOT}/context.hpp
     ${INCROOT}/debug.hpp
+    ${INCROOT}/exception.hpp
     ${INCROOT}/handles.hpp
     ${INCROOT}/hephaistos.hpp
     ${INCROOT}/image.hpp
@@ -34,7 +35,8 @@ set(SRC
     ${SRCROOT}/command.cpp
     ${SRCROOT}/compiler.cpp
     ${SRCROOT}/context.cpp
-    ${SRCROOT}/debug.cpp     
+    ${SRCROOT}/debug.cpp
+    ${SRCROOT}/exception.cpp
     ${SRCROOT}/image.cpp
     ${SRCROOT}/program.cpp
     ${SRCROOT}/stopwatch.cpp

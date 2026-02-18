@@ -1,6 +1,6 @@
 #pragma once
 
-#include <stdexcept>
+#include "hephaistos/exception.hpp"
 #include "volk.h"
 
 #define STR(c) case VK_##c: return #c;
@@ -50,8 +50,12 @@ inline auto printResult(VkResult res) {
 #undef STR
 
 inline void checkResult(VkResult res) {
+    if (res == VK_ERROR_DEVICE_LOST)
+        throw device_lost_error();
+    if (res == VK_ERROR_OUT_OF_DEVICE_MEMORY)
+        throw out_of_device_memory_error();
     if (res != VK_SUCCESS) {
-        throw std::runtime_error(printResult(res));
+        throw vulkan_error(printResult(res));
     }
 }
 

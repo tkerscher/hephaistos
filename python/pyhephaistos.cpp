@@ -7,6 +7,7 @@ void registerBufferModule(nb::module_&);
 void registerCommandModule(nb::module_&);
 void registerCompilerModule(nb::module_&);
 void registerContextModule(nb::module_&);
+void registerExceptionModule(nb::module_&);
 void registerImageModule(nb::module_&);
 void registerBindingModule(nb::module_&);
 void registerProgramModule(nb::module_&);
@@ -18,6 +19,7 @@ void registerDebugModule(nb::module_&);
 
 NB_MODULE(pyhephaistos, m) {
     registerContextModule(m);
+    registerExceptionModule(m);
     registerCommandModule(m);
     registerCompilerModule(m);
     registerBindingModule(m);
