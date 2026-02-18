@@ -225,16 +225,20 @@ void destroyContext(vulkan::Context* context) {
     context->canaryHost.reset();
     if (context->allocator)
         vmaDestroyAllocator(context->allocator);
-    context->fnTable.vkDestroyPipelineCache(context->device, context->cache, nullptr);
-    context->fnTable.vkDestroyFence(context->device, context->oneTimeSubmitFence, nullptr);
-    context->fnTable.vkDestroyCommandPool(context->device, context->oneTimeSubmitPool, nullptr);
-    context->fnTable.vkDestroyCommandPool(context->device, context->subroutinePool, nullptr);
-    while (!context->sequencePool.empty()) {
-        context->fnTable.vkDestroyCommandPool(
-            context->device, context->sequencePool.front(), nullptr);
-        context->sequencePool.pop();
+    //it's fine to call destroy with nullptr, but only if we have a valid fn pointer
+    //all fn pointer get init at the same time, so checking one is enough
+    if (context->fnTable.vkDestroyDevice) {
+        context->fnTable.vkDestroyPipelineCache(context->device, context->cache, nullptr);
+        context->fnTable.vkDestroyFence(context->device, context->oneTimeSubmitFence, nullptr);
+        context->fnTable.vkDestroyCommandPool(context->device, context->oneTimeSubmitPool, nullptr);
+        context->fnTable.vkDestroyCommandPool(context->device, context->subroutinePool, nullptr);
+        while (!context->sequencePool.empty()) {
+            context->fnTable.vkDestroyCommandPool(
+                context->device, context->sequencePool.front(), nullptr);
+            context->sequencePool.pop();
+        }
+        context->fnTable.vkDestroyDevice(context->device, nullptr);
     }
-    context->fnTable.vkDestroyDevice(context->device, nullptr);
     vulkan::returnInstance();
     delete context;
 }
@@ -245,7 +249,7 @@ ContextHandle createContext(
     std::span<ExtensionHandle> extensions)
 {
     //Allocate memory
-    ContextHandle context{ new vulkan::Context, destroyContext };
+    ContextHandle context{ new vulkan::Context(), destroyContext};
     context->physicalDevice = device;
 
     //query queue family
