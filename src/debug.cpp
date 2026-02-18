@@ -1,5 +1,6 @@
 #include "hephaistos/debug.hpp"
 
+#include <array>
 #include <cstring>
 #include <stdexcept>
 #include <vector>
@@ -7,8 +8,14 @@
 #include "volk.h"
 
 #include "vk/instance.hpp"
+#include "vk/result.hpp"
+#include "vk/types.hpp"
+
+#include "hephaistos/context.hpp"
 
 namespace hephaistos {
+
+/********************************** CALLBACK **********************************/
 
 namespace {
 
@@ -87,6 +94,101 @@ void configureDebug(DebugOptions options, DebugCallback callback) {
 	PFN_vkDebugUtilsMessengerCallbackEXT pCallback;
 	pCallback = debugCallback ? transformCallback : nullptr;
 	vulkan::setInstanceDebugState(enable, disable, pCallback);
+}
+
+/******************************** DEVICE FAULT ********************************/
+
+namespace {
+
+constexpr auto DeviceFaultExtensionName = "DeviceFault";
+
+constexpr auto DeviceFaultExtensions = std::to_array({
+	VK_EXT_DEVICE_FAULT_EXTENSION_NAME
+});
+
+class DeviceFaultExtension final : public Extension {
+public:
+	bool isDeviceSupported(const DeviceHandle& device) const override {
+		return isDeviceFaultExtensionSupported(device);
+	}	
+	std::string_view getExtensionName() const override {
+		return DeviceFaultExtensionName;
+	}
+	std::span<const char* const> getDeviceExtensions() const override {
+		return DeviceFaultExtensions;
+	}
+	void* chain(void* pNext) override {
+		features.pNext = pNext;
+		return &features;
+	}
+	void finalize(const ContextHandle& context) override {}
+
+	DeviceFaultExtension() {
+		features = {
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FAULT_FEATURES_EXT,
+			.deviceFault = VK_TRUE
+		};
+	}
+	~DeviceFaultExtension() override = default;
+
+private:
+	VkPhysicalDeviceFaultFeaturesEXT features;
+};
+	
+}
+
+bool isDeviceFaultExtensionSupported(const DeviceHandle& device) {
+	VkPhysicalDeviceFaultFeaturesEXT fault{
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FAULT_FEATURES_EXT
+	};
+	VkPhysicalDeviceFeatures2 features{
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+		.pNext = &fault
+	};
+	vkGetPhysicalDeviceFeatures2(device->device, &features);
+
+	return fault.deviceFault;
+}
+
+ExtensionHandle createDeviceFaultInfoExtension() {
+	return std::make_unique<DeviceFaultExtension>();
+}
+
+DeviceFaultInfo getDeviceFaultInfo(const ContextHandle& context) {
+	VkDeviceFaultCountsEXT counts{
+		.sType = VK_STRUCTURE_TYPE_DEVICE_FAULT_COUNTS_EXT
+	};
+	vulkan::checkResult(context->fnTable.vkGetDeviceFaultInfoEXT(
+		context->device, &counts, nullptr));
+
+	std::vector<VkDeviceFaultAddressInfoEXT> address{ counts.addressInfoCount };
+	std::vector<VkDeviceFaultVendorInfoEXT> vendor{ counts.vendorInfoCount };
+	VkDeviceFaultInfoEXT info{
+		.sType = VK_STRUCTURE_TYPE_DEVICE_FAULT_INFO_EXT,
+		.pAddressInfos = address.data(),
+		.pVendorInfos = vendor.data()
+	};
+	vulkan::checkResult(context->fnTable.vkGetDeviceFaultInfoEXT(
+		context->device, &counts, &info));
+
+	DeviceFaultInfo result{};
+	result.description = info.description;
+	for (auto& a : address) {
+		result.addressInfo.emplace_back(
+			static_cast<DeviceFaultAddressType>(static_cast<int32_t>(a.addressType)),
+			a.reportedAddress,
+			a.addressPrecision
+		);
+	}
+	for (auto& v : vendor) {
+		result.vendorInfo.emplace_back(
+			v.description,
+			v.vendorFaultCode,
+			v.vendorFaultData
+		);
+	}
+
+	return result;
 }
 
 }

@@ -2,9 +2,12 @@
 
 #include <cstdint>
 #include <functional>
+#include <string>
 #include <type_traits>
+#include <vector>
 
 #include "hephaistos/config.hpp"
+#include "hephaistos/handles.hpp"
 
 namespace hephaistos {
 
@@ -101,5 +104,92 @@ struct DebugOptions {
 HEPHAISTOS_API void configureDebug(
 	DebugOptions options,
 	DebugCallback callback = nullptr);
+
+/**
+ * @brief Enumeration of address fault types that may have caused a device loss
+ */
+enum class DeviceFaultAddressType {
+	None = 0,
+	ReadInvalid = 1,
+	WriteInvalid = 2,
+	ExecuteInvalid = 3,
+	InstructionPointerUnknown = 4,
+	InstructionPointerInvalid = 5,
+	InstructionPointerFault = 6
+};
+
+/**
+ * @brief Specifies memory address at which a fault occurred
+ */
+struct DeviceFaultAddressInfo {
+	/**
+	 * @brief Type of memory operation that triggered the fault
+	 */
+	DeviceFaultAddressType addressType;
+	/**
+	 * @brief Address at which the fault occurred
+	 */
+	uint64_t address;
+	/**
+	 * @brief Precision of the reported address
+	 */
+	uint64_t precision;
+};
+
+/**
+ * @brief Vendor specific fault information
+ */
+struct DeviceFaultVendorInfo {
+	/**
+	 * @brief Human readable description of the fault
+	 */
+	std::string description;
+	/**
+	 * @brief Vendor specific fault code
+	 */
+	uint64_t code;
+	/**
+	 * @brief Vendor specific data associated with fault
+	 */
+	uint64_t data;
+};
+
+/**
+ * @brief Structure containing information about device fault
+ */
+struct DeviceFaultInfo {
+	/**
+	 * @brief Human readable description of fault
+	 */
+	std::string description;
+	/**
+	 * @brief List of address faults
+	 */
+	std::vector<DeviceFaultAddressInfo> addressInfo;
+	/**
+	 * @brief List of vendor specific faults
+	 */
+	std::vector<DeviceFaultVendorInfo> vendorInfo;
+};
+
+/**
+ * @brief Queries whether the given device supports device fault information.
+ */
+[[nodiscard]] HEPHAISTOS_API
+bool isDeviceFaultExtensionSupported(const DeviceHandle& device);
+
+/**
+ * @brief Creates extension enabling device fault information.
+ */
+[[nodiscard]] HEPHAISTOS_API ExtensionHandle createDeviceFaultInfoExtension();
+
+/**
+ * @brief Queries information about the last device lost error.
+ * 
+ * Can be called after a device lost error occurred to gather information about
+ * its cause. May only be called after such an error occurred.
+ */
+[[nodiscard]] HEPHAISTOS_API
+DeviceFaultInfo getDeviceFaultInfo(const ContextHandle& context);
 
 }
