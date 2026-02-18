@@ -8,6 +8,7 @@ set(TEST_FILES
     ${TESTROOT}/command.cpp
     ${TESTROOT}/compiler.cpp
     ${TESTROOT}/context.cpp
+    ${TESTROOT}/debug.cpp
     ${TESTROOT}/image.cpp
     ${TESTROOT}/program.cpp
     ${TESTROOT}/raytracing.cpp
