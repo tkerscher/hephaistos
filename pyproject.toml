@@ -1,7 +1,7 @@
 [build-system]
 requires = [
-    "scikit-build-core ~= 0.11.3",
-    "nanobind ~= 2.8.0"
+    "scikit-build-core ~= 0.11.6",
+    "nanobind ~= 2.11.0"
 ]
 build-backend = "scikit_build_core.build"
 
@@ -39,7 +39,6 @@ wheel.license-files = [
     "external/NOTICE"
 ]
 wheel.packages = ["python/hephaistos"]
-wheel.py-api = "cp312"
 sdist.exclude = [".github", "examples", "notebooks", "test"]
 
 [tool.pytest.ini_options]

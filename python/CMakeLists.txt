@@ -50,7 +50,6 @@ find_package(nanobind CONFIG REQUIRED)
 nanobind_add_module(
     pyhephaistos
     NB_DOMAIN hephaistos
-    STABLE_ABI
     NB_STATIC
     LTO
     ${SRC}
