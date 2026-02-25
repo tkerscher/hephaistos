@@ -389,8 +389,10 @@ public:
         uint64_t offset = 0) const
     {
         return traceRaysIndirect(
+            bindings,
             { reinterpret_cast<const std::byte*>(&push), sizeof(T) },
-            tensor, offset);
+            tensor, offset
+        );
     }
     
     RayTracingPipeline(const RayTracingPipeline&) = delete;

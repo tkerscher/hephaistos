@@ -1,6 +1,7 @@
 #include "hephaistos/raytracing/structure.hpp"
 
 #include <array>
+#include <cstring>
 
 #include "volk.h"
 

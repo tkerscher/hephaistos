@@ -1,5 +1,6 @@
 #include "hephaistos/compiler.hpp"
 
+#include <format>
 #include <fstream>
 #include <memory>
 #include <sstream>

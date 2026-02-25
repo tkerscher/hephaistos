@@ -6,6 +6,7 @@
 #include <nanobind/stl/string_view.h>
 #include <nanobind/stl/variant.h>
 
+#include <cstring>
 #include <sstream>
 
 #include <hephaistos/program.hpp>

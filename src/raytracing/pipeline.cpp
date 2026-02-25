@@ -1,5 +1,7 @@
 #include "hephaistos/raytracing/pipeline.hpp"
 
+#include <cstring>
+
 #include "vk/types.hpp"
 #include "vk/util.hpp"
 

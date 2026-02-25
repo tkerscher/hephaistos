@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstring>
 #include <span>
 
 #include <hephaistos/command.hpp>
