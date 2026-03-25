@@ -64,15 +64,48 @@ DeviceHandle createDevice(VkPhysicalDevice device) {
     return result;
 };
 
+bool deviceSupportsPCIBusInfo(VkPhysicalDevice device) {
+    //check if extension is present
+    uint32_t count;
+    if (vkEnumerateDeviceExtensionProperties(device, nullptr, &count, nullptr) != VK_SUCCESS) return false;
+    std::vector<VkExtensionProperties> extensions(count);
+    if (vkEnumerateDeviceExtensionProperties(device, nullptr, &count, extensions.data()) != VK_SUCCESS) return false;
+
+    return std::find_if(
+            extensions.begin(),
+            extensions.end(),
+            [](VkExtensionProperties prop) -> bool {
+                return std::strcmp(VK_EXT_PCI_BUS_INFO_EXTENSION_NAME, prop.extensionName);
+            }
+        ) != extensions.end();
+}
+
 DeviceInfo createInfo(VkPhysicalDevice device) {
+    //include pci bus information if supported
+    bool includePCI = deviceSupportsPCIBusInfo(device);
+    VkPhysicalDevicePCIBusInfoPropertiesEXT pci{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PCI_BUS_INFO_PROPERTIES_EXT
+    };
     //retrieve props
-    VkPhysicalDeviceProperties props;
-    vkGetPhysicalDeviceProperties(device, &props);
+    VkPhysicalDeviceProperties2 props{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2
+    };
+    if (includePCI) props.pNext = &pci;
+    vkGetPhysicalDeviceProperties2(device, &props);
 
     //return and build info
     return {
-        .name       = props.deviceName,
-        .isDiscrete = props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
+        .name       = props.properties.deviceName,
+        .isDiscrete = props.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU,
+        .vendorID   = props.properties.vendorID,
+        .deviceID   = props.properties.deviceID,
+        .pci = {
+            //following values will be zero if not queried earlier
+            .pciDomain   = pci.pciDomain,
+            .pciBus      = pci.pciBus,
+            .pciDevice   = pci.pciDevice,
+            .pciFunction = pci.pciFunction
+        }
     };
 }
 

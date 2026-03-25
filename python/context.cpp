@@ -1,6 +1,7 @@
 #include "context.hpp"
 
 #include <algorithm>
+#include <iomanip>
 #include <stdexcept>
 #include <sstream>
 #include <string>
@@ -80,6 +81,19 @@ std::optional<uint32_t> getSelectedDeviceId() {
         return selectedDeviceId;
 }
 
+std::string printPCIBus(const hp::PCIBusInfo& pci) {
+    std::ostringstream str;
+    str << std::hex << std::setfill('0')
+        << std::setw(8) << pci.pciDomain
+        << ':'
+        << std::setw(2) << (pci.pciBus & 0xFF)
+        << ':'
+        << (pci.pciDevice & 0xFF)
+        << '.'
+        << std::setw(1) << (pci.pciFunction & 0xF);
+    return str.str();
+}
+
 } //end namespace
 
 const hp::ContextHandle& getCurrentContext() {
@@ -141,6 +155,13 @@ void registerContextModule(nb::module_& m) {
     m.def("isVulkanAvailable", &hp::isVulkanAvailable,
         "Returns True if Vulkan is available on this system.");
 
+    nb::class_<hp::PCIBusInfo>(m, "PCIBusInfo",
+            "PCI bus information of a physical device")
+        .def_rw("pciDomain", &hp::PCIBusInfo::pciDomain, "PCI bus domain")
+        .def_rw("pciBus", &hp::PCIBusInfo::pciBus, "PCI bus identifier")
+        .def_rw("pciDevice", &hp::PCIBusInfo::pciDevice, "PCI device identifier")
+        .def_rw("pciFunction", &hp::PCIBusInfo::pciFunction, "PCI device function identifier")
+        .def("__repr__", &printPCIBus);
     nb::class_<hp::DeviceInfo>(m, "Device",
             "Handle for a physical device implementing the Vulkan API. "
             "Contains basic properties of the device.")
@@ -148,6 +169,26 @@ void registerContextModule(nb::module_& m) {
         .def_ro("isDiscrete", &hp::DeviceInfo::isDiscrete,
             "True, if the device is a discrete GPU. "
             "Can be useful to distinguish from integrated ones.")
+        .def_ro("vendorID", &hp::DeviceInfo::vendorID,
+            "Unique identifier for the device vendor. If it exists, will contain the "
+            "PCI vendor ID in the lower 16 bits with the rest zeroed out.")
+        .def_ro("deviceID", &hp::DeviceInfo::deviceID,
+            "Unique identifier for the device among other devices of the same vendor. "
+            "If it exists, will contain the PCI device ID in the lower 16 bits with "
+            "rest zeroed out.")
+        .def_ro("pci", &hp::DeviceInfo::pci,
+            "If applicable, contains information about the PCI device.")
+        .def("__str__", [](const hp::DeviceInfo& info){
+            std::ostringstream str;
+            str << std::boolalpha << std::hex;
+            str << "Name:      " << info.name << '\n';
+            str << "Discrete:  " << info.isDiscrete << '\n';
+            str << std::setw(4);
+            str << "Vendor ID: 0x" << info.vendorID << '\n';
+            str << "Device ID: 0x" << info.deviceID << '\n';
+            str << "PCI Bus:   " << printPCIBus(info.pci) << '\n';
+            return str.str();
+        })
         .def("__repr__", [](const hp::DeviceInfo& info){
             std::ostringstream str;
             str << info.name;

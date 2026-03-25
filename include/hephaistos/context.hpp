@@ -12,17 +12,59 @@
 namespace hephaistos {
 
 /**
+ * @brief PCI bus information of a physical device
+*/
+struct PCIBusInfo {
+    /**
+     * @brief PCI bus domain
+    */
+    uint32_t pciDomain = 0;
+    /**
+     * @brief PCI bus identifier
+    */
+    uint32_t pciBus = 0;
+    /**
+     * @brief PCI device identifier
+    */
+    uint32_t pciDevice = 0;
+    /**
+     * @brief PCI device function identifier
+    */
+    uint32_t pciFunction = 0;
+};
+
+/**
  * @brief Information about a device
 */
 struct DeviceInfo {
     /**
      * @brief Name of the device
     */
-    std::string name;
+    std::string name = "";
     /**
      * @brief Wether the device is a discrete GPU
     */
-    bool isDiscrete;
+    bool isDiscrete = false;
+
+    /**
+     * @brief Unique identifier for the device vendor
+     * 
+     * If the device has a valid PCI vendor ID, this will be stored
+     * in the lower 16 bits with the rest zeroed out.
+    */
+    uint32_t vendorID = 0;
+    /**
+     * @brief Unique identifier for the physical device for the same vendor
+     * 
+     * If the device has a vliad PCI device ID, this will be stored
+     * in the lower 16 bits with the rest zeroed out.
+    */
+    uint32_t deviceID = 0;
+
+    /**
+     * @brief Optional PCI device information
+    */
+    PCIBusInfo pci = {};
 };
 
 /**

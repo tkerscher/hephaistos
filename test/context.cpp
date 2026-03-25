@@ -17,6 +17,19 @@ ContextHandle getContext() {
 
 }
 
+TEST_CASE("devices can be enumerated and information can be retrieved", "[context]") {
+    //we do not know any present devices a priori
+    //the only thing we can do here is calling the functions
+    //and see if they crash
+    
+    auto devices = enumerateDevices();
+    REQUIRE(devices.size() > 0);
+    REQUIRE_NOTHROW(getDeviceInfo(devices[0]));
+
+    auto context = createContext();
+    REQUIRE_NOTHROW(getDeviceInfo(context));
+}
+
 TEST_CASE("resources can be destroyed invidually or all at once", "[context]") {
     REQUIRE(getResourceCount(getContext()) == 0);
     
