@@ -38,7 +38,8 @@ constexpr auto DebugMessageType =
     VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT;
 
 constexpr auto InstanceLayers = std::to_array({
-    "VK_LAYER_KHRONOS_validation"
+    "VK_LAYER_KHRONOS_validation",
+    "VK_LAYER_KHRONOS_synchronization2"
 });
 constexpr auto InstanceExtensions = std::to_array({
     VK_EXT_DEBUG_UTILS_EXTENSION_NAME

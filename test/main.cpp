@@ -39,7 +39,13 @@ int main() {
 	//globally enable debug
     if (!isDebugAvailable())
         throw std::runtime_error("Validation Layers are not installed!");
-    configureDebug({ .enableAPIValidation = true }, debugCallback);
+    configureDebug(
+        {
+            .enableSynchronizationValidation = true,
+            .enableAPIValidation = true
+        },
+        debugCallback
+    );
 
 	//run tests
 	return session.run();
