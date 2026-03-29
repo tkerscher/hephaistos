@@ -409,9 +409,6 @@ void TraceRaysCommand::record(vulkan::Command& cmd) const {
 	if (totalCount > ext->props.maxRayDispatchCount)
 		throw std::runtime_error("Total ray count exceeds device limit");
 
-	//we're working in the ray tracing stage
-	cmd.stage |= VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
-
 	//bind pipeline
 	context.fnTable.vkCmdBindPipeline(cmd.buffer,
 		VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
@@ -474,11 +471,6 @@ void TraceRaysIndirectCommand::record(vulkan::Command& cmd) const {
 	auto& context = prog.context;
 	auto address = tensor.get().address() + offset;
 
-	//we're working on the ray tracing pipeline
-	cmd.stage |=
-		VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT |
-		VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
-
 	//bind pipeline
 	context.fnTable.vkCmdBindPipeline(cmd.buffer,
 		VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
@@ -504,24 +496,24 @@ void TraceRaysIndirectCommand::record(vulkan::Command& cmd) const {
 	}
 
 	//barrier to ensure indirect data is complete
-	VkBufferMemoryBarrier barrier{
-		.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-		.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-		.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT,
+	VkBufferMemoryBarrier2 barrier{
+		.sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+		.srcStageMask        = context.computeStages | VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+		.srcAccessMask       = VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
+		.dstStageMask        = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT,
+		.dstAccessMask       = VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT,
 		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-		.buffer = buffer,
-		.offset = offset,
-		.size = 12 // 3 * int
+		.buffer              = buffer,
+		.offset              = offset,
+		.size                = 12 // 3 * int
 	};
-	context.fnTable.vkCmdPipelineBarrier(cmd.buffer,
-		VK_PIPELINE_STAGE_TRANSFER_BIT |
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
-		VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
-		VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0,
-		0, nullptr,
-		1, &barrier,
-		0, nullptr);
+	VkDependencyInfo depInfo{
+		.sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+		.bufferMemoryBarrierCount = 1,
+		.pBufferMemoryBarriers    = &barrier
+	};
+	context.fnTable.vkCmdPipelineBarrier2(cmd.buffer, &depInfo);
 
 	//convert SBT pointers
 	auto rayGen = toAddressRegion(shaderBindings.rayGenShaders);

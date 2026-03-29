@@ -148,6 +148,7 @@ bool isDeviceSuitable(const DeviceHandle& device, std::span<const ExtensionHandl
         if (
             !maintenance5.maintenance5 ||
             !features13.maintenance4 ||
+            !features13.synchronization2 ||
             !features12.timelineSemaphore ||
             !features12.bufferDeviceAddress ||
             !features12.hostQueryReset || //stopwatch
@@ -381,9 +382,14 @@ ContextHandle createContext(
             .pNext = &maintenance5,
             .maintenance4 = VK_TRUE
         };
+        VkPhysicalDeviceSynchronization2Features synch2{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES,
+            .pNext = &maintenance4,
+            .synchronization2 = VK_TRUE
+        };
         VkPhysicalDeviceTimelineSemaphoreFeatures timeline{
             .sType             = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
-            .pNext             = &maintenance4,
+            .pNext             = &synch2,
             .timelineSemaphore = VK_TRUE
         };
         VkPhysicalDeviceHostQueryResetFeatures hostQueryReset{

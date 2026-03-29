@@ -20,9 +20,6 @@ public:
     uint32_t query;
 
     void record(vulkan::Command& cmd) const override {
-        //TODO: really necessary?
-        cmd.stage |= stage;
-
         context.fnTable.vkCmdWriteTimestamp(cmd.buffer,
             stage, queryPool, query);
     }

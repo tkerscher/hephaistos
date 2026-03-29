@@ -51,7 +51,7 @@ struct Command {
     VkCommandBuffer buffer;
     //specifies which stage the commands used so the semaphores
     //can be more fine grained.
-    VkPipelineStageFlags stage;
+    //VkPipelineStageFlags2 stage;
 
     //const Context& context;
 };
@@ -87,8 +87,8 @@ struct Context {
     //ray tracing pipelines have been enabled. Since we do not want
     //to cluster the code with checks for ray tracing support, we
     //instead have save the correct stage flags here
-    VkPipelineStageFlags computeStages =
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    VkPipelineStageFlags2 computeStages =
+        VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT;
 
     //looks like a hack, but this is the only one we need to change
     //would be a bit drastic to remove const Context because of this

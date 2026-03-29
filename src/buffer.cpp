@@ -200,7 +200,7 @@ Tensor<std::byte>::Tensor(const Buffer<std::byte>& source, bool mapped)
     //one time submit copy buffer to source
     UpdateTensorCommand command(source, *this);
     vulkan::oneTimeSubmit(*getContext(), [&command](VkCommandBuffer cmd) {
-        vulkan::Command wrapper{ cmd, 0 };
+        vulkan::Command wrapper{ cmd };
         command.record(wrapper);
     });
 }
@@ -245,40 +245,40 @@ void RetrieveTensorCommand::record(vulkan::Command& cmd) const {
     if (size + destinationOffset > dst.size_bytes())
         throw std::logic_error(COPY_REGION_OUT_OF_DESTINATION);
 
-    //we're acting on the transfer stage
-    cmd.stage |= VK_PIPELINE_STAGE_TRANSFER_BIT;
-
     //ensure writing to tensor is finished
     if (!unsafe) {
-        std::array<VkBufferMemoryBarrier, 2> barriers{
-            VkBufferMemoryBarrier{
-                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-                .srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT,
-                .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+        auto barriers = std::to_array({
+            VkBufferMemoryBarrier2{
+                .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+                .srcStageMask        = context->computeStages | VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                .srcAccessMask       = VK_ACCESS_2_MEMORY_WRITE_BIT,
+                .dstStageMask        = VK_PIPELINE_STAGE_2_COPY_BIT,
+                .dstAccessMask       = VK_ACCESS_2_TRANSFER_READ_BIT,
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .buffer = src.getBuffer().buffer,
-                .offset = sourceOffset,
-                .size = size
+                .buffer              = src.getBuffer().buffer,
+                .offset              = sourceOffset,
+                .size                = size
             },
-            VkBufferMemoryBarrier{
-                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-                .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT,
-                .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            VkBufferMemoryBarrier2{
+                .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+                .srcStageMask        = VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                .srcAccessMask       = VK_ACCESS_2_TRANSFER_READ_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                .dstStageMask        = VK_PIPELINE_STAGE_2_COPY_BIT,
+                .dstAccessMask       = VK_ACCESS_2_TRANSFER_WRITE_BIT,
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .buffer = dst.getBuffer().buffer,
-                .offset = destinationOffset,
-                .size = size
+                .buffer              = dst.getBuffer().buffer,
+                .offset              = destinationOffset,
+                .size                = size
             }
+        });
+        VkDependencyInfo depInfo{
+            .sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .bufferMemoryBarrierCount = static_cast<uint32_t>(barriers.size()),
+            .pBufferMemoryBarriers    = barriers.data()
         };
-        context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-            context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_DEPENDENCY_BY_REGION_BIT,
-            0, nullptr,
-            static_cast<uint32_t>(barriers.size()), barriers.data(),
-            0, nullptr);
+        context->fnTable.vkCmdPipelineBarrier2(cmd.buffer, &depInfo);
     }
 
     //actually copy the buffer
@@ -294,23 +294,24 @@ void RetrieveTensorCommand::record(vulkan::Command& cmd) const {
 
     //barrier to ensure transfer finished
     if (!unsafe) {
-        VkBufferMemoryBarrier barrier{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+        VkBufferMemoryBarrier2 barrier{
+            .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+            .srcStageMask        = VK_PIPELINE_STAGE_2_COPY_BIT,
+            .srcAccessMask       = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            .dstStageMask        = VK_PIPELINE_STAGE_2_HOST_BIT,
+            .dstAccessMask       = VK_ACCESS_2_HOST_READ_BIT,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .buffer = dst.getBuffer().buffer,
-            .offset = destinationOffset,
-            .size = size
+            .buffer              = dst.getBuffer().buffer,
+            .offset              = destinationOffset,
+            .size                = size
         };
-        context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_HOST_BIT,
-            VK_DEPENDENCY_BY_REGION_BIT,
-            0, nullptr,
-            1, &barrier,
-            0, nullptr);
+        VkDependencyInfo depInfo{
+            .sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .bufferMemoryBarrierCount = 1,
+            .pBufferMemoryBarriers    = &barrier
+        };
+        context->fnTable.vkCmdPipelineBarrier2(cmd.buffer, &depInfo);
     }
 }
 
@@ -355,45 +356,40 @@ void UpdateTensorCommand::record(vulkan::Command& cmd) const {
     if (size + destinationOffset > dst.size_bytes())
         throw std::logic_error(COPY_REGION_OUT_OF_DESTINATION);
 
-    //we're acting on the transfer stage
-    cmd.stage |= VK_PIPELINE_STAGE_TRANSFER_BIT;
-
     //ensure tensor is safe to update
     if (!unsafe) {
-        VkBufferMemoryBarrier barrier{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .buffer = dst.getBuffer().buffer,
-            .offset = destinationOffset,
-            .size = size
-        };
-        context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-            context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_DEPENDENCY_BY_REGION_BIT,
-            0, nullptr,
-            1, &barrier,
-            0, nullptr);
-        barrier = VkBufferMemoryBarrier{
-                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-                .srcAccessMask = VK_ACCESS_HOST_WRITE_BIT,
-                .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+        auto barriers = std::to_array({
+            VkBufferMemoryBarrier2{
+                .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+                .srcStageMask        = context->computeStages | VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                .srcAccessMask       = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
+                .dstStageMask        = VK_PIPELINE_STAGE_2_COPY_BIT,
+                .dstAccessMask       = VK_ACCESS_2_TRANSFER_WRITE_BIT,
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .buffer = src.getBuffer().buffer,
-                .offset = sourceOffset,
-                .size = size
+                .buffer              = dst.getBuffer().buffer,
+                .offset              = destinationOffset,
+                .size                = size
+            },
+            VkBufferMemoryBarrier2{
+                .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+                .srcStageMask        = VK_PIPELINE_STAGE_2_HOST_BIT,
+                .srcAccessMask       = VK_ACCESS_2_HOST_WRITE_BIT,
+                .dstStageMask        = VK_PIPELINE_STAGE_2_COPY_BIT,
+                .dstAccessMask       = VK_ACCESS_2_TRANSFER_READ_BIT,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .buffer              = src.getBuffer().buffer,
+                .offset              = sourceOffset,
+                .size                = size
+            }
+        });
+        VkDependencyInfo depInfo{
+            .sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .bufferMemoryBarrierCount = static_cast<uint32_t>(barriers.size()),
+            .pBufferMemoryBarriers    = barriers.data()
         };
-        context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-            VK_PIPELINE_STAGE_HOST_BIT,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_DEPENDENCY_BY_REGION_BIT,
-            0, nullptr,
-            1, &barrier,
-            0, nullptr);
+        context->fnTable.vkCmdPipelineBarrier2(cmd.buffer, &depInfo);
     }
 
     //actually copy the buffer
@@ -409,23 +405,24 @@ void UpdateTensorCommand::record(vulkan::Command& cmd) const {
 
     //barrier to ensure transfer finished
     if (!unsafe) {
-        VkBufferMemoryBarrier barrier{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
+        VkBufferMemoryBarrier2 barrier{
+            .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+            .srcStageMask        = VK_PIPELINE_STAGE_2_COPY_BIT,
+            .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .dstStageMask        = context->computeStages | VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+            .dstAccessMask       = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .buffer = dst.getBuffer().buffer,
-            .offset = destinationOffset,
-            .size = size
+            .buffer              = dst.getBuffer().buffer,
+            .offset              = destinationOffset,
+            .size                = size
         };
-        context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_DEPENDENCY_BY_REGION_BIT,
-            0, nullptr,
-            1, &barrier,
-            0, nullptr);
+        VkDependencyInfo depInfo{
+            .sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .bufferMemoryBarrierCount = 1,
+            .pBufferMemoryBarriers    = &barrier
+        };
+        context->fnTable.vkCmdPipelineBarrier2(cmd.buffer, &depInfo);
     }
 }
 
@@ -455,27 +452,25 @@ void ClearTensorCommand::record(vulkan::Command& cmd) const {
     auto& context = tensor.get().getContext();
     auto buffer = tensor.get().getBuffer().buffer; //ptr -> by value
 
-    //we're acting on the transfer stage
-    cmd.stage |= VK_PIPELINE_STAGE_TRANSFER_BIT;
-
     //ensure tensor is safe to update
     if (!unsafe) {
-        VkBufferMemoryBarrier barrier{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+        VkBufferMemoryBarrier2 barrier{
+            .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+            .srcStageMask        = context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
+            .srcAccessMask       = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
+            .dstStageMask        = VK_PIPELINE_STAGE_2_CLEAR_BIT,
+            .dstAccessMask       = VK_ACCESS_2_TRANSFER_WRITE_BIT,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .buffer = buffer,
-            .size = VK_WHOLE_SIZE
+            .buffer              = buffer,
+            .size                = VK_WHOLE_SIZE
         };
-        context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-            context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_DEPENDENCY_BY_REGION_BIT,
-            0, nullptr,
-            1, &barrier,
-            0, nullptr);
+        VkDependencyInfo depInfo{
+            .sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .bufferMemoryBarrierCount = 1,
+            .pBufferMemoryBarriers    = &barrier
+        };
+        context->fnTable.vkCmdPipelineBarrier2(cmd.buffer, &depInfo);
     }
 
     //fill buffer
@@ -484,22 +479,23 @@ void ClearTensorCommand::record(vulkan::Command& cmd) const {
 
     //barrier to ensure transfer finished
     if (!unsafe) {
-        VkBufferMemoryBarrier barrier{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
+        VkBufferMemoryBarrier2 barrier{
+            .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+            .srcStageMask        = VK_PIPELINE_STAGE_2_CLEAR_BIT,
+            .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .dstStageMask        = context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
+            .dstAccessMask       = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .buffer = buffer,
-            .size = VK_WHOLE_SIZE
+            .buffer              = buffer,
+            .size                = VK_WHOLE_SIZE
         };
-        context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_DEPENDENCY_BY_REGION_BIT,
-            0, nullptr,
-            1, &barrier,
-            0, nullptr);
+        VkDependencyInfo depInfo{
+            .sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .bufferMemoryBarrierCount = 1,
+            .pBufferMemoryBarriers    = &barrier
+        };
+        context->fnTable.vkCmdPipelineBarrier2(cmd.buffer, &depInfo);
     }
 }
 

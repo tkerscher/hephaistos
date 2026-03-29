@@ -37,7 +37,7 @@ void destroySubroutine(Subroutine* subroutine) {
 }
 
 SubroutineHandle beginSubroutine(const ContextHandle& context, bool simultaneous_use) {
-    SubroutineHandle result{ new Subroutine({ { 0, 0 }, *context }), destroySubroutine };
+    SubroutineHandle result{ new Subroutine({ { 0 }, *context }), destroySubroutine };
 
     //Allocate command buffer
     VkCommandBufferAllocateInfo allocInfo{
@@ -324,6 +324,19 @@ VkCommandPool fetchCommandPool(const vulkan::Context& context) {
     return pool;
 }
 
+template <class T>
+const T* vectorBackOffset(const std::vector<T>& vec) {
+    //we return the offset, when added to the base address of vector/array
+    //will point to the currently last element in vec
+    //NOTE: This is not a valid pointer and reading from it will likely crash!
+    return reinterpret_cast<const T*>(static_cast<uint64_t>(vec.size()));
+}
+
+template<class T>
+void applyVecOffset(const T* &offset, const std::vector<T>& vec) {
+    offset = vec.data() + reinterpret_cast<uint64_t>(offset);
+}
+
 }
 
 struct SequenceBuilder::pImp {
@@ -331,40 +344,38 @@ struct SequenceBuilder::pImp {
     VkCommandPool pool;
     vulkan::Command recordingCmd = {};
     std::vector<VkCommandBuffer> recordedBuffers = {};
+    
+    //submission infos
+    std::vector<VkSubmitInfo2> submitInfos = {};
+    std::vector<VkCommandBufferSubmitInfo> cmdBufSubmitInfos = {};
+    std::vector<VkSemaphoreSubmitInfo> semaphoreWaits = {};
+    std::vector<VkSemaphoreSubmitInfo> semaphoreSignals = {};
+
+    //local sempahore for signaling
+    uint64_t currentValue = 0; //value to wait for in the next batch
+    std::unique_ptr<Timeline> exclusiveTimeline;
+    Timeline& timeline;
+    VkSemaphore semaphore;
+
+    const vulkan::Context& context;
 
     void finishRecording() {
-        //any buffer to finish?
+        //any buffer to finish
         if (!recordingCmd.buffer)
             return;
 
         //end recording
         vulkan::checkResult(context.fnTable.vkEndCommandBuffer(
             recordingCmd.buffer));
-        commandBuffers.push_back(recordingCmd.buffer);
+        cmdBufSubmitInfos.push_back({
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+            .commandBuffer = recordingCmd.buffer
+        });
         recordedBuffers.push_back(recordingCmd.buffer);
-        waitStages.back() |= recordingCmd.stage;
+
         //reset recording command buffer
         recordingCmd = {};
     }
-
-    std::vector<VkPipelineStageFlags> waitStages = {};
-    std::vector<VkCommandBuffer> commandBuffers = {};
-
-    std::vector<uint64_t> waitValues = {};
-    std::vector<VkSemaphore> waitSemaphores = {};
-    std::vector<uint64_t> signalValues = {};
-    std::vector<VkSemaphore> signalSemaphores = {};
-    std::vector<VkSubmitInfo> submitInfos = {};
-    std::vector<VkTimelineSemaphoreSubmitInfo> timelineInfos = {};
-    //the value to wait for in the next batch
-    uint64_t currentValue = 0;
-
-    //Handle to manage lifetime of implicit timeline
-    std::unique_ptr<Timeline> exclusiveTimeline;
-    Timeline& timeline;
-    VkSemaphore semaphore; //timeline semaphore
-
-    const vulkan::Context& context;
 
     pImp(Timeline& timeline, uint64_t value)
         : pool(fetchCommandPool(*timeline.getContext()))
@@ -374,7 +385,6 @@ struct SequenceBuilder::pImp {
         , semaphore(timeline.getTimeline().semaphore)
         , context(*timeline.getContext())
     {}
-
     pImp(ContextHandle context)
         : pool(fetchCommandPool(*context))
         , exclusiveTimeline(std::make_unique<Timeline>(std::move(context)))
@@ -407,7 +417,7 @@ SequenceBuilder& SequenceBuilder::And(const Command& command) & {
             _pImp->recordingCmd.buffer, &BeginInfo));
 
         //mark submission
-        _pImp->submitInfos.back().commandBufferCount += 1;
+        _pImp->submitInfos.back().commandBufferInfoCount += 1;
     }
 
     //Record command
@@ -422,9 +432,11 @@ SequenceBuilder& SequenceBuilder::And(const Subroutine& subroutine) & {
 
     //add command buffer
     auto& cmd = subroutine.getCommandBuffer();
-    _pImp->commandBuffers.push_back(cmd.buffer);
-    _pImp->waitStages.back() |= cmd.stage;
-    _pImp->submitInfos.back().commandBufferCount += 1;
+    _pImp->cmdBufSubmitInfos.push_back({
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+        .commandBuffer = cmd.buffer
+    });
+    _pImp->submitInfos.back().commandBufferInfoCount += 1;
 
     return *this;
 }
@@ -437,26 +449,33 @@ SequenceBuilder& SequenceBuilder::NextStep() & {
     _pImp->finishRecording();
 
     //create new submission
-    _pImp->timelineInfos.push_back(VkTimelineSemaphoreSubmitInfo{
-        .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO,
-        .waitSemaphoreValueCount = 1,
-        .signalSemaphoreValueCount = 1
+    //we cannot yet store valid pointers. As the vectors grow the current ones
+    //may become invalid. Their offset to the beginning, however, will stay
+    //costant as we won't change their relative order. By storing this offset
+    //we later only need to add the base address to get valid pointers back.
+    //Just keep in mind that during construction reading the pointers will crash
+    _pImp->submitInfos.push_back(VkSubmitInfo2{
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .waitSemaphoreInfoCount = 1,
+        .pWaitSemaphoreInfos = vectorBackOffset(_pImp->semaphoreWaits),
+        .commandBufferInfoCount = 0,
+        .pCommandBufferInfos = vectorBackOffset(_pImp->cmdBufSubmitInfos),
+        .signalSemaphoreInfoCount = 1,
+        .pSignalSemaphoreInfos = vectorBackOffset(_pImp->semaphoreSignals)
+        });
+    _pImp->semaphoreWaits.push_back(VkSemaphoreSubmitInfo{
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+        .semaphore = _pImp->semaphore,
+        .value = _pImp->currentValue,
+        .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR
     });
-    _pImp->submitInfos.push_back(VkSubmitInfo{
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .waitSemaphoreCount = 1,
-        //we only ever signal our own timeline
-        .signalSemaphoreCount = 1,
-        .pSignalSemaphores = &_pImp->semaphore
-    });
-
-    //save wait values & semaphores
-    _pImp->waitValues.push_back(_pImp->currentValue);
-    _pImp->waitSemaphores.push_back(_pImp->semaphore);
     _pImp->currentValue += 1;
-    _pImp->signalValues.push_back(_pImp->currentValue);
-    _pImp->signalSemaphores.push_back(_pImp->semaphore);
-    _pImp->waitStages.push_back(0);
+    _pImp->semaphoreSignals.push_back(VkSemaphoreSubmitInfo{
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+        .semaphore = _pImp->semaphore,
+        .value = _pImp->currentValue,
+        .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT
+    });
 
     return *this;
 }
@@ -482,13 +501,13 @@ SequenceBuilder& SequenceBuilder::WaitFor(uint64_t value) & {
         throw std::logic_error("WaitFor will dead lock with an implicit timeline!");
 
     //check if we have an open submission
-    if (_pImp->submitInfos.back().commandBufferCount > 0)
+    if (_pImp->submitInfos.back().commandBufferInfoCount > 0)
         NextStep();
 
     //update wait/signal values
     //they are always the last ones
-    _pImp->waitValues.back() = value;
-    _pImp->signalValues.back() = value + 1;
+    _pImp->semaphoreWaits.back().value = value;
+    _pImp->semaphoreSignals.back().value = value + 1;
     _pImp->currentValue = value + 1;
 
     return *this;
@@ -503,18 +522,23 @@ SequenceBuilder& SequenceBuilder::WaitFor(const Timeline& timeline, uint64_t val
         return WaitFor(value);
 
     //check if we have an open submission
-    if (_pImp->submitInfos.back().commandBufferCount > 0)
+    if (_pImp->submitInfos.back().commandBufferInfoCount > 0)
         NextStep();
 
-    _pImp->submitInfos.back().waitSemaphoreCount += 1;
-    _pImp->timelineInfos.back().waitSemaphoreValueCount += 1;
+    _pImp->submitInfos.back().waitSemaphoreInfoCount += 1;
     //ensure the last element in wait values/semaphores is the signaling timeline:
     // ... | back() | => ... | value | back() |
     // i.e. insert in second to last place
     //This is so WaitFor(uint64_t) wait works by simply alter the last value
-    auto semaphore = timeline.getTimeline().semaphore;
-    _pImp->waitSemaphores.insert(_pImp->waitSemaphores.end() - 1, semaphore);
-    _pImp->waitValues.insert(_pImp->waitValues.end() - 1, value);
+    _pImp->semaphoreWaits.insert(
+        _pImp->semaphoreWaits.end() - 1,
+        VkSemaphoreSubmitInfo{
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+            .semaphore = timeline.getTimeline().semaphore,
+            .value = value,
+            .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR
+        }
+    );
 
     return *this;
 }
@@ -558,48 +582,20 @@ Submission SequenceBuilder::Submit() {
     //update submit infos
     //since the vectors may change their memory location as they grow
     //we can only now fill in the pointers in the submission infos
-
-    //also duplicate waitStages to match size of semaphores
-    auto semaphoreCount = _pImp->waitValues.size();
-    std::vector<VkPipelineStageFlags> waitStages(semaphoreCount);
-
-    auto pWaitStage = waitStages.data();
-    auto pWaitValue = _pImp->waitValues.data();
-    auto pWaitSemaphore = _pImp->waitSemaphores.data();
-    auto pSignalValue = _pImp->signalValues.data();
-    auto pCmd = _pImp->commandBuffers.data();
-
-    auto pTimeline = _pImp->timelineInfos.data();
-    auto pSubmit = _pImp->submitInfos.data();
-
-    auto submitCount = _pImp->submitInfos.size();
-    for (auto i = 0u; i < submitCount; ++i, ++pTimeline, ++pSubmit) {
-        //edge case: empty submission can't have waitStage=0
-        //  -> use TOP_OF_PIPE
-        if (_pImp->waitStages[i] == 0)
-            _pImp->waitStages[i] = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        //duplicate wait stages
-        std::fill_n(pWaitStage, pSubmit->waitSemaphoreCount, _pImp->waitStages[i]);
-
-        //fix timeline info
-        pTimeline->pSignalSemaphoreValues = pSignalValue;
-        pTimeline->pWaitSemaphoreValues = pWaitValue;
-        pSignalValue += pTimeline->signalSemaphoreValueCount;
-        pWaitValue += pTimeline->waitSemaphoreValueCount;
-
-        //fix submit info
-        pSubmit->pNext = pTimeline;
-        pSubmit->pCommandBuffers = pCmd;
-        pSubmit->pWaitSemaphores = pWaitSemaphore;
-        pSubmit->pWaitDstStageMask = pWaitStage;
-        pCmd += pSubmit->commandBufferCount;
-        pWaitSemaphore += pSubmit->waitSemaphoreCount;
-        pWaitStage += pSubmit->waitSemaphoreCount;
+    //since we earlier stored the offsets, we only need to add the base address
+    for (auto& submit : _pImp->submitInfos) {
+        applyVecOffset(submit.pWaitSemaphoreInfos, _pImp->semaphoreWaits);
+        applyVecOffset(submit.pCommandBufferInfos, _pImp->cmdBufSubmitInfos);
+        applyVecOffset(submit.pSignalSemaphoreInfos, _pImp->semaphoreSignals);
     }
 
     //submit
-    vulkan::checkResult(_pImp->context.fnTable.vkQueueSubmit(
-        _pImp->context.queue, submitCount, _pImp->submitInfos.data(), nullptr));
+    vulkan::checkResult(_pImp->context.fnTable.vkQueueSubmit2(
+        _pImp->context.queue,
+        static_cast<uint32_t>(_pImp->submitInfos.size()),
+        _pImp->submitInfos.data(),
+        nullptr
+    ));
 
     //if there are no recorded command buffers we can already give the pool back
     if (_pImp->recordedBuffers.empty()) {
@@ -630,21 +626,20 @@ std::string SequenceBuilder::printWaitGraph() const {
         throw std::runtime_error("SequenceBuilder has already finished!");
 
     std::stringstream out;
-    auto n = _pImp->submitInfos.size();
-    auto pSub = _pImp->submitInfos.data();
-    auto pWait = _pImp->waitValues.data();
-    auto pWaitSem = _pImp->waitSemaphores.data();
-    auto pSig = _pImp->signalValues.data();
-    for (auto i = 0u; i < n; ++i) {
-        // print wait values
-        auto nWaits = _pImp->timelineInfos[i].waitSemaphoreValueCount;
-        for (auto ii = 0u; ii < nWaits; ++ii) {
-            out << *(pWaitSem++) << '(' << *(pWait++) << ") ";
+    for (auto& submit : _pImp->submitInfos) {
+        //print wait values
+        auto nWaits = submit.waitSemaphoreInfoCount;
+        auto pWait = submit.pWaitSemaphoreInfos;
+        applyVecOffset(pWait, _pImp->semaphoreWaits);
+        for (auto i = 0; i < nWaits; ++i, ++pWait) {
+            out << pWait->semaphore << '(' << pWait->value << ") ";
         }
-        // print #commands/subroutines
-        out << "-> (" << (pSub++)->commandBufferCount << ") -> ";
-        // print signal values
-        out << _pImp->semaphore << '(' << *(pSig++) << ")\n";
+        //print #commands/subroutines
+        out << "-> " << submit.commandBufferInfoCount << ") -> ";
+        //print signal values
+        auto pSign = submit.pSignalSemaphoreInfos;
+        applyVecOffset(pSign, _pImp->semaphoreSignals);
+        out << pSign->semaphore << '(' << pSign->value << ")\n";
     }
     return out.str();
 }
@@ -691,7 +686,7 @@ SequenceBuilder::~SequenceBuilder() {
 void execute(const ContextHandle& context, const Command& command) {
     //run a one time submit command
     vulkan::oneTimeSubmit(*context, [&command](VkCommandBuffer cmd) {
-        vulkan::Command wrapper{ cmd, 0 };
+        vulkan::Command wrapper{ cmd };
         command.record(wrapper);
         });
 }
@@ -719,7 +714,7 @@ void execute(const ContextHandle& context,
     const std::function<void(vulkan::Command& cmd)>& emitter)
 {
     vulkan::oneTimeSubmit(*context, [&emitter](VkCommandBuffer cmd){
-        vulkan::Command wrapper{ cmd, 0 };
+        vulkan::Command wrapper{ cmd };
         emitter(wrapper);
     });
 }

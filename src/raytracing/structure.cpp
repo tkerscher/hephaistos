@@ -275,15 +275,19 @@ GeometryStore::GeometryStore(
             buildInfo.data(),
             pRanges.data());
         //memory barrier to ensure queries are valid
-        VkMemoryBarrier barrier{
-            .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
-            .dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR
+        VkMemoryBarrier2 barrier{
+            .sType         = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+            .srcStageMask  = VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+            .srcAccessMask = VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+            .dstStageMask  = VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+            .dstAccessMask = VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR
         };
-        context->fnTable.vkCmdPipelineBarrier(cmd,
-            VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-            VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-            0, 1, &barrier, 0, nullptr, 0, nullptr);
+        VkDependencyInfo depInfo{
+            .sType              = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .memoryBarrierCount = 1,
+            .pMemoryBarriers    = &barrier
+        };
+        context->fnTable.vkCmdPipelineBarrier2(cmd, &depInfo);
         //query
         context->fnTable.vkCmdWriteAccelerationStructuresPropertiesKHR(cmd,
             nMeshes, accStructures.data(),
@@ -697,47 +701,53 @@ void BuildAccelerationStructureCommand::record(vulkan::Command& cmd) const {
     auto instanceBuffer = buildResources->instanceBuffer->buffer;
     auto scratchBuffer = buildResources->scratchBuffer->buffer;
 
-    //we're acting on the acceleration structure build stage
-    cmd.stage |= VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
-
     //ensure previous memory operation have finished
     if (!unsafe) {
         //acceleration structure barrier
         //TODO: Not sure if a buffer barrier on the underlying buffer would also work?
-        VkMemoryBarrier memoryBarrier{
-            .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR,
-            .dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR
+        VkMemoryBarrier2 memoryBarrier{
+            .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+            .srcStageMask  = context->computeStages | VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+            .srcAccessMask = VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR,
+            .dstStageMask  = VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+            .dstAccessMask = VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR |
+                             VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR
         };
-        auto bufferBarriers = std::to_array<VkBufferMemoryBarrier>({
+        auto bufferBarriers = std::to_array<VkBufferMemoryBarrier2>({
             //scratch buffer
             {
-                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-                .srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
-                .dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+                .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+                .srcStageMask        = context->computeStages | VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                .srcAccessMask       = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
+                .dstStageMask        = VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+                .dstAccessMask       = VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR |
+                                       VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .buffer = scratchBuffer,
-                .size = VK_WHOLE_SIZE
+                .buffer              = scratchBuffer,
+                .size                = VK_WHOLE_SIZE
             },
             //instance buffer
             {
-                .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-                .srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
-                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+                .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+                .srcStageMask        = context->computeStages | VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                .srcAccessMask       = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
+                .dstStageMask        = VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+                .dstAccessMask       = VK_ACCESS_2_SHADER_READ_BIT,
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .buffer = instanceBuffer,
-                .size = VK_WHOLE_SIZE
+                .buffer              = instanceBuffer,
+                .size                = VK_WHOLE_SIZE
             }
-            });
-        context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-            context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-            VK_DEPENDENCY_BY_REGION_BIT,
-            1, &memoryBarrier,
-            static_cast<uint32_t>(bufferBarriers.size()), bufferBarriers.data(),
-            0, nullptr);
+        });
+        VkDependencyInfo depInfo{
+            .sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .memoryBarrierCount       = 1,
+            .pMemoryBarriers          = &memoryBarrier,
+            .bufferMemoryBarrierCount = static_cast<uint32_t>(bufferBarriers.size()),
+            .pBufferMemoryBarriers    = bufferBarriers.data()
+        };
+        context->fnTable.vkCmdPipelineBarrier2(cmd.buffer, &depInfo);
     }
 
     //build acceleration structure
@@ -748,28 +758,34 @@ void BuildAccelerationStructureCommand::record(vulkan::Command& cmd) const {
     if (!unsafe) {
         //acceleration structure barrier
         //TODO: Not sure if a buffer barrier on the underlying buffer would also work?
-        VkMemoryBarrier memoryBarrier{
-            .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
-            .dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR
+        VkMemoryBarrier2 memoryBarrier{
+            .sType         = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+            .srcStageMask  = VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+            .srcAccessMask = VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR |
+                             VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+            .dstStageMask  = context->computeStages,
+            .dstAccessMask = VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR
         };
         //ensure we aren't changing instance buffer while building acceleration structure
-        VkBufferMemoryBarrier bufferBarrier{
-            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR,
-            .dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT,
+        VkBufferMemoryBarrier2 bufferBarrier{
+            .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+            .srcStageMask        = VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+            .srcAccessMask       = VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR,
+            .dstStageMask        = context->computeStages,
+            .dstAccessMask       = VK_ACCESS_2_MEMORY_WRITE_BIT,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .buffer = instanceBuffer,
-            .size = VK_WHOLE_SIZE
+            .buffer              = instanceBuffer,
+            .size                = VK_WHOLE_SIZE
         };
-        context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-            VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-            context->computeStages,
-            VK_DEPENDENCY_BY_REGION_BIT,
-            1, &memoryBarrier,
-            1, &bufferBarrier,
-            0, nullptr);
+        VkDependencyInfo depInfo{
+            .sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .memoryBarrierCount       = 1,
+            .pMemoryBarriers          = &memoryBarrier,
+            .bufferMemoryBarrierCount = 1,
+            .pBufferMemoryBarriers    = &bufferBarrier
+        };
+        context->fnTable.vkCmdPipelineBarrier2(cmd.buffer, &depInfo);
     }
 }
 

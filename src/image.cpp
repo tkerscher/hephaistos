@@ -118,29 +118,32 @@ Image::Image(ContextHandle context, ImageFormat format,
     //transition image from undefined to general
     auto& con = *getContext();
     oneTimeSubmit(con, [&image = image->image, &con](VkCommandBuffer cmdBuffer) {
-        VkImageMemoryBarrier barrier{
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout = VK_IMAGE_LAYOUT_GENERAL,
+        VkImageMemoryBarrier2 barrier{
+            .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+            .srcStageMask        = VK_PIPELINE_STAGE_2_NONE,
+            .srcAccessMask       = VK_ACCESS_2_NONE,
+            .dstStageMask        = VK_PIPELINE_STAGE_2_NONE,
+            .dstAccessMask       = VK_ACCESS_2_NONE,
+            .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
+            .newLayout           = VK_IMAGE_LAYOUT_GENERAL,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = image,
-            .subresourceRange = VkImageSubresourceRange{
+            .image               = image,
+            .subresourceRange    = VkImageSubresourceRange{
                 VK_IMAGE_ASPECT_COLOR_BIT,
                 0, 1, 0, 1
             }
         };
-        con.fnTable.vkCmdPipelineBarrier(cmdBuffer,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_DEPENDENCY_BY_REGION_BIT,
-            0, nullptr,
-            0, nullptr,
-            1, &barrier);
+        VkDependencyInfo depInfo{
+            .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+            .imageMemoryBarrierCount = 1,
+            .pImageMemoryBarriers    = &barrier
+        };
+        con.fnTable.vkCmdPipelineBarrier2(cmdBuffer, &depInfo);
     });
 
     parameter->info = VkDescriptorImageInfo{
-        .imageView = image->view,
+        .imageView   = image->view,
         .imageLayout = VK_IMAGE_LAYOUT_GENERAL
     };
 }
@@ -312,7 +315,7 @@ Image ImageBuffer::createImage(bool copy) const {
         UpdateImageCommand copyCommand(*this, result);
         vulkan::oneTimeSubmit(*getContext(), [&copyCommand](VkCommandBuffer cmd) {
             //package into vulkan::command
-            vulkan::Command command{ cmd, 0 };
+            vulkan::Command command{ cmd };
             copyCommand.record(command);
         });
     }
@@ -328,7 +331,7 @@ Texture ImageBuffer::createTexture(const Sampler& sampler, bool copy) const {
         UpdateTextureCommand copyCommand(*this, result);
         vulkan::oneTimeSubmit(*getContext(), [&copyCommand](VkCommandBuffer cmd) {
             //package into vulkan::command
-            vulkan::Command command{ cmd, 0 };
+            vulkan::Command command{ cmd };
             copyCommand.record(command);
         });
     }
@@ -415,28 +418,26 @@ void RetrieveImageCommand::record(vulkan::Command& cmd) const {
         throw std::logic_error(SIZE_MISMATCH_ERROR_STR);
     auto size = src.size_bytes();
 
-    //we're acting on the transfer stage
-    cmd.stage |= VK_PIPELINE_STAGE_TRANSFER_BIT;
-
     //ensure writing to image finished and prepare image as transfer src
-    VkImageMemoryBarrier barrier{
-        .sType            = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask    = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
-        .dstAccessMask    = VK_ACCESS_TRANSFER_READ_BIT,
-        .oldLayout        = VK_IMAGE_LAYOUT_GENERAL,
-        .newLayout        = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    VkImageMemoryBarrier2 barrier{
+        .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .srcStageMask        = context->computeStages | VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+        .srcAccessMask       = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
+        .dstStageMask        = VK_PIPELINE_STAGE_2_COPY_BIT,
+        .dstAccessMask       = VK_ACCESS_2_TRANSFER_READ_BIT,
+        .oldLayout           = VK_IMAGE_LAYOUT_GENERAL,
+        .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image            = src.getImage().image,
-        .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+        .image               = src.getImage().image,
+        .subresourceRange    = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
     };
-    context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-        context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_DEPENDENCY_BY_REGION_BIT,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier);
+    VkDependencyInfo depInfo{
+        .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = 1,
+        .pImageMemoryBarriers    = &barrier
+    };
+    context->fnTable.vkCmdPipelineBarrier2(cmd.buffer, &depInfo);
 
     //issue copy
     VkBufferImageCopy copy{
@@ -450,33 +451,33 @@ void RetrieveImageCommand::record(vulkan::Command& cmd) const {
         1, &copy);
 
     //ensure transfer finished and return image layout
-    barrier = VkImageMemoryBarrier{
-        .sType            = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask    = VK_ACCESS_TRANSFER_READ_BIT,
-        .dstAccessMask    = VK_ACCESS_MEMORY_WRITE_BIT, //TODO: Not entirely shure about that one
-        .oldLayout        = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        .newLayout        = VK_IMAGE_LAYOUT_GENERAL,
+    barrier = VkImageMemoryBarrier2{
+        .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .srcStageMask        = VK_PIPELINE_STAGE_2_COPY_BIT,
+        .srcAccessMask       = VK_ACCESS_2_TRANSFER_READ_BIT,
+        .dstStageMask        = VK_PIPELINE_STAGE_2_COPY_BIT,
+        .dstAccessMask       = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
+        .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        .newLayout           = VK_IMAGE_LAYOUT_GENERAL,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image            = src.getImage().image,
-        .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+        .image               = src.getImage().image,
+        .subresourceRange    = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
     };
-    VkBufferMemoryBarrier bufferBarrier{
-        .sType         = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+    VkBufferMemoryBarrier2 bufferBarrier{
+        .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+        .srcStageMask        = VK_PIPELINE_STAGE_2_COPY_BIT,
+        .srcAccessMask       = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        .dstStageMask        = VK_PIPELINE_STAGE_2_HOST_BIT,
+        .dstAccessMask       = VK_ACCESS_2_HOST_READ_BIT,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .buffer        = dst.getBuffer().buffer,
-        .size          = VK_WHOLE_SIZE
+        .buffer              = dst.getBuffer().buffer,
+        .size                = VK_WHOLE_SIZE
     };
-    context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_PIPELINE_STAGE_HOST_BIT,
-        VK_DEPENDENCY_BY_REGION_BIT,
-        0, nullptr,
-        1, &bufferBarrier,
-        1, &barrier);
+    depInfo.bufferMemoryBarrierCount = 1;
+    depInfo.pBufferMemoryBarriers = &bufferBarrier;
+    context->fnTable.vkCmdPipelineBarrier2(cmd.buffer, &depInfo);
 }
 
 RetrieveImageCommand::RetrieveImageCommand(const RetrieveImageCommand& other) = default;
@@ -505,28 +506,26 @@ void UpdateImageCommand::record(vulkan::Command& cmd) const {
         throw std::logic_error(SIZE_MISMATCH_ERROR_STR);
     auto size = src.size_bytes();
 
-    //we're acting on the transfer stage
-    cmd.stage |= VK_PIPELINE_STAGE_TRANSFER_BIT;
-
     //make ensure image is safe to write and prepare it for the transfer
-    VkImageMemoryBarrier barrier{
-        .sType            = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask    = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
-        .dstAccessMask    = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .oldLayout        = VK_IMAGE_LAYOUT_GENERAL,
-        .newLayout        = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    VkImageMemoryBarrier2 barrier{
+        .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .srcStageMask        = context->computeStages | VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+        .srcAccessMask       = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
+        .dstStageMask        = VK_PIPELINE_STAGE_2_COPY_BIT,
+        .dstAccessMask       = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        .oldLayout           = VK_IMAGE_LAYOUT_GENERAL,
+        .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image            = dst.getImage().image,
-        .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+        .image               = dst.getImage().image,
+        .subresourceRange    = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
     };
-    context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-        context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_DEPENDENCY_BY_REGION_BIT,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier);
+    VkDependencyInfo depInfo{
+        .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = 1,
+        .pImageMemoryBarriers    = &barrier
+    };
+    context->fnTable.vkCmdPipelineBarrier2(cmd.buffer, &depInfo);
 
     //issue copy
     VkBufferImageCopy copy{
@@ -540,24 +539,20 @@ void UpdateImageCommand::record(vulkan::Command& cmd) const {
         1, &copy);
 
     //make sure the image is ready and transfer to shader comp layout
-    barrier = VkImageMemoryBarrier{
-        .sType            = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask    = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .dstAccessMask    = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
-        .oldLayout        = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        .newLayout        = VK_IMAGE_LAYOUT_GENERAL,
+    barrier = VkImageMemoryBarrier2{
+        .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .srcStageMask        = VK_PIPELINE_STAGE_2_COPY_BIT,
+        .srcAccessMask       = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        .dstStageMask        = context->computeStages | VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+        .dstAccessMask       = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT,
+        .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .newLayout           = VK_IMAGE_LAYOUT_GENERAL,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image            = dst.getImage().image,
-        .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+        .image               = dst.getImage().image,
+        .subresourceRange    = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
     };
-    context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        context->computeStages | VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_DEPENDENCY_BY_REGION_BIT,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier);
+    context->fnTable.vkCmdPipelineBarrier2(cmd.buffer, &depInfo);
 }
 
 UpdateImageCommand::UpdateImageCommand(const UpdateImageCommand& other) = default;
@@ -586,28 +581,26 @@ void UpdateTextureCommand::record(vulkan::Command& cmd) const {
         throw std::logic_error(SIZE_MISMATCH_ERROR_STR);
     auto size = src.size_bytes();
 
-    //we're acting on the transfer stage
-    cmd.stage |= VK_PIPELINE_STAGE_TRANSFER_BIT;
-
     //make ensure image is safe to write and prepare it for the transfer
-    VkImageMemoryBarrier barrier{
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
-        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    VkImageMemoryBarrier2 barrier{
+        .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .srcStageMask        = context->computeStages,
+        .srcAccessMask       = VK_ACCESS_2_SHADER_READ_BIT,
+        .dstStageMask        = VK_PIPELINE_STAGE_2_COPY_BIT,
+        .dstAccessMask       = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
+        .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = dst.getImage().image,
-        .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+        .image               = dst.getImage().image,
+        .subresourceRange    = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
     };
-    context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-        context->computeStages,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_DEPENDENCY_BY_REGION_BIT,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier);
+    VkDependencyInfo depInfo{
+        .sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .imageMemoryBarrierCount = 1,
+        .pImageMemoryBarriers    = &barrier
+    };
+    context->fnTable.vkCmdPipelineBarrier2(cmd.buffer, &depInfo);
 
     //issue copy
     VkBufferImageCopy copy{
@@ -621,24 +614,20 @@ void UpdateTextureCommand::record(vulkan::Command& cmd) const {
         1, &copy);
 
     //make sure the image is ready and transfer to shader comp layout
-    barrier = VkImageMemoryBarrier{
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    barrier = VkImageMemoryBarrier2{
+        .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+        .srcStageMask        = VK_PIPELINE_STAGE_2_COPY_BIT,
+        .srcAccessMask       = VK_ACCESS_2_TRANSFER_WRITE_BIT,
+        .dstStageMask        = context->computeStages,
+        .dstAccessMask       = VK_ACCESS_2_SHADER_READ_BIT,
+        .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = dst.getImage().image,
-        .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+        .image               = dst.getImage().image,
+        .subresourceRange    = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
     };
-    context->fnTable.vkCmdPipelineBarrier(cmd.buffer,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        context->computeStages,
-        VK_DEPENDENCY_BY_REGION_BIT,
-        0, nullptr,
-        0, nullptr,
-        1, &barrier);
+    context->fnTable.vkCmdPipelineBarrier2(cmd.buffer, &depInfo);
 }
 
 UpdateTextureCommand::UpdateTextureCommand(const UpdateTextureCommand& other) = default;

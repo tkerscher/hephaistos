@@ -93,9 +93,6 @@ void DispatchCommand::record(vulkan::Command& cmd) const {
     auto& prog = program.get();
     auto& context = prog.context;
 
-    //we're working in the compute stage
-    cmd.stage |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-
     //bind pipeline
     context.fnTable.vkCmdBindPipeline(cmd.buffer,
         VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -151,11 +148,6 @@ void DispatchIndirectCommand::record(vulkan::Command& cmd) const {
     auto& prog = program.get();
     auto& context = prog.context;
 
-    //we're working in the compute stage
-    cmd.stage |=
-        VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT |
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-
     //bind pipeline
     context.fnTable.vkCmdBindPipeline(cmd.buffer,
         VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -181,22 +173,26 @@ void DispatchIndirectCommand::record(vulkan::Command& cmd) const {
     }
 
     //barrier to ensure indirect data is complete
-    VkBufferMemoryBarrier barrier{
-        .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_SHADER_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT,
+    VkBufferMemoryBarrier2 barrier{
+        .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
+        .srcStageMask        = VK_PIPELINE_STAGE_2_TRANSFER_BIT |
+                               VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+        .srcAccessMask       = VK_ACCESS_2_TRANSFER_WRITE_BIT |
+                               VK_ACCESS_2_SHADER_WRITE_BIT,
+        .dstStageMask        = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT,
+        .dstAccessMask       = VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .buffer = buffer,
-        .offset = offset,
-        .size = 12 // 3 * int
+        .buffer              = buffer,
+        .offset              = offset,
+        .size                = 12 // 3 * int
     };
-    context.fnTable.vkCmdPipelineBarrier(cmd.buffer,
-        VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0,
-        0, nullptr,
-        1, &barrier,
-        0, nullptr);
+    VkDependencyInfo depInfo{
+        .sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .bufferMemoryBarrierCount = 1,
+        .pBufferMemoryBarriers    = &barrier
+    };
+    context.fnTable.vkCmdPipelineBarrier2(cmd.buffer, &depInfo);
 
     //disptach indirect
     context.fnTable.vkCmdDispatchIndirect(cmd.buffer, buffer, offset);
@@ -322,27 +318,22 @@ Program::~Program() {
 
 /********************************* FLUSH MEMORY *******************************/
 
-namespace {
-
-const VkMemoryBarrier memoryBarrier {
-    .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
-    .srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT,
-    .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT
-};
-
-}
-
 void FlushMemoryCommand::record(vulkan::Command& cmd) const {
     auto compStages = context.get().computeStages;
 
-    cmd.stage |= compStages;
-    context.get().fnTable.vkCmdPipelineBarrier(cmd.buffer,
-        compStages,
-        compStages,
-        VK_DEPENDENCY_BY_REGION_BIT,
-        1, &memoryBarrier,
-        0, nullptr,
-        0, nullptr);
+    VkMemoryBarrier2 barrier{
+        .sType         = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
+        .srcStageMask  = compStages,
+        .srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
+        .dstStageMask  = compStages,
+        .dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT,
+    };
+    VkDependencyInfo depInfo{
+        .sType              = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .memoryBarrierCount = 1,
+        .pMemoryBarriers    = &barrier
+    };
+    context.get().fnTable.vkCmdPipelineBarrier2(cmd.buffer, &depInfo);
 }
 
 FlushMemoryCommand::FlushMemoryCommand(const FlushMemoryCommand&) = default;
