@@ -154,8 +154,8 @@ void registerTypedBuffer(nb::module_& m, const char* name) {
 template<DType DT>
 class TypedTensor : public hp::Tensor<std::byte> {
 public:
-    TypedTensor(size_t size, bool mapped)
-        : hp::Tensor<std::byte>(getCurrentContext(), size, mapped)
+    TypedTensor(size_t size, uint32_t alignment, bool mapped)
+        : hp::Tensor<std::byte>(getCurrentContext(), size, { alignment, mapped })
     {}
     ~TypedTensor() override = default;
 };
@@ -163,17 +163,17 @@ public:
 template<DType DT>
 void registerTypedTensor(nb::module_& m, const char* name) {
     nb::class_<TypedTensor<DT>, hp::Tensor<std::byte>>(m, name)
-        .def("__init__", [](TypedTensor<DT>* t, size_t size, bool mapped) {
+        .def("__init__", [](TypedTensor<DT>* t, size_t size, uint32_t alignment, bool mapped) {
                 size *= getItemSize(DT);
-                new (t) TypedTensor<DT>(size, mapped);
-            }, "_size"_a, nb::kw_only(), "mapped"_a = false)
-        .def("__init__", [](TypedTensor<DT>* t, nb::typed<nb::tuple, nb::int_> shape, bool mapped) {
+                new (t) TypedTensor<DT>(size, alignment, mapped);
+            }, "_size"_a, nb::kw_only(), "alignment"_a = 0, "mapped"_a = false)
+        .def("__init__", [](TypedTensor<DT>* t, nb::typed<nb::tuple, nb::int_> shape, uint32_t alignment, bool mapped) {
                 auto ndim = shape.size();
                 auto size = getItemSize(DT);
                 for (auto i = 0; i < ndim; ++i)
                     size *= nb::cast<uint64_t>(shape[i]);
-                new (t) TypedTensor<DT>(size, mapped);
-            }, "shape"_a, nb::kw_only(), "mapped"_a = false);
+                new (t) TypedTensor<DT>(size, alignment, mapped);
+            }, "shape"_a, nb::kw_only(), "alignment"_a = 0, "mapped"_a = false);
 }
 
 }
@@ -249,43 +249,52 @@ void registerBufferModule(nb::module_& m) {
     
     auto tensor = nb::class_<hp::Tensor<std::byte>, hp::Resource>(m, "Tensor",
             "Tensor allocating memory on the device.")
-        .def("__init__", [](hp::Tensor<std::byte>* t, size_t size, bool mapped) {
-                new (t) hp::Tensor<std::byte>(getCurrentContext(), size, mapped);
-            }, "size"_a, nb::kw_only(), "mapped"_a = false,
+        .def("__init__", [](hp::Tensor<std::byte>* t, size_t size, uint32_t alignment, bool mapped) {
+                new (t) hp::Tensor<std::byte>(getCurrentContext(), size, { alignment, mapped });
+            }, "size"_a, nb::kw_only(), "alignment"_a = 0, "mapped"_a = false,
             "Creates a new tensor of given size.\n\n"
             "Parameters\n"
             "----------\n"
             "size: int\n"
             "    Size of the tensor in bytes\n"
+            "alignment: int, default=0\n"
+            "    Alignment of the underlying memory allocation. Must be a power of two.\n"
+            "    Default value of zero means no alignment required."
             "mapped: bool, default=False\n"
             "    If True, tries to map the tensor to host address space.")
-        .def("__init__", [](hp::Tensor<std::byte>* t, size_t nbytes, uint64_t addr, bool mapped) {
+        .def("__init__", [](hp::Tensor<std::byte>* t, size_t nbytes, uint64_t addr, uint32_t alignment, bool mapped) {
                 new (t) hp::Tensor<std::byte>(
                     getCurrentContext(),
                     { reinterpret_cast<const std::byte*>(addr), nbytes },
-                    mapped
+                    { alignment, mapped }
                 );
-            }, "size"_a, nb::kw_only(), "addr"_a, "mapped"_a = false,
+            }, "size"_a, nb::kw_only(), "addr"_a, "alignment"_a = 0, "mapped"_a = false,
             "Creates a new tensor and fills it with the provided data"
             "\n\nParameters\n----------\n"
             "addr: int\n"
             "    Address of the data used to fill the tensor\n"
             "n: int\n"
             "    Number of bytes to copy from addr\n"
+            "alignment: int, default=0\n"
+            "    Alignment of the underlying memory allocation. Must be a power of two. "
+                "Default value of zero means no alignment required."
             "mapped: bool, default=False\n"
             "    If True, tries to map memory to host address space")
-        .def("__init__", [](hp::Tensor<std::byte>* t, const const_ndarray& array, bool mapped) {
+        .def("__init__", [](hp::Tensor<std::byte>* t, const const_ndarray& array, uint32_t alignment, bool mapped) {
                 new (t) hp::Tensor<std::byte>(
                     getCurrentContext(),
                     { reinterpret_cast<const std::byte*>(array.data()), array.nbytes() },
-                    mapped
+                    { alignment, mapped }
                 );
-            }, "array"_a, nb::kw_only(), "mapped"_a = false,
+            }, "array"_a, nb::kw_only(), "alignment"_a = 0, "mapped"_a = false,
             "Creates a new tensor and fills it with the provided data"
             "\n\nParameters\n----------\n"
             "array: NDArray\n"
             "    Numpy array containing the data used to fill the tensor. "
                 "Its type must match the tensor's.\n"
+            "alignment: int, default=0\n"
+            "    Alignment of the underlying memory allocation. Must be a power of two. "
+                "Default value of zero means no alignment required."
             "mapped: bool, default=False\n"
             "    If True, tries to map memory to host address space")
         .def_prop_ro("address", [](const hp::Tensor<std::byte>& t) { return t.address(); },

@@ -178,13 +178,14 @@ constexpr VmaAllocationCreateFlags tensor_mapped_flags =
 
 }
 
-Tensor<std::byte>::Tensor(ContextHandle context, uint64_t size, bool mapped)
+Tensor<std::byte>::Tensor(ContextHandle context, uint64_t size, const AllocationOptions& options)
     : Resource(std::move(context))
     , _size(size)
-    , buffer(vulkan::createBuffer(
-        getContext(), size,
+    , buffer(vulkan::createBufferAligned(
+        getContext(),
+        size, options.alignment,
         tensor_usage,
-        mapped ? tensor_mapped_flags : 0))
+        options.mapped ? tensor_mapped_flags : 0))
     , parameter(std::make_unique<Parameter>())
 {
     parameter->buffer = VkDescriptorBufferInfo{
@@ -194,8 +195,8 @@ Tensor<std::byte>::Tensor(ContextHandle context, uint64_t size, bool mapped)
     };
     parameter->address = vulkan::getBufferDeviceAddress(buffer);
 }
-Tensor<std::byte>::Tensor(const Buffer<std::byte>& source, bool mapped)
-    : Tensor<std::byte>(source.getContext(), source.size_bytes(), mapped)
+Tensor<std::byte>::Tensor(const Buffer<std::byte>& source, const AllocationOptions& options)
+    : Tensor<std::byte>(source.getContext(), source.size_bytes(), options)
 {
     //one time submit copy buffer to source
     UpdateTensorCommand command(source, *this);
@@ -204,8 +205,8 @@ Tensor<std::byte>::Tensor(const Buffer<std::byte>& source, bool mapped)
         command.record(wrapper);
     });
 }
-Tensor<std::byte>::Tensor(ContextHandle context, std::span<const std::byte> data, bool mapped)
-    : Tensor<std::byte>(Buffer<std::byte>(std::move(context), data), mapped)
+Tensor<std::byte>::Tensor(ContextHandle context, std::span<const std::byte> data, const AllocationOptions& options)
+    : Tensor<std::byte>(Buffer<std::byte>(std::move(context), data), options)
 {}
 Tensor<std::byte>::~Tensor() = default;
 

@@ -104,7 +104,7 @@ TEST_CASE("tensor know about their size", "[buffer]") {
 }
 
 TEST_CASE("tensors can be mapped", "[buffer]") {
-    Tensor<int> tensor(getContext(), 10, true);
+    Tensor<int> tensor(getContext(), 10, { .mapped = true });
     if (!tensor.isMapped()) {
         SKIP("device has no host visible, devive local memory");
     }
@@ -124,7 +124,7 @@ TEST_CASE("tensors can be mapped", "[buffer]") {
 TEST_CASE("mapped tensors can be copied to and from", "[buffer]") {
     std::array<int, 10> dst;
 
-    Tensor<int> tensor(getContext(), 10, true);
+    Tensor<int> tensor(getContext(), 10, { .mapped = true });
 
     //We dont know at what hardware we're running
     //and what decision the allocator will make

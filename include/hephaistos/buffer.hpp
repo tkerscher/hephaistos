@@ -123,6 +123,24 @@ template<>
 class Tensor<std::byte> : public Argument, public Resource {
 public:
     /**
+     * @brief Options to configure allocation
+     */
+    struct AllocationOptions {
+        /**
+         * @brief Alignment of allocations. Zero means no alignment required.
+         */
+        uint32_t alignment = 0;
+        /**
+         * @brief Whether allocation should be mapped to host memory space.
+         *
+         * @note Mapping may not supported by the device. Check for success via
+         *       isMapped().
+         */
+        bool mapped = false;
+    };
+
+public:
+    /**
      * @brief Returns device memory address
     */
     [[nodiscard]] uint64_t address() const noexcept;
@@ -210,33 +228,24 @@ public:
      * 
      * @param context Context onto which to create the Tensor
      * @param size Number of elements
-     * @param mapped If true, tries to map the allocated tensor to host memory space
-     * 
-     * @note Mapping may not supported by the device. Check for success via
-     *       isMapped().
+     * @param options Allocation options
     */
-    Tensor(ContextHandle context, uint64_t size, bool mapped = false);
+    Tensor(ContextHandle context, uint64_t size, const AllocationOptions& options = {});
     /**
      * @brief Allocates a new Tensor
      * 
      * @param source Source buffer to copy from
-     * @param mapped If true, tries to map the allocated tensor to host memory space
-     * 
-     * @note Mapping may not supported by the device. Check for success via
-     *       isMapped().
+     * @param options Allocation options
     */
-    explicit Tensor(const Buffer<std::byte>& source, bool mapped = false);
+    explicit Tensor(const Buffer<std::byte>& source, const AllocationOptions& options = {});
     /**
      * @brief Allocates a new Tensor
      * 
      * @param context Context onto which to create the Tensor
      * @param data Data the tensor will be initialized with
-     * @param mapped If true, tries to map the allocated tensor to host memory space
-     * 
-     * @note Mapping may not supported by the device. Check for success via
-     *       isMapped().
+     * @param options Allocation options
     */
-    Tensor(ContextHandle context, std::span<const std::byte> data, bool mapped = false);
+    Tensor(ContextHandle context, std::span<const std::byte> data, const AllocationOptions& options = {});
     ~Tensor() override;
 
 public: //internal
@@ -296,20 +305,21 @@ public:
         return *this;
     }
 
-    Tensor(ContextHandle context, size_t count, bool mapped = false)
-        : Tensor<std::byte>(std::move(context), count * sizeof(T), mapped)
+    Tensor(ContextHandle context, size_t count, const AllocationOptions& options = {})
+        : Tensor<std::byte>(std::move(context), count * sizeof(T), options)
     {}
-    explicit Tensor(const Buffer<std::byte>& buffer, bool mapped = false)
-        : Tensor<std::byte>(buffer, mapped)
+    explicit Tensor(const Buffer<std::byte>& buffer, const AllocationOptions& options = {})
+        : Tensor<std::byte>(buffer, options)
     {}
-    Tensor(ContextHandle context, std::span<const T> data, bool mapped = false)
-        : Tensor<std::byte>(std::move(context), std::as_bytes(data), mapped)
+    Tensor(ContextHandle context, std::span<const T> data, const AllocationOptions& options = {})
+        : Tensor<std::byte>(std::move(context), std::as_bytes(data), options)
     {}
-    Tensor(ContextHandle context, const T& data, bool mapped = false) requires (!std::is_integral_v<T>)
+    Tensor(ContextHandle context, const T& data, const AllocationOptions& options = {}) requires (!std::is_integral_v<T>)
         : Tensor<std::byte>(
             std::move(context),
             { reinterpret_cast<const std::byte*>(&data), sizeof(T) },
-            mapped)
+            options
+          )
     {}
     ~Tensor() override = default;
 };
