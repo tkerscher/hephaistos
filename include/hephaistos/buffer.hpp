@@ -116,29 +116,29 @@ template<class Container> Buffer(ContextHandle, const Container&)
 
 template<class T = std::byte> class Tensor;
 
+
+/**
+ * @brief Options to configure tensor allocations
+ */
+struct TensorAllocationOptions {
+    /**
+     * @brief Alignment of allocations. Zero means no alignment required.
+     */
+    uint32_t alignment = 0;
+    /**
+     * @brief Whether allocation should be mapped to host memory space.
+     *
+     * @note Mapping may not supported by the device. Check for success via
+     *       isMapped().
+     */
+    bool mapped = false;
+};
+
 /**
  * @brief Allocates memory on the device
 */
 template<>
 class Tensor<std::byte> : public Argument, public Resource {
-public:
-    /**
-     * @brief Options to configure allocation
-     */
-    struct AllocationOptions {
-        /**
-         * @brief Alignment of allocations. Zero means no alignment required.
-         */
-        uint32_t alignment = 0;
-        /**
-         * @brief Whether allocation should be mapped to host memory space.
-         *
-         * @note Mapping may not supported by the device. Check for success via
-         *       isMapped().
-         */
-        bool mapped = false;
-    };
-
 public:
     /**
      * @brief Returns device memory address
@@ -230,14 +230,14 @@ public:
      * @param size Number of elements
      * @param options Allocation options
     */
-    Tensor(ContextHandle context, uint64_t size, const AllocationOptions& options = {});
+    Tensor(ContextHandle context, uint64_t size, const TensorAllocationOptions& options = {});
     /**
      * @brief Allocates a new Tensor
      * 
      * @param source Source buffer to copy from
      * @param options Allocation options
     */
-    explicit Tensor(const Buffer<std::byte>& source, const AllocationOptions& options = {});
+    explicit Tensor(const Buffer<std::byte>& source, const TensorAllocationOptions& options = {});
     /**
      * @brief Allocates a new Tensor
      * 
@@ -245,7 +245,7 @@ public:
      * @param data Data the tensor will be initialized with
      * @param options Allocation options
     */
-    Tensor(ContextHandle context, std::span<const std::byte> data, const AllocationOptions& options = {});
+    Tensor(ContextHandle context, std::span<const std::byte> data, const TensorAllocationOptions& options = {});
     ~Tensor() override;
 
 public: //internal
@@ -305,16 +305,16 @@ public:
         return *this;
     }
 
-    Tensor(ContextHandle context, size_t count, const AllocationOptions& options = {})
+    Tensor(ContextHandle context, size_t count, const TensorAllocationOptions& options = {})
         : Tensor<std::byte>(std::move(context), count * sizeof(T), options)
     {}
-    explicit Tensor(const Buffer<std::byte>& buffer, const AllocationOptions& options = {})
+    explicit Tensor(const Buffer<std::byte>& buffer, const TensorAllocationOptions& options = {})
         : Tensor<std::byte>(buffer, options)
     {}
-    Tensor(ContextHandle context, std::span<const T> data, const AllocationOptions& options = {})
+    Tensor(ContextHandle context, std::span<const T> data, const TensorAllocationOptions& options = {})
         : Tensor<std::byte>(std::move(context), std::as_bytes(data), options)
     {}
-    Tensor(ContextHandle context, const T& data, const AllocationOptions& options = {}) requires (!std::is_integral_v<T>)
+    Tensor(ContextHandle context, const T& data, const TensorAllocationOptions& options = {}) requires (!std::is_integral_v<T>)
         : Tensor<std::byte>(
             std::move(context),
             { reinterpret_cast<const std::byte*>(&data), sizeof(T) },

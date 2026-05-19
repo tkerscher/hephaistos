@@ -178,7 +178,7 @@ constexpr VmaAllocationCreateFlags tensor_mapped_flags =
 
 }
 
-Tensor<std::byte>::Tensor(ContextHandle context, uint64_t size, const AllocationOptions& options)
+Tensor<std::byte>::Tensor(ContextHandle context, uint64_t size, const TensorAllocationOptions& options)
     : Resource(std::move(context))
     , _size(size)
     , buffer(vulkan::createBufferAligned(
@@ -195,7 +195,7 @@ Tensor<std::byte>::Tensor(ContextHandle context, uint64_t size, const Allocation
     };
     parameter->address = vulkan::getBufferDeviceAddress(buffer);
 }
-Tensor<std::byte>::Tensor(const Buffer<std::byte>& source, const AllocationOptions& options)
+Tensor<std::byte>::Tensor(const Buffer<std::byte>& source, const TensorAllocationOptions& options)
     : Tensor<std::byte>(source.getContext(), source.size_bytes(), options)
 {
     //one time submit copy buffer to source
@@ -205,7 +205,7 @@ Tensor<std::byte>::Tensor(const Buffer<std::byte>& source, const AllocationOptio
         command.record(wrapper);
     });
 }
-Tensor<std::byte>::Tensor(ContextHandle context, std::span<const std::byte> data, const AllocationOptions& options)
+Tensor<std::byte>::Tensor(ContextHandle context, std::span<const std::byte> data, const TensorAllocationOptions& options)
     : Tensor<std::byte>(Buffer<std::byte>(std::move(context), data), options)
 {}
 Tensor<std::byte>::~Tensor() = default;
