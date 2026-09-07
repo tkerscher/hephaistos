@@ -1,4 +1,5 @@
 #include <nanobind/nanobind.h>
+#include <nanobind/stl/pair.h>
 #include <nanobind/stl/string.h>
 
 #include <sstream>
@@ -24,7 +25,51 @@ void registerCommandModule(nb::module_& m) {
             "and may be amortized by reusing sequences via Subroutines.")
         .def_prop_ro("simultaneousUse",
             [](const hp::Subroutine& s) -> bool { return s.simultaneousUse(); },
-            "True, if the subroutine can be used simultaneous");
+            "True, if the subroutine can be used simultaneous")
+        .def("submit",
+            [](
+                const hp::Subroutine& s,
+                const hp::Timeline* timeline,
+                uint64_t signalValue,
+                nb::list waitOnList
+            ) -> hp::Submission {
+                std::vector<hp::TimePoint> waitOnVec;
+                waitOnVec.reserve(waitOnList.size());
+                using TimePoint = std::pair<const hp::Timeline*, uint64_t>;
+                TimePoint tp{};
+                auto i = 0u;
+                for (nb::handle h : waitOnList) {
+                    if (!nb::try_cast<TimePoint>(h, tp))
+                        nb::raise_type_error(
+                            "waitOn[%u] must be a tuple of (hephaistos.Timeline, int), but got %s",
+                            i, nb::repr(h).c_str()
+                        );
+                    waitOnVec.push_back({ *tp.first, tp.second });
+                    i++;
+                }
+
+                nb::gil_scoped_release release;
+
+                if (timeline) {
+                    return s.submit(*timeline, signalValue, waitOnVec);
+                }
+                else {
+                    return s.submit(waitOnVec);
+                }
+            },
+            "timeline"_a.none() = nb::none(), "signalValue"_a = 1,
+            nb::kw_only(),
+            "waitOn"_a = nb::list{},
+            nb::sig("def submit(self, timeline: Timeline | None = None, signalValue: int = 1, *, waitOn: list[tuple[Timeline, int]] = []) -> Submission"),
+            "Submits the subroutine to be run on the device\n\n"
+            "Parameters\n"
+            "----------\n"
+            "timeline: Timeline | None = None\n"
+            "   Optional timeline to signal once the submission finishes.\n"
+            "signalValue: int = 1\n"
+            "   Value to signal the timeline with\n"
+            "waitOn: list[tuple[Timeline, value]], default=[]\n"
+            "   Timelines and their respective values to wait for before running the subroutine");
     m.def("createSubroutine",
         [](nb::list list, bool simultaneous) -> hp::Subroutine {
             //try to minimize holding of GIL

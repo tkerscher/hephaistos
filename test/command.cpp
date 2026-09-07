@@ -154,6 +154,70 @@ TEST_CASE("sequences can handle subroutines", "[command]") {
     REQUIRE(!hasValidationErrorOccurred());
 }
 
+TEST_CASE("subroutines can be submitted directly", "[command]") {
+    Tensor<int> tensor(getContext(), 8);
+    Buffer<int> buffer(getContext(), 8);
+    Timeline delay1(getContext());
+    Timeline delay2(getContext());
+    auto delays = std::to_array<TimePoint>({
+        { delay1, 2 },
+        { delay2, 5 }
+    });
+
+    auto subroutine = createSubroutine(
+        getContext(),
+        clearTensor(tensor, { .data = 42 }),
+        retrieveTensor(tensor, buffer)
+    );
+    auto submission = subroutine.submit(delays);
+
+    REQUIRE(!submission.forgettable());
+    REQUIRE(!submission.hasFinished());
+    delay1.setValue(10);
+    REQUIRE(!submission.hasFinished());
+    delay2.setValue(10);
+    REQUIRE(submission.wait(100'000'000)); //wait up to 100ms
+    REQUIRE(submission.hasFinished());
+
+    auto data = std::to_array<int>({ 42, 42, 42, 42, 42, 42, 42, 42 });
+    REQUIRE(std::equal(data.begin(), data.end(), buffer.getMemory().data()));
+
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
+TEST_CASE("subroutines can be submitted using existing timelines", "[command]") {
+    Tensor<int> tensor(getContext(), 8);
+    Buffer<int> buffer(getContext(), 8);
+    Timeline signal(getContext());
+    Timeline delay1(getContext());
+    Timeline delay2(getContext());
+    auto delays = std::to_array<TimePoint>({
+        { delay1, 2 },
+        { delay2, 5 }
+        });
+
+    auto subroutine = createSubroutine(
+        getContext(),
+        clearTensor(tensor, { .data = 42 }),
+        retrieveTensor(tensor, buffer)
+    );
+    auto submission = subroutine.submit(signal, 4, delays);
+
+    REQUIRE(submission.forgettable());
+    REQUIRE(!submission.hasFinished());
+    delay1.setValue(10);
+    REQUIRE(!submission.hasFinished());
+    delay2.setValue(10);
+    REQUIRE(submission.wait(100'000'000)); //wait up to 100ms
+    REQUIRE(submission.hasFinished());
+    REQUIRE(signal.getValue() == 4);
+
+    auto data = std::to_array<int>({ 42, 42, 42, 42, 42, 42, 42, 42 });
+    REQUIRE(std::equal(data.begin(), data.end(), buffer.getMemory().data()));
+
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
 TEST_CASE("subroutines can be moved and destroyed", "[command]") {
     Tensor<int> tensor(getContext(), 8);
     Buffer<int> buffer(getContext(), 8);

@@ -14,6 +14,85 @@ namespace hephaistos {
 
 Command::~Command() = default;
 
+/******************************** SUBMISSION *********************************/
+
+struct SubmissionResources {
+    VkCommandPool pool;
+    std::vector<VkCommandBuffer> commands;
+    //Handle used to manage lifetime of implicit timeline
+    std::unique_ptr<Timeline> exclusiveTimeline = nullptr;
+};
+
+const Timeline& Submission::getTimeline() const { return timeline.get(); }
+uint64_t Submission::getFinalStep() const { return finalStep; }
+
+bool Submission::forgettable() const noexcept {
+    return !resources ||
+        (resources->commands.empty() && !resources->exclusiveTimeline);
+}
+
+bool Submission::hasFinished() const {
+    return timeline.get().getValue() >= finalStep;
+}
+
+void Submission::wait() const {
+    if (finalStep > 0)
+        timeline.get().waitValue(finalStep);
+}
+bool Submission::wait(uint64_t timeout) const {
+    return (finalStep == 0 || timeline.get().waitValue(finalStep, timeout));
+}
+
+Submission::Submission(Submission&& other) noexcept
+    : finalStep(other.finalStep)
+    , timeline(std::move(other.timeline))
+    , resources(std::move(other.resources))
+{
+    //make waits no-op to be safe
+    other.finalStep = 0;
+}
+Submission& Submission::operator=(Submission&& other) noexcept {
+    finalStep = other.finalStep;
+    timeline = std::move(other.timeline);
+    resources = std::move(other.resources);
+    //make waits no-op to be safe
+    other.finalStep = 0;
+
+    return *this;
+}
+
+Submission::Submission(const Timeline& timeline, uint64_t finalStep, std::unique_ptr<SubmissionResources> resources)
+    : finalStep(finalStep)
+    , timeline(std::cref(timeline))
+    , resources(std::move(resources))
+{
+}
+Submission::~Submission() {
+    //nothing to do if it's fire and forget
+    if (forgettable()) return;
+
+    //wait on submission to finish
+    wait();
+
+    //free command buffers if hold any
+    if (!resources->commands.empty()) {
+        auto& context = timeline.get().getContext();
+        //free command buffers
+        context->fnTable.vkFreeCommandBuffers(
+            context->device,
+            resources->pool,
+            static_cast<uint32_t>(resources->commands.size()),
+            resources->commands.data());
+        //reset pool
+        vulkan::checkResult(context->fnTable.vkResetCommandPool(
+            context->device,
+            resources->pool,
+            VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT));
+        //return to context
+        context->sequencePool.push(resources->pool);
+    }
+}
+
 /******************************** SUBROUTINE **********************************/
 
 namespace vulkan {
@@ -63,11 +142,76 @@ SubroutineHandle beginSubroutine(const ContextHandle& context, bool simultaneous
 
 }
 
+namespace {
+
+void submitSubroutine(
+    const vulkan::Subroutine& subroutine,
+    const Timeline& timeline,
+    uint64_t signalValue,
+    std::span<const TimePoint> waitOn
+) {
+    VkSemaphoreSubmitInfo signalInfo{
+        .sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+        .semaphore = timeline.getTimeline().semaphore,
+        .value     = signalValue,
+        .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR
+    };
+    std::vector<VkSemaphoreSubmitInfo> waitInfo(waitOn.size());
+    for (auto i = 0; i < waitOn.size(); ++i) {
+        waitInfo[i] = {
+            .sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+            .semaphore = waitOn[i].timeline.get().getTimeline().semaphore,
+            .value     = waitOn[i].value,
+            .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT_KHR
+        };
+    }
+
+    VkCommandBufferSubmitInfo cmdInfo{
+        .sType         = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+        .commandBuffer = subroutine.command.buffer
+    };
+
+    VkSubmitInfo2 info{
+        .sType                    = VK_STRUCTURE_TYPE_SUBMIT_INFO_2,
+        .waitSemaphoreInfoCount   = static_cast<uint32_t>(waitOn.size()),
+        .pWaitSemaphoreInfos      = waitOn.size() > 0 ? waitInfo.data() : nullptr,
+        .commandBufferInfoCount   = 1,
+        .pCommandBufferInfos      = &cmdInfo,
+        .signalSemaphoreInfoCount = 1,
+        .pSignalSemaphoreInfos    = &signalInfo
+    };
+    vulkan::checkResult(subroutine.context.fnTable.vkQueueSubmit2(
+        subroutine.context.queue, 1, &info, nullptr
+    ));
+}
+
+}
+
 bool Subroutine::simultaneousUse() const {
     return simultaneous_use;
 }
 const vulkan::Command& Subroutine::getCommandBuffer() const {
     return subroutine->command;
+}
+
+Submission Subroutine::submit(const Timeline& timeline, uint64_t signalValue, std::span<const TimePoint> waitOn) const {
+    submitSubroutine(*subroutine, timeline, signalValue, waitOn);  
+    return Submission{ timeline, signalValue, {} };
+}
+Submission Subroutine::submit(const Timeline& timeline, uint64_t signalValue) const {
+    return submit(timeline, signalValue, {});
+}
+Submission Subroutine::submit(std::span<const TimePoint> waitOn) const {
+    auto exclusiveTimeline = std::make_unique<Timeline>(getContext());
+    auto& timeline = *exclusiveTimeline;
+    submitSubroutine(*subroutine, timeline, 1, waitOn);
+    auto resource = std::unique_ptr<SubmissionResources>(
+        new SubmissionResources{ nullptr, {}, std::move(exclusiveTimeline) }
+    );
+    return Submission{ timeline, 1, std::move(resource) };
+}
+Submission Subroutine::submit() const {
+    return submit({});
 }
 
 void Subroutine::onDestroy() {
@@ -190,7 +334,7 @@ Timeline::Timeline(Timeline&& other) noexcept
     : Resource(std::move(other))
     , timeline(std::move(other.timeline))
 {}
-Timeline& Timeline::operator=(Timeline&& other) {
+Timeline& Timeline::operator=(Timeline&& other) noexcept {
     Resource::operator=(std::move(other));
     timeline = std::move(other.timeline);
     return *this;
@@ -216,80 +360,6 @@ Timeline::Timeline(ContextHandle context, uint64_t initialValue)
 }
 Timeline::~Timeline() {
     onDestroy();
-}
-
-/******************************** SUBMISSION *********************************/
-
-struct SubmissionResources {
-    VkCommandPool pool;
-    std::vector<VkCommandBuffer> commands;
-    //Handle used to manage lifetime of implicit timeline
-    std::unique_ptr<Timeline> exclusiveTimeline = nullptr;
-};
-
-const Timeline& Submission::getTimeline() const { return timeline.get(); }
-uint64_t Submission::getFinalStep() const { return finalStep; }
-
-bool Submission::forgettable() const noexcept {
-    return !resources || resources->commands.empty();
-}
-
-bool Submission::hasFinished() const {
-    return timeline.get().getValue() >= finalStep;
-}
-
-void Submission::wait() const {
-    if (finalStep > 0)
-        timeline.get().waitValue(finalStep);
-}
-bool Submission::wait(uint64_t timeout) const {
-    return (finalStep == 0 || timeline.get().waitValue(finalStep, timeout));
-}
-
-Submission::Submission(Submission&& other) noexcept
-    : finalStep(other.finalStep)
-    , timeline(std::move(other.timeline))
-    , resources(std::move(other.resources))
-{
-    //make waits no-op to be safe
-    other.finalStep = 0;
-}
-Submission& Submission::operator=(Submission&& other) noexcept {
-    finalStep = other.finalStep;
-    timeline = std::move(other.timeline);
-    resources = std::move(other.resources);
-    //make waits no-op to be safe
-    other.finalStep = 0;
-
-    return *this;
-}
-
-Submission::Submission(const Timeline& timeline, uint64_t finalStep, std::unique_ptr<SubmissionResources> resources)
-    : finalStep(finalStep)
-    , timeline(std::cref(timeline))
-    , resources(std::move(resources))
-{}
-Submission::~Submission() {
-    //reset pool if there is one
-    if (!forgettable()) {
-        //ensure we're save to reset pool by waiting submission to finish
-        wait();
-
-        auto& context = timeline.get().getContext();
-        //free command buffers
-        context->fnTable.vkFreeCommandBuffers(
-            context->device,
-            resources->pool,
-            static_cast<uint32_t>(resources->commands.size()),
-            resources->commands.data());
-        //reset pool
-        vulkan::checkResult(context->fnTable.vkResetCommandPool(
-            context->device,
-            resources->pool,
-            VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT));
-        //return to context
-        context->sequencePool.push(resources->pool);
-    }
 }
 
 /********************************* SEQUENCE **********************************/

@@ -33,129 +33,6 @@ public:
 };
 
 /**
- * @brief Reusable sequence of commands
- * 
- * Recording work onto command buffers have a non negligible CPU overhead.
- * Subroutines allow to reuse common sequences of commands to amortize this
- * overhead.
-*/
-class HEPHAISTOS_API Subroutine : public Resource {
-public:
-    /**
-     * @brief Wether this Subroutine can be submitted multiple times simultaneously
-    */
-    bool simultaneousUse() const;
-
-    Subroutine(const Subroutine&) = delete;
-    Subroutine& operator=(const Subroutine&) = delete;
-
-    Subroutine(Subroutine&& other) noexcept;
-    Subroutine& operator=(Subroutine&& other);
-
-    ~Subroutine() override;
-
-public: //internal
-    const vulkan::Command& getCommandBuffer() const;
-
-protected:
-    void onDestroy() override;
-
-private:
-    Subroutine(
-        ContextHandle context,
-        SubroutineHandle subroutine,
-        bool simultaneous_use);
-
-    friend class SubroutineBuilder;
-
-private:
-    SubroutineHandle subroutine;
-    bool simultaneous_use;
-};
-
-/**
- * @brief Builder for creating Subroutines from a sequence of Command
-*/
-class HEPHAISTOS_API SubroutineBuilder final {
-public:
-    /**
-     * @brief True, if the builder is still recording
-    */
-    explicit operator bool() const;
-
-    /**
-     * @brief Records the next command into the sequence
-    */
-    SubroutineBuilder& addCommand(const Command& command) &;
-    /**
-     * @brief Records the next command into the sequence
-    */
-    SubroutineBuilder addCommand(const Command& command) &&;
-    /**
-     * @brief Finishes recording and returns the built Subroutine
-    */
-    Subroutine finish();
-
-    SubroutineBuilder(const SubroutineBuilder& other) = delete;
-    SubroutineBuilder& operator=(const SubroutineBuilder& other) = delete;
-
-    SubroutineBuilder(SubroutineBuilder&& other) noexcept;
-    SubroutineBuilder& operator=(SubroutineBuilder&& other) noexcept;
-
-    /**
-     * @brief Creates a new SubroutineBuilder
-     * 
-     * @param context Conext onto which to create the builder
-     * @param simultaneous_use Wether the built Subroutine can be submitted
-     *                         multiple times simultaneously
-    */
-    explicit SubroutineBuilder(ContextHandle context, bool simultaneous_use = false);
-    ~SubroutineBuilder();
-
-private:
-    ContextHandle context;
-    SubroutineHandle subroutine;
-    bool simultaneous_use;
-};
-
-/**
- * @brief Tag to enable simultaneous use
-*/
-struct simultaneous_use_tag{};
-/**
- * @brief Tag to enable simultaneous use
-*/
-inline constexpr simultaneous_use_tag simultaneous_use{};
-
-/**
- * @brief Creates a new subroutine from the given sequence of commands
- * 
- * @param context Context onto which to create the Subroutine
- * @param commands... Sequence of Command to record
- * @return Subroutine consisting of the provided sequence of Command
-*/
-template<std::derived_from<Command> ...T>
-[[nodiscard]] Subroutine createSubroutine(ContextHandle context, T... commands) {
-    SubroutineBuilder builder(std::move(context));
-    (builder.addCommand(commands), ...);
-    return builder.finish();
-}
-/**
- * @brief Creates a new subroutine from the given sequence of commands and sets
- *        the simultaneous use flag
- * 
- * @param context Context onto which to create the Subroutine
- * @param commands... Sequence of Command to record
- * @return Subroutine consisting of the provided sequence of Command
-*/
-template<std::derived_from<Command> ...T>
-[[nodiscard]] Subroutine createSubroutine(ContextHandle context, simultaneous_use_tag, T... commands) {
-    SubroutineBuilder builder(std::move(context), true);
-    (builder.addCommand(commands), ...);
-    return builder.finish();
-}
-
-/**
  * @brief Synchronizes work between and across GPU and CPU
  * 
  * Timeline allows to synchronize work between GPU-GPU, CPU-CPU and GPU-CPU.
@@ -202,7 +79,7 @@ public:
     Timeline& operator=(const Timeline&) = delete;
 
     Timeline(Timeline&& other) noexcept;
-    Timeline& operator=(Timeline&& other);
+    Timeline& operator=(Timeline&& other) noexcept;
 
     /**
      * @brief Creates a new Timeline
@@ -221,6 +98,20 @@ protected:
 
 private:
     std::unique_ptr<vulkan::Timeline> timeline;
+};
+
+/**
+ * @brief Marks a single time point on a specified timeline
+*/
+struct TimePoint {
+    /**
+     * @brief Referenced timeline
+    */
+    std::reference_wrapper<const Timeline> timeline;
+    /**
+     * Value marking a single time point
+    */
+    uint64_t value;
 };
 
 /**
@@ -280,6 +171,161 @@ private:
     std::reference_wrapper<const Timeline> timeline;
     std::unique_ptr<SubmissionResources> resources;
 };
+
+/**
+ * @brief Reusable sequence of commands
+ *
+ * Recording work onto command buffers have a non negligible CPU overhead.
+ * Subroutines allow to reuse common sequences of commands to amortize this
+ * overhead.
+*/
+class HEPHAISTOS_API Subroutine : public Resource {
+public:
+    /**
+     * @brief Wether this Subroutine can be submitted multiple times simultaneously
+    */
+    bool simultaneousUse() const;
+
+    /**
+     * @brief Submits this subroutine to be run on the device
+     * 
+     * @param timeline Timeline to be used to signal finished submission
+     * @param signalValue Value to update the timeline with once submission finished
+     * @param waitOn Optional list of time points to wait before running subroutine
+    */
+    Submission submit(const Timeline& timeline, uint64_t signalValue, std::span<const TimePoint> waitOn) const;
+    /**
+     * @brief Submits this subroutine to be run on the device
+     * 
+     * @param timeline Timeline to be used to signal finished submission
+     * @param signalValue Value to update the timeline with once submission finished
+    */
+    Submission submit(const Timeline& timeline, uint64_t signalValue) const;
+    /**
+     * @brief Submits this subroutine to be run on the device
+     * 
+     * @param waitOn Optional list of time points to wait before running subroutine
+     * 
+     * @note If the returned Submission is not stored, execution blocks until the
+     *       subroutine finishes including any waiting operation
+    */
+    Submission submit(std::span<const TimePoint> waitOn) const;
+    /**
+     * @brief Submits this subroutine to be run on the device
+     *
+     * @note If the returned Submission is not stored, execution blocks until the
+     *       subroutine finishes including any waiting operation
+    */
+    Submission submit() const;
+
+    Subroutine(const Subroutine&) = delete;
+    Subroutine& operator=(const Subroutine&) = delete;
+
+    Subroutine(Subroutine&& other) noexcept;
+    Subroutine& operator=(Subroutine&& other);
+
+    ~Subroutine() override;
+
+public: //internal
+    const vulkan::Command& getCommandBuffer() const;
+
+protected:
+    void onDestroy() override;
+
+private:
+    Subroutine(
+        ContextHandle context,
+        SubroutineHandle subroutine,
+        bool simultaneous_use);
+
+    friend class SubroutineBuilder;
+
+private:
+    SubroutineHandle subroutine;
+    bool simultaneous_use;
+};
+
+/**
+ * @brief Builder for creating Subroutines from a sequence of Command
+*/
+class HEPHAISTOS_API SubroutineBuilder final {
+public:
+    /**
+     * @brief True, if the builder is still recording
+    */
+    explicit operator bool() const;
+
+    /**
+     * @brief Records the next command into the sequence
+    */
+    SubroutineBuilder& addCommand(const Command& command)&;
+    /**
+     * @brief Records the next command into the sequence
+    */
+    SubroutineBuilder addCommand(const Command& command)&&;
+    /**
+     * @brief Finishes recording and returns the built Subroutine
+    */
+    Subroutine finish();
+
+    SubroutineBuilder(const SubroutineBuilder& other) = delete;
+    SubroutineBuilder& operator=(const SubroutineBuilder& other) = delete;
+
+    SubroutineBuilder(SubroutineBuilder&& other) noexcept;
+    SubroutineBuilder& operator=(SubroutineBuilder&& other) noexcept;
+
+    /**
+     * @brief Creates a new SubroutineBuilder
+     *
+     * @param context Conext onto which to create the builder
+     * @param simultaneous_use Wether the built Subroutine can be submitted
+     *                         multiple times simultaneously
+    */
+    explicit SubroutineBuilder(ContextHandle context, bool simultaneous_use = false);
+    ~SubroutineBuilder();
+
+private:
+    ContextHandle context;
+    SubroutineHandle subroutine;
+    bool simultaneous_use;
+};
+
+/**
+ * @brief Tag to enable simultaneous use
+*/
+struct simultaneous_use_tag {};
+/**
+ * @brief Tag to enable simultaneous use
+*/
+inline constexpr simultaneous_use_tag simultaneous_use{};
+
+/**
+ * @brief Creates a new subroutine from the given sequence of commands
+ *
+ * @param context Context onto which to create the Subroutine
+ * @param commands... Sequence of Command to record
+ * @return Subroutine consisting of the provided sequence of Command
+*/
+template<std::derived_from<Command> ...T>
+[[nodiscard]] Subroutine createSubroutine(ContextHandle context, T... commands) {
+    SubroutineBuilder builder(std::move(context));
+    (builder.addCommand(commands), ...);
+    return builder.finish();
+}
+/**
+ * @brief Creates a new subroutine from the given sequence of commands and sets
+ *        the simultaneous use flag
+ *
+ * @param context Context onto which to create the Subroutine
+ * @param commands... Sequence of Command to record
+ * @return Subroutine consisting of the provided sequence of Command
+*/
+template<std::derived_from<Command> ...T>
+[[nodiscard]] Subroutine createSubroutine(ContextHandle context, simultaneous_use_tag, T... commands) {
+    SubroutineBuilder builder(std::move(context), true);
+    (builder.addCommand(commands), ...);
+    return builder.finish();
+}
 
 /**
  * @brief Builder for creating work to be submitted to the device
