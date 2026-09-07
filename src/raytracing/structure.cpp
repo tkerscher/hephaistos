@@ -32,6 +32,10 @@ size_t GeometryStore::size() const noexcept {
     return pImp->geometries.size();
 }
 
+uint64_t GeometryStore::size_bytes() const noexcept {
+    return pImp->blasBuffer->allocInfo.size;
+}
+
 GeometryInstance GeometryStore::createInstance(
     size_t idx,
     const TransformMatrix& transform,
@@ -374,6 +378,8 @@ GeometryStore::GeometryStore(
         };
         blasResult[i].blas_address = context->fnTable.vkGetAccelerationStructureDeviceAddressKHR(
             context->device, &addressInfo);
+        //store compacted size
+        blasResult[i].size_bytes = compactSizes[i];
     }
     //save results
     pImp->blas = std::move(compactAccStructures);
@@ -606,6 +612,10 @@ uint32_t AccelerationStructure::capacity() const noexcept {
 }
 uint32_t AccelerationStructure::size() const noexcept {
     return param->instanceCount;
+}
+
+uint64_t AccelerationStructure::size_bytes() const noexcept {
+    return param->tlasBuffer->allocInfo.size;
 }
 
 uint64_t AccelerationStructure::instanceBufferAddress() const {

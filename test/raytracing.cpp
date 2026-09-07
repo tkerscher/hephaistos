@@ -168,6 +168,73 @@ TEST_CASE("can query ray tracing support and properties", "[raytracing]") {
     REQUIRE(!hasValidationErrorOccurred());
 }
 
+TEST_CASE("geometry store and acceleration structures report their size", "[raytracing]") {
+    //Check if we have the necessary hardware for this check
+    if (!isRayTracingSupported(RAY_TRACING_SUPPORT))
+        SKIP("No ray tracing hardware for testing available.");
+
+    //build geometries
+    GeometryStore store(getContext(), std::to_array<Mesh>({
+        { //triangle
+            .vertices = std::as_bytes(std::span<const float>(triangle_vertices))
+        },
+        { //square
+            .vertices = std::as_bytes(std::span<const float>(square_vertices)),
+            .indices = square_indices
+        }
+        }));
+    auto& triangle = store[0];
+    auto& square = store[1];
+    //check their sizes
+    REQUIRE(triangle.size_bytes > 0);
+    REQUIRE(square.size_bytes > 0);
+    auto geom_sum_size = triangle.size_bytes + square.size_bytes;
+    REQUIRE(store.size_bytes() >= geom_sum_size); //may include padding
+
+    //create acceleration structure
+    GeometryInstance topInstance{
+        .blas_address = triangle.blas_address,
+        .transform = TopTransform,
+        .customIndex = customIdx[0]
+    };
+    GeometryInstance bottomInstance{
+        .blas_address = square.blas_address,
+        .transform = BottomTransform,
+        .customIndex = customIdx[1]
+    };
+    GeometryInstance leftInstance{
+        .blas_address = triangle.blas_address,
+        .transform = LeftTransform,
+        .customIndex = customIdx[2]
+    };
+    GeometryInstance rightInstance{
+        .blas_address = square.blas_address,
+        .transform = RightTransform,
+        .customIndex = customIdx[3]
+    };
+    GeometryInstance backInstance{
+        .blas_address = triangle.blas_address,
+        .transform = BackTransform,
+        .customIndex = customIdx[4]
+    };
+    GeometryInstance frontInstance{
+        .blas_address = square.blas_address,
+        .transform = FrontTransform,
+        .customIndex = customIdx[5]
+    };
+    auto instances = std::to_array<GeometryInstance>({
+        topInstance, bottomInstance,
+        leftInstance, rightInstance,
+        backInstance, frontInstance
+        });
+    AccelerationStructure tlas(getContext(), instances);
+    //check AS size
+    REQUIRE(tlas.size_bytes() > 0);
+
+    //check validation errors
+    REQUIRE(!hasValidationErrorOccurred());
+}
+
 TEST_CASE("ray queries are available in shaders", "[raytracing]") {
     //Check if we have the necessary hardware for this check
     if (!isRayTracingSupported(RAY_TRACING_SUPPORT))

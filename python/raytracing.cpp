@@ -238,7 +238,9 @@ void registerRayTracingStructure(nb::module_& m) {
         .def_rw("vertices_address", &hp::Geometry::vertices_address,
             "device address of the vertex buffer or zero if it was discarded")
         .def_rw("indices_address", &hp::Geometry::indices_address,
-            "device address of the index buffer, or zero if it was discarded or is non existent");
+            "device address of the index buffer, or zero if it was discarded or is non existent")
+        .def_rw("size_bytes", &hp::Geometry::size_bytes,
+            "amount of bytes the geometry takes on the device");
     
     nb::class_<hp::GeometryInstance>(m, "GeometryInstance",
             "Building blocks of Acceleration Structures containing a reference "
@@ -298,6 +300,10 @@ void registerRayTracingStructure(nb::module_& m) {
         .def_prop_ro("size",
             [](const hp::GeometryStore& gs) -> size_t { return gs.size(); },
             "Number of geometries stored")
+        .def_prop_ro("size_bytes",
+            [](const hp::GeometryStore& gs) -> uint64_t { return gs.size_bytes(); },
+            "Amount of bytes the store takes on the device. May be larger then the "
+            "sum of its geometries as it can include padding between them.")
         .def("createInstance",
             [](const hp::GeometryStore& gs, size_t idx) -> hp::GeometryInstance {
                 nb::gil_scoped_release release;
@@ -337,6 +343,8 @@ void registerRayTracingStructure(nb::module_& m) {
             "Number of instances that can fit in the acceleration structure")
         .def_prop_ro("size", &hp::AccelerationStructure::size,  
             "Current amount of instances in the acceleration structure")
+        .def_prop_ro("size_bytes", &hp::AccelerationStructure::size_bytes,
+            "Amount of bytes the acceleration structure takes on the device")
         .def_prop_ro("instanceBufferAddress", &hp::AccelerationStructure::instanceBufferAddress,
             "Device buffer address of where the contiguous array of VkAccelerationStructureInstanceKHR "
             "elements used to build the acceleration structure is stored. Will raise an exception if "

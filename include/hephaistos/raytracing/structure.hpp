@@ -85,6 +85,11 @@ struct Geometry {
      * @brief Device memory address containing the index data
     */
     uint64_t indices_address  = 0;
+
+    /**
+     * @brief Amount of bytes the processed geometry takes on the device
+    */
+    uint64_t size_bytes = 0;
 };
 
 /**
@@ -146,6 +151,14 @@ public:
      * @brief Returns the amount of Geometry in this store
     */
     [[nodiscard]] size_t size() const noexcept;
+
+    /**
+     * @brief Returns the amount of bytes the store takes on the device.
+     * 
+     * @note The store may take up more memory then the sum of its geometries
+     *       as it can include padding between them.
+    */
+    [[nodiscard]] uint64_t size_bytes() const noexcept;
 
     /**
      * @brief Creates a GeometryInstance referencing the i-th Geometry
@@ -243,6 +256,13 @@ public:
      * @brief Returns the current amount of instances in the acceleration structure
      */
     [[nodiscard]] uint32_t size() const noexcept;
+
+    /**
+     * @brief Returns the amount of bytes the acceleration structure takes on the device
+     * 
+     * @note This does not include the memory taken by the referenced geometries
+    */
+    [[nodiscard]] uint64_t size_bytes() const noexcept;
 
     /**
      * @brief Device address containing the instance data
