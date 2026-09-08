@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from ctypes import Structure, addressof, memmove, sizeof, c_uint8
 from itertools import chain
-from queue import Empty, Queue
+from queue import Empty, Full, Queue
 from threading import Event, Lock, Thread
 import warnings
 
@@ -668,8 +668,6 @@ class PipelineScheduler:
         self._totalTasks = 0
         self._pipeline = pipeline
         self._pipelineTimeline = Timeline()
-        # create queue worker
-        self._updateTimeline = Timeline()
         self._updateWorker = _CounterWorkerThread(self._update)
         self._updateQueue = Queue(queueSize)
         # create process worker if needed
@@ -738,7 +736,6 @@ class PipelineScheduler:
         if self._processWorker is not None:
             self._processWorker.stop()
         # while we are at it, destroy timeline as well
-        self._updateTimeline.destroy()
         self._pipelineTimeline.destroy()
         if self._processTimeline is not None:
             self._processTimeline.destroy()
@@ -749,7 +746,7 @@ class PipelineScheduler:
         tasks: Iterable[Task],
         *,
         timeout: Optional[float] = None,
-    ) -> Tuple[int, Union[Submission, None]]:
+    ) -> int:
         """
         Schedules the given list of tasks to be processed by the pipeline after
         previous tasks submissions have finished.
@@ -764,25 +761,20 @@ class PipelineScheduler:
             onto.
         timeout: float | None, default=None
             Timeout in seconds for waiting on free space in the queue.
+            Resets after each successfully submitted task.
             If None, waits indefinitely.
 
         Returns
         -------
         nSubmitted: int
             Number of tasks actually submitted.
-        submission: Submission | None
-            The submission created for submitting work to the GPU. Can be used
-            to wait on the tasks to finish or query the final task index via
-            `submission.finalStep`.
-            None if nSubmitted == 0.
         """
         # check if not destroyed
         if self.destroyed:
             raise RuntimeError("Can not schedule work on destroyed scheduler!")
 
-        # put task onto queue
+        # put tasks onto queue
         n = 0
-        builder = None
         for task in tasks:
             # unpack task
             pipeName, params, args = _unpackTask(task)
@@ -802,57 +794,26 @@ class PipelineScheduler:
                     continue
                 pipeline = self.pipeline[pipeName]
 
-            # do not try to enlist more tasks then what fits in the queue
-            if self.queueSize > 0 and n > self.queueSize:
-                break
             # try to enlist in queue
             try:
                 self._updateQueue.put((pipeline, params), timeout=timeout)
-            except:
+            except Full:
                 break
             # args queue is always infinite so there should be no problem here
             if self._userArgsQueue is not None:
                 self._userArgsQueue.put(args)
 
-            # lazy create builder
-            if builder is None:
-                builder = beginSequence(self._pipelineTimeline, self._totalTasks)
-
-            # issue wait on previous task
-            builder.WaitFor(self._pipelineTimeline, self._totalTasks)
-            # issue wait on update thread
-            builder.WaitFor(self._updateTimeline, self._totalTasks + 1)
-            # issue wait on process thread is present
-            if self._processTimeline is not None and self._totalTasks >= 2:
-                # double buffered -> wait for the processing of tasks scheduled
-                # two earlier to finish to make sure we don't overwrite the
-                # result it tries to process
-                builder.WaitFor(self._processTimeline, self._totalTasks - 1)
-            # run task
-            i = self._totalTasks % 2
-            builder.And(pipeline.getSubroutine(i))
+            # update worker threads eagerly to support infinite (very long) iterables
+            self._updateWorker.run(1)
+            if self._processWorker is not None:
+                self._processWorker.run(1)
 
             # update counters
             n += 1
             self._totalTasks += 1
 
-        # enqueued anything?
-        if n == 0:
-            return (0, None)
-
-        # submit work
-        assert builder is not None
-        submission = builder.Submit()
-        # just to ensure we're not breaking stuff in the future
-        assert submission.forgettable
-
-        # update worker threads
-        self._updateWorker.run(n)
-        if self._processWorker is not None:
-            self._processWorker.run(n)
-
-        # return result
-        return (n, submission)
+        # return amount of new submitted tasks
+        return n
 
     def wait(self, task: Optional[int] = None) -> None:
         """
@@ -918,8 +879,13 @@ class PipelineScheduler:
             pipeline.update(n % 2)
         except Exception as ex:
             warnings.warn(f"Exception raised while preparing task {n}:\n{ex}")
-        # advance timeline
-        self._updateTimeline.value = n + 1
+        # submit subroutine
+        waitOn = [(self._pipelineTimeline, n)]
+        if self._processTimeline is not None and n >= 2:
+            waitOn.append((self._processTimeline, n - 1))
+        routine = pipeline.getSubroutine(n % 2)
+        submission = routine.submit(self._pipelineTimeline, n + 1, waitOn=waitOn)
+        assert submission.forgettable  # to ensure we didn't screw anything up
 
     def _process(self, n: int) -> None:
         """Internal process thread body"""
@@ -1121,7 +1087,7 @@ class DynamicTaskScheduler:
         # both the user thread and the process thread may schedule more batches
         # -> need to synchronize access to the underlying scheduler
         with self._schedulerLock:
-            n, _ = self._scheduler.schedule(batches)
+            n = self._scheduler.schedule(batches)
         # we assume that all batches have been scheduled
         assert n == nBatches
 

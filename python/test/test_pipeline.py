@@ -72,7 +72,7 @@ class PipelineTestStage(pl.PipelineStage):
         self._program.bindParams(Output=self.tensor)
 
     def run(self, i: int) -> List:
-        self._bindParams(self._program, i)
+        self.bindParams(self._program, i)
         return [self._program.dispatch(256 // 32)]
 
 
