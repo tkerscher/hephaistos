@@ -1,6 +1,5 @@
 //
-// Copyright (C) 2014 LunarG, Inc.
-// Copyright (C) 2015-2018 Google, Inc.
+// Copyright 2026 Google LLC
 //
 // All rights reserved.
 //
@@ -32,39 +31,33 @@
 // LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
 // ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
+//
 
-#pragma once
+#ifndef GLSLANG_INCLUDE_DEFER_H
+#define GLSLANG_INCLUDE_DEFER_H
 
-#include <string>
-#include <vector>
-
-#include "Logger.h"
-#include "glslang/Include/visibility.h"
+#include <utility>
 
 namespace glslang {
-class TIntermediate;
 
-struct SpvOptions {
-    bool generateDebugInfo {false};
-    bool stripDebugInfo {false};
-    bool disableOptimizer {true};
-    bool optimizeSize {false};
-    bool optimizePerformance {false};
-    bool disassemble {false};
-    bool validate {false};
-    bool emitNonSemanticShaderDebugInfo {false};
-    bool emitNonSemanticShaderDebugSource{ false };
-    bool compileOnly{false};
-    bool optimizerAllowExpandedIDBound{false};
+// An object that, when destroyed, executes a given function.
+// Use this to perform work along all exit paths from a function.
+template <typename F>
+class Defer {
+ public:
+  explicit Defer(F&& f) : f_(std::move(f)) { }
+  Defer(Defer&&) = default;
+  ~Defer() { f_(); } // Run the given function.
+ private:
+  Defer(const Defer&) = delete;
+  Defer& operator=(const Defer&) = delete;
+  F f_;
 };
 
-GLSLANG_EXPORT void GetSpirvVersion(std::string&);
-GLSLANG_EXPORT int GetSpirvGeneratorVersion();
-GLSLANG_EXPORT void GlslangToSpv(const glslang::TIntermediate& intermediate, std::vector<unsigned int>& spirv,
-                                 SpvOptions* options = nullptr);
-GLSLANG_EXPORT void GlslangToSpv(const glslang::TIntermediate& intermediate, std::vector<unsigned int>& spirv,
-                                 spv::SpvBuildLogger* logger, SpvOptions* options = nullptr);
-GLSLANG_EXPORT bool OutputSpvBin(const std::vector<unsigned int>& spirv, const char* baseName);
-GLSLANG_EXPORT bool OutputSpvHex(const std::vector<unsigned int>& spirv, const char* baseName, const char* varName);
+// Template argument deduction guide for Defer.
+template <typename T>
+Defer(T) -> Defer<T>;
 
-}
+} // namespace glslang
+
+#endif

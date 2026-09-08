@@ -219,6 +219,7 @@ static int c_shader_messages(glslang_messages_t messages)
     CONVERT_MSG(GLSLANG_MSG_ENHANCED, EShMsgEnhanced);
     CONVERT_MSG(GLSLANG_MSG_ABSOLUTE_PATH, EShMsgAbsolutePath);
     CONVERT_MSG(GLSLANG_MSG_DISPLAY_ERROR_COLUMN, EShMsgDisplayErrorColumn);
+    CONVERT_MSG(GLSLANG_MSG_RELAX_SET_BINDING_LIMITS_BIT, EShMsgRelaxSetBindingLimits);
     return res;
 #undef CONVERT_MSG
 }
@@ -383,6 +384,10 @@ GLSLANG_EXPORT void glslang_shader_set_options(glslang_shader_t* shader, int opt
 
     if (options & GLSLANG_SHADER_VULKAN_RULES_RELAXED) {
         shader->shader->setEnvInputVulkanRulesRelaxed();
+    }
+
+    if (options & GLSLANG_SHADER_BINDINGS_PER_RESOURCE_TYPE) {
+        shader->shader->setBindingsPerResourceType();
     }
 }
 
