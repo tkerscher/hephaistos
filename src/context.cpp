@@ -507,8 +507,9 @@ ContextHandle createContext(
             .vkBindBufferMemory2KHR                  = context->fnTable.vkBindBufferMemory2,
             .vkBindImageMemory2KHR                   = context->fnTable.vkBindImageMemory2,
             .vkGetPhysicalDeviceMemoryProperties2KHR = vkGetPhysicalDeviceMemoryProperties2,
-            .vkGetDeviceBufferMemoryRequirements     = context->fnTable.vkGetDeviceBufferMemoryRequirementsKHR,
-            .vkGetDeviceImageMemoryRequirements      = context->fnTable.vkGetDeviceImageMemoryRequirementsKHR
+            .vkGetDeviceBufferMemoryRequirements     = context->fnTable.vkGetDeviceBufferMemoryRequirements,
+            .vkGetDeviceImageMemoryRequirements      = context->fnTable.vkGetDeviceImageMemoryRequirements,
+            .vkGetPhysicalDeviceProperties2KHR       = vkGetPhysicalDeviceProperties2
         };
 
         VmaAllocatorCreateInfo info{
