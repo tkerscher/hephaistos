@@ -53,6 +53,18 @@ void resetContext() {
     //handles.clear();
 }
 
+//called at exit of interpreter to safely release all vulkan resources
+//without this, releases would be handled by the smart pointer's destructor
+//at which point the vulkan function table might already point to unloaded memory
+void cleanUpContext() {
+    hp::destroyAllResources(currentContext);
+    extension_names.clear();
+    extensions.clear();
+    currentContext.reset();
+    handles.clear();
+    selectedDeviceId = MaxId;   //unecessary, but it's always good to leave as found
+}
+
 void selectDevice(uint32_t id, bool force) {
     //check if we have to recreate context
     if (currentContext) {
@@ -152,6 +164,11 @@ void addExtension(hp::ExtensionHandle extension, bool force) {
 }
 
 void registerContextModule(nb::module_& m) {
+    //Register clean up via C API so it cannot be observed from within the
+    //python interpreter
+    if (Py_AtExit(&cleanUpContext) != 0)
+        throw nb::import_error("hephaistos: Failed to register clean up function via Py_AtExit!");
+
     m.def("isVulkanAvailable", &hp::isVulkanAvailable,
         "Returns True if Vulkan is available on this system.");
 
