@@ -46,6 +46,12 @@ void registerProgramModule(nb::module_& m) {
             "Support for GL_KHR_shader_subgroup_clustered")
         .def_ro("quadSupport", &hp::SubgroupProperties::quadSupport,
             "Support for GL_KHR_shader_subgroup_quad")
+        .def_ro("rotateSupport", &hp::SubgroupProperties::rotateSupport,
+            "Basic support for GL_KHR_shader_subgroup_rotate")
+        .def_ro("rotateClusteredSupport", &hp::SubgroupProperties::rotateClusteredSupport,
+            "Support for clustered overloads in GL_KHR_shader_subgroup_rotate")
+        .def_ro("partitionSupport", &hp::SubgroupProperties::partitionSupport,
+            "Support for GL_NV_shader_subgroup_partitioned")
         .def_ro("uniformControlFlowSupport", &hp::SubgroupProperties::uniformControlFlowSupport,
             "Support for GL_EXT_subgroup_uniform_control_flow")
         .def_ro("maximalReconvergenceSupport", &hp::SubgroupProperties::maximalReconvergenceSupport,
@@ -64,6 +70,9 @@ void registerProgramModule(nb::module_& m) {
             str << "shuffleRelativeSupport:  " << props.shuffleRelativeSupport << '\n';
             str << "shuffleClusteredSupport: " << props.shuffleClusteredSupport << '\n';
             str << "quadSupport:             " << props.quadSupport << '\n';
+            str << "rotateSupport:           " << props.rotateSupport << '\n';
+            str << "rotateClusteredSupport:  " << props.rotateClusteredSupport << '\n';
+            str << "partitionSupport:        " << props.partitionSupport << '\n';
             str << "uniformControlFlow:      " << props.uniformControlFlowSupport << '\n';
             str << "maximalReconvergence:    " << props.maximalReconvergenceSupport << '\n';
             str << "extendedTypeSupport:     " << props.extendedTypeSupport;

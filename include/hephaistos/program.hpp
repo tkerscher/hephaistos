@@ -58,6 +58,18 @@ struct SubgroupProperties {
     */
     bool quadSupport;
     /**
+     * @brief Basic support for GL_KHR_shader_subgroup_rotate
+    */
+    bool rotateSupport;
+    /**
+     * @brief Support for clustered overloads in GL_KHR_shader_subgroup_rotate
+    */
+    bool rotateClusteredSupport;
+    /**
+     * @brief Support for GL_NV_shader_subgroup_partitioned
+    */
+    bool partitionSupport;
+    /**
      * @brief Support for GL_EXT_subgroup_uniform_control_flow
      */
     bool uniformControlFlowSupport;

@@ -62,6 +62,9 @@ SubgroupProperties getSubgroupProperties(VkPhysicalDevice device) {
         .shuffleRelativeSupport  = !!(subgroupProps.supportedOperations & VK_SUBGROUP_FEATURE_SHUFFLE_RELATIVE_BIT),
         .shuffleClusteredSupport = !!(subgroupProps.supportedOperations & VK_SUBGROUP_FEATURE_CLUSTERED_BIT),
         .quadSupport             = !!(subgroupProps.supportedOperations & VK_SUBGROUP_FEATURE_QUAD_BIT),
+        .rotateSupport           = !!(subgroupProps.supportedOperations & VK_SUBGROUP_FEATURE_ROTATE_BIT_KHR),
+        .rotateClusteredSupport  = !!(subgroupProps.supportedOperations & VK_SUBGROUP_FEATURE_ROTATE_CLUSTERED_BIT_KHR),
+        .partitionSupport        = !!(subgroupProps.supportedOperations & VK_SUBGROUP_FEATURE_PARTITIONED_BIT_EXT),
         .uniformControlFlowSupport   = controlFlow.shaderSubgroupUniformControlFlow == VK_TRUE,
         .maximalReconvergenceSupport = reconvergence.shaderMaximalReconvergence == VK_TRUE,
         .extendedTypeSupport         = feat12.shaderSubgroupExtendedTypes == VK_TRUE

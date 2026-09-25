@@ -308,9 +308,17 @@ ContextHandle createContext(
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FMA_FEATURES_KHR
         };
         //check for certain shader subgroup features
+        VkPhysicalDeviceShaderSubgroupRotateFeaturesKHR subgroupRotate{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_ROTATE_FEATURES_KHR,
+            .pNext = &fma
+        };
+        VkPhysicalDeviceShaderSubgroupPartitionedFeaturesEXT subgroupPartition{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_PARTITIONED_FEATURES_EXT,
+            .pNext = &subgroupRotate
+        };
         VkPhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR controlFlow{
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_FEATURES_KHR,
-            .pNext = &fma
+            .pNext = &subgroupPartition
         };
         VkPhysicalDeviceShaderMaximalReconvergenceFeaturesKHR reconvergence{
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_MAXIMAL_RECONVERGENCE_FEATURES_KHR,
@@ -371,6 +379,18 @@ ContextHandle createContext(
             pNext = static_cast<void*>(&fma);
             allDeviceExtensions.push_back(
                 VK_KHR_SHADER_FMA_EXTENSION_NAME);
+        }
+        if (subgroupRotate.shaderSubgroupRotate || subgroupRotate.shaderSubgroupRotateClustered) {
+            subgroupRotate.pNext = pNext;
+            pNext = static_cast<void*>(&subgroupRotate);
+            allDeviceExtensions.push_back(
+                VK_KHR_SHADER_SUBGROUP_ROTATE_EXTENSION_NAME);
+        }
+        if (subgroupPartition.shaderSubgroupPartitioned) {
+            subgroupPartition.pNext = pNext;
+            pNext = static_cast<void*>(&subgroupPartition);
+            allDeviceExtensions.push_back(
+                VK_EXT_SHADER_SUBGROUP_PARTITIONED_EXTENSION_NAME);
         }
         if (controlFlow.shaderSubgroupUniformControlFlow) {
             controlFlow.pNext = pNext;
