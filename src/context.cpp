@@ -303,9 +303,14 @@ ContextHandle createContext(
 
     //Create logical device
     {
+        //check for fma support
+        VkPhysicalDeviceShaderFmaFeaturesKHR fma{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FMA_FEATURES_KHR
+        };
         //check for certain shader subgroup features
         VkPhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR controlFlow{
-            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_FEATURES_KHR
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_UNIFORM_CONTROL_FLOW_FEATURES_KHR,
+            .pNext = &fma
         };
         VkPhysicalDeviceShaderMaximalReconvergenceFeaturesKHR reconvergence{
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_MAXIMAL_RECONVERGENCE_FEATURES_KHR,
@@ -353,6 +358,12 @@ ContextHandle createContext(
         }
 
         //chain optional features if available
+        if (fma.shaderFmaFloat16 || fma.shaderFmaFloat32 || fma.shaderFmaFloat64) {
+            fma.pNext = pNext;
+            pNext = static_cast<void*>(&fma);
+            allDeviceExtensions.push_back(
+                VK_KHR_SHADER_FMA_EXTENSION_NAME);
+        }
         if (controlFlow.shaderSubgroupUniformControlFlow) {
             controlFlow.pNext = pNext;
             pNext = static_cast<void*>(&controlFlow);

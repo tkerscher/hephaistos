@@ -1,12 +1,16 @@
 #include "hephaistos/types.hpp"
 
+#include <array>
+
 #include "vk/types.hpp"
 
 namespace hephaistos {
 
+/*********************************** TYPES ***********************************/
+
 namespace  {
 	
-auto ExtensionName = "Types";
+constexpr auto TypesExtensionName = "Types";
 
 constexpr uint32_t toBitFlags(const TypeSupport& types) {
 	uint32_t v = 0;
@@ -28,7 +32,7 @@ public:
 		return (supported & requiredFlags) == requiredFlags;
 	}
 	std::string_view getExtensionName() const override {
-		return ExtensionName;
+		return TypesExtensionName;
 	}
 	std::span<const char* const> getDeviceExtensions() const override {
 		return {};
@@ -87,6 +91,77 @@ TypeSupport getSupportedTypes(const ContextHandle& context) {
 
 ExtensionHandle createTypeExtension(const TypeSupport& types) {
 	return std::make_unique<TypesExtension>(types);
+}
+
+/************************************ FMA ************************************/
+
+namespace {
+
+constexpr auto FmaExtensionName = "FMA";
+
+class FmaExtension : public Extension {
+public:
+	bool isDeviceSupported(const DeviceHandle& device) const override {
+		auto supported = getFmaSupport(device);
+		return
+			(!required.float16 || supported.float16) &&
+			(!required.float32 || supported.float32) &&
+			(!required.float64 || supported.float64);
+	}
+	std::string_view getExtensionName() const override {
+		return FmaExtensionName;
+	}
+	std::span<const char* const> getDeviceExtensions() const override {
+		//this extension is automatically added during context creation
+		//-> do not add it twice
+		return {};
+	}
+	void* chain(void* pNext) override {
+		//does not partake in chain -> skip
+		return pNext;
+	}
+	void finalize(const ContextHandle& context) {}
+
+	FmaExtension(const FmaSupport& fma) : required(fma) {}
+	virtual ~FmaExtension() = default;
+
+private:
+	FmaSupport required;
+};
+
+FmaSupport queryFmaSupport(VkPhysicalDevice device) {
+	VkPhysicalDeviceShaderFmaFeaturesKHR fma{
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FMA_FEATURES_KHR
+	};
+	VkPhysicalDeviceFeatures2 features{
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+		.pNext = &fma
+	};
+	vkGetPhysicalDeviceFeatures2(device, &features);
+
+	return {
+		!!fma.shaderFmaFloat16,
+		!!fma.shaderFmaFloat32,
+		!!fma.shaderFmaFloat64
+	};
+}
+
+}
+
+FmaSupport getFmaSupport(const DeviceHandle& device) {
+	if (!device)
+		return {};
+	return queryFmaSupport(device->device);
+}
+
+FmaSupport getFmaSupport(const ContextHandle& context) {
+	if (!context)
+		return {};
+	return queryFmaSupport(context->physicalDevice);
+}
+
+ExtensionHandle createFmaExtension(const FmaSupport& fma) {
+	return std::make_unique<FmaExtension>(fma);
 }
 
 }

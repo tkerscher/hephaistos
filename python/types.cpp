@@ -57,4 +57,40 @@ void registerTypeModule(nb::module_& m) {
     }, "types"_a, "force"_a = false,
     "Forces the given types, i.e. devices not supported will be considered"
     "not suitable. Set force=True if an existing context should be destroyed");
+
+    nb::class_<hp::FmaSupport>(m, "FmaSupport",
+            "List of types for which the device supports OpFmaKHR")
+        .def_ro("float16", &hp::FmaSupport::float16)
+        .def_ro("float32", &hp::FmaSupport::float32)
+        .def_ro("float64", &hp::FmaSupport::float64)
+        .def("__repr__", [](const hp::FmaSupport& fma) {
+            std::ostringstream str;
+            str << std::boolalpha;
+            str << "float16: " << !!fma.float16 << '\n';
+            str << "float32: " << !!fma.float32 << '\n';
+            str << "float64: " << !!fma.float64;
+            return str.str();
+        });
+    
+    m.def("getFmaSupport", [](std::optional<uint32_t> id) {
+            if (id) {
+                return hp::getFmaSupport(getDevice(*id));
+            }
+            else {
+                return hp::getFmaSupport(getCurrentContext());
+            }
+        }, "id"_a.none() = nb::none(),
+        "Queries the types supporting OpFmaKHR");
+    
+    m.def("requireFmaSupport", [](const nb::set& types, bool force) {
+            hp::FmaSupport fma{
+                .float16 = types.contains("f16"),
+                .float32 = types.contains("f32"),
+                .float64 = types.contains("f64")
+            };
+            addExtension(hp::createFmaExtension(fma), force);
+        }, "types"_a, "force"_a = false,
+        "Forces support of OpFmaKHR for the given types, i.e. devices not "
+        "meeting this requirement will be considered not suitable. Set "
+        "force=True if an existing context should be destroyed.");
 }
