@@ -28,6 +28,10 @@ struct RayTracingFeatures {
      * @brief Support for hit objects and shader invocation reorder
      */
     bool hitObjects;
+    /**
+     * @brief Support for subgroup operations in ray tracing pipelines
+    */
+    bool subgroupOperations;
 };
 
 /**

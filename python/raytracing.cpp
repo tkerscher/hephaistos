@@ -29,7 +29,8 @@ void initRayTracingFeatures(
     bool pipeline,
     bool indirectDispatch,
     bool positionFetch,
-    bool hitObjects
+    bool hitObjects,
+    bool subgroupOperations
 ) {
     new (features) hp::RayTracingFeatures();
     features->query = query;
@@ -37,6 +38,7 @@ void initRayTracingFeatures(
     features->indirectDispatch = indirectDispatch;
     features->positionFetch = positionFetch;
     features->hitObjects = hitObjects;
+    features->subgroupOperations = subgroupOperations;
 }
 
 bool isRayTracingSupported(hp::RayTracingFeatures features, std::optional<uint32_t> id) {
@@ -79,14 +81,16 @@ void registerRayTracingExtension(nb::module_& m) {
         .def_rw("indirectDispatch", &hp::RayTracingFeatures::indirectDispatch, "Support for indirect ray tracing dispatch")
         .def_rw("positionFetch", &hp::RayTracingFeatures::positionFetch, "Support for fetching intersection position in shaders")
         .def_rw("hitObjects", &hp::RayTracingFeatures::hitObjects, "Support for hit objects and shader invocation reorder")
+        .def_rw("subgroupOperations", &hp::RayTracingFeatures::subgroupOperations, "Support for subgroup operations in ray tracing pipelines")
         .def("__str__", [](const hp::RayTracingFeatures& f) {
             std::ostringstream str;
             str << std::boolalpha;
-            str << "query:            " << f.query << '\n';
-            str << "pipeline:         " << f.pipeline << '\n';
-            str << "indirectDispatch: " << f.indirectDispatch << '\n';
-            str << "positionFetch:    " << f.positionFetch << '\n';
-            str << "hitObjects:       " << f.hitObjects;
+            str << "query:              " << f.query << '\n';
+            str << "pipeline:           " << f.pipeline << '\n';
+            str << "indirectDispatch:   " << f.indirectDispatch << '\n';
+            str << "positionFetch:      " << f.positionFetch << '\n';
+            str << "hitObjects:         " << f.hitObjects << '\n';
+            str << "subgroupOperations: " << f.subgroupOperations;
             return str.str();
         })
         .def("__init__", &initRayTracingFeatures,
@@ -95,7 +99,8 @@ void registerRayTracingExtension(nb::module_& m) {
             "pipeline"_a = false,
             "indirectDispatch"_a = false,
             "positionFetch"_a = false,
-            "hitObjects"_a = false);
+            "hitObjects"_a = false,
+            "subgroupOperations"_a = false);
     
     nb::class_<hp::RayTracingProperties>(m, "RayTracingProperties",
             "Additional device properties specific to ray tracing")

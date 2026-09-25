@@ -13,6 +13,14 @@ namespace {
 
 constexpr auto RayTracing_ExtensionName = "RayTracing";
 
+constexpr VkShaderStageFlags RayTracingShaderStages =
+    VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+    VK_SHADER_STAGE_MISS_BIT_KHR |
+    VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+    VK_SHADER_STAGE_ANY_HIT_BIT_KHR |
+    VK_SHADER_STAGE_INTERSECTION_BIT_KHR |
+    VK_SHADER_STAGE_CALLABLE_BIT_KHR;
+
 }
 
 RayTracingFeatures getRayTracingFeatures(const DeviceHandle& device) {
@@ -44,6 +52,14 @@ RayTracingFeatures getRayTracingFeatures(const DeviceHandle& device) {
         .pNext = &accelerationStructureFeatures
     };
     vkGetPhysicalDeviceFeatures2(device->device, &features);
+    VkPhysicalDeviceSubgroupProperties subgroup{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES
+    };
+    VkPhysicalDeviceProperties2 props{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+        .pNext = &subgroup
+    };
+    vkGetPhysicalDeviceProperties2(device->device, &props);
 
     //check common required features
     if (!accelerationStructureFeatures.accelerationStructure)
@@ -55,7 +71,8 @@ RayTracingFeatures getRayTracingFeatures(const DeviceHandle& device) {
         !!pipelineFeatures.rayTracingPipeline,
         !!pipelineFeatures.rayTracingPipelineTraceRaysIndirect,
         !!posFetchFeatures.rayTracingPositionFetch,
-        !!reorderFeatures.rayTracingInvocationReorder
+        !!reorderFeatures.rayTracingInvocationReorder,
+        (subgroup.supportedStages & RayTracingShaderStages) == RayTracingShaderStages
     };
 }
 
