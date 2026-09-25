@@ -42,6 +42,14 @@ SubgroupProperties getSubgroupProperties(VkPhysicalDevice device) {
         .pNext = &subgroupProps
     };
     vkGetPhysicalDeviceProperties2(device, &props);
+    VkPhysicalDeviceVulkan12Features feat12{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
+    };
+    VkPhysicalDeviceFeatures2 feat{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext = &feat12
+    };
+    vkGetPhysicalDeviceFeatures2(device, &feat);
 
     //build struct
     return SubgroupProperties{
@@ -55,7 +63,8 @@ SubgroupProperties getSubgroupProperties(VkPhysicalDevice device) {
         .shuffleClusteredSupport = !!(subgroupProps.supportedOperations & VK_SUBGROUP_FEATURE_CLUSTERED_BIT),
         .quadSupport             = !!(subgroupProps.supportedOperations & VK_SUBGROUP_FEATURE_QUAD_BIT),
         .uniformControlFlowSupport   = controlFlow.shaderSubgroupUniformControlFlow == VK_TRUE,
-        .maximalReconvergenceSupport = reconvergence.shaderMaximalReconvergence == VK_TRUE
+        .maximalReconvergenceSupport = reconvergence.shaderMaximalReconvergence == VK_TRUE,
+        .extendedTypeSupport         = feat12.shaderSubgroupExtendedTypes == VK_TRUE
     };
 }
 

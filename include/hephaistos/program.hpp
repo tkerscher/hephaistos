@@ -65,6 +65,10 @@ struct SubgroupProperties {
      * @brief Support for GL_EXT_maximal_reconvergence
      */
     bool maximalReconvergenceSupport;
+    /**
+     * @brief Support for GLSL_EXT_shader_subgroup_extended_types
+    */
+    bool extendedTypeSupport;
 };
 /**
  * @brief Returns the subgroup properties of the given device

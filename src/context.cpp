@@ -384,6 +384,15 @@ ContextHandle createContext(
             allDeviceExtensions.push_back(
                 VK_KHR_SHADER_MAXIMAL_RECONVERGENCE_EXTENSION_NAME);
         }
+        VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures subgroupExtTypeFeatures{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_EXTENDED_TYPES_FEATURES,
+            .shaderSubgroupExtendedTypes = VK_TRUE
+        };
+        if (features12.shaderSubgroupExtendedTypes) {
+            subgroupExtTypeFeatures.pNext = pNext;
+            pNext = static_cast<void*>(&subgroupExtTypeFeatures);
+            //feature is part of Vulkan 1.2 -> no extension required
+        }
         //obligatory features
         VkDeviceQueueCreateInfo queueInfo{
             .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
