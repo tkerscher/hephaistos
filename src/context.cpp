@@ -319,9 +319,17 @@ ContextHandle createContext(
         //Check for extended arithmetic type support (e.f. float64)
         //and enable them by default
         //(since we can't reasonable chain basic feature set)
+        VkPhysicalDevice16BitStorageFeatures storage16{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES,
+            .pNext = &reconvergence
+        };
+        VkPhysicalDevice8BitStorageFeatures storage8{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES,
+            .pNext = &storage16
+        };
         VkPhysicalDeviceVulkan12Features features12{
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
-            .pNext = &reconvergence
+            .pNext = &storage8
         };
         VkPhysicalDeviceFeatures2 features2{
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
@@ -431,6 +439,9 @@ ContextHandle createContext(
             .vulkanMemoryModel            = VK_TRUE,
             .vulkanMemoryModelDeviceScope = VK_TRUE
         };
+        //enable the storage access features queried earlier by reusing filled structs
+        storage16.pNext = &memModelFeatures;
+        storage8.pNext = &storage16;
         VkPhysicalDeviceFeatures features{
             .shaderFloat64 = features2.features.shaderFloat64,
             .shaderInt64   = features2.features.shaderInt64,
@@ -438,7 +449,7 @@ ContextHandle createContext(
         };
         VkDeviceCreateInfo deviceInfo{
             .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-            .pNext                   = &memModelFeatures,
+            .pNext                   = &storage8,
             .queueCreateInfoCount    = 1,
             .pQueueCreateInfos       = &queueInfo,
             .enabledExtensionCount   = static_cast<uint32_t>(allDeviceExtensions.size()),

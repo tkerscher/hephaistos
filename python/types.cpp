@@ -21,14 +21,34 @@ void registerTypeModule(nb::module_& m) {
         .def_ro("int64", &hp::TypeSupport::int64)
         .def_ro("int16", &hp::TypeSupport::int16)
         .def_ro("int8", &hp::TypeSupport::int8)
+        .def_ro("buffer16BitAccess", &hp::TypeSupport::buffer16BitAccess)
+        .def_ro("uniform16BitAccess", &hp::TypeSupport::uniform16BitAccess)
+        .def_ro("pushConstant16BitAccess", &hp::TypeSupport::pushConstant16BitAccess)
+        .def_ro("buffer8BitAccess", &hp::TypeSupport::buffer8BitAccess)
+        .def_ro("uniform8BitAccess", &hp::TypeSupport::uniform8BitAccess)
+        .def_ro("pushConstant8BitAccess", &hp::TypeSupport::pushConstant8BitAccess)
         .def("__repr__", [](const hp::TypeSupport& t) {
             std::ostringstream str;
             str << std::boolalpha;
-            str << "float64: " << !!t.float64 << '\n';
-            str << "float16: " << !!t.float16 << '\n';
-            str << "int64:   " << !!t.int64 << '\n';
-            str << "int16:   " << !!t.int16 << '\n';
-            str << "int8:    " << !!t.int8;
+            str << "Data Types\n";
+            str << "----------------------\n";
+            str << " float64: " << !!t.float64 << '\n';
+            str << " float16: " << !!t.float16 << '\n';
+            str << " int64:   " << !!t.int64 << '\n';
+            str << " int16:   " << !!t.int16 << '\n';
+            str << " int8:    " << !!t.int8 << '\n';
+            str << "Buffer Storage Access\n";
+            str << "----------------------\n";
+            str << " 16 bit:  " << !!t.buffer16BitAccess << '\n';
+            str << "  8 bit:  " << !!t.buffer8BitAccess << '\n';
+            str << "Uniform Storage Access\n";
+            str << "----------------------\n";
+            str << " 16 bit:  " << !!t.uniform16BitAccess << '\n';
+            str << "  8 bit:  " << !!t.uniform8BitAccess << '\n';
+            str << "Push Constant Access\n";
+            str << "----------------------\n";
+            str << " 16 bit:  " << !!t.pushConstant16BitAccess << '\n';
+            str << "  8 bit:  " << !!t.pushConstant8BitAccess;
             return str.str();
         });
     
@@ -50,7 +70,13 @@ void registerTypeModule(nb::module_& m) {
             .float16 = types.contains("f16"),
             .int64 = types.contains("i64"),
             .int16 = types.contains("i16"),
-            .int8 = types.contains("i8")
+            .int8 = types.contains("i8"),
+            .buffer16BitAccess = types.contains("B16"),
+            .uniform16BitAccess = types.contains("U16"),
+            .pushConstant16BitAccess = types.contains("P16"),
+            .buffer8BitAccess = types.contains("B8"),
+            .uniform8BitAccess = types.contains("U8"),
+            .pushConstant8BitAccess = types.contains("P8")
         };
 
         addExtension(hp::createTypeExtension(t), force);

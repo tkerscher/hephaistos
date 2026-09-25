@@ -14,6 +14,14 @@ struct TypeSupport {
 	bool int64;
 	bool int16;
 	bool int8;
+
+	bool buffer16BitAccess;
+	bool uniform16BitAccess;
+	bool pushConstant16BitAccess;
+
+	bool buffer8BitAccess;
+	bool uniform8BitAccess;
+	bool pushConstant8BitAccess;
 };
 
 /**

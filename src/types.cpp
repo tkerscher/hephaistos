@@ -22,6 +22,14 @@ constexpr uint32_t toBitFlags(const TypeSupport& types) {
 	v += types.int16 << 3;
 	v += types.int8 << 4;
 
+	v += types.buffer16BitAccess << 5;
+	v += types.uniform16BitAccess << 6;
+	v += types.pushConstant16BitAccess << 7;
+
+	v += types.buffer8BitAccess << 8;
+	v += types.uniform8BitAccess << 9;
+	v += types.pushConstant8BitAccess << 10;
+
 	return v;
 }
 
@@ -53,8 +61,16 @@ private:
 };
 
 TypeSupport createTypeSupport(VkPhysicalDevice device) {
+	VkPhysicalDevice8BitStorageFeatures storage8{
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES
+	};
+	VkPhysicalDevice16BitStorageFeatures storage16{
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES,
+		.pNext = &storage8
+	};
 	VkPhysicalDeviceVulkan12Features features12{
-			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+		.pNext = &storage16
 	};
 	VkPhysicalDeviceFeatures2 features2{
 		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
@@ -67,7 +83,13 @@ TypeSupport createTypeSupport(VkPhysicalDevice device) {
 		!!features12.shaderFloat16,
 		!!features2.features.shaderInt64,
 		!!features2.features.shaderInt16,
-		!!features12.shaderInt8
+		!!features12.shaderInt8,
+		!!storage16.storageBuffer16BitAccess,
+		!!storage16.uniformAndStorageBuffer16BitAccess,
+		!!storage16.storagePushConstant16,
+		!!storage8.storageBuffer8BitAccess,
+		!!storage8.uniformAndStorageBuffer8BitAccess,
+		!!storage8.storagePushConstant8
 	};
 }
 
