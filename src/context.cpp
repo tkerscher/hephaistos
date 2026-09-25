@@ -424,6 +424,13 @@ ContextHandle createContext(
             .pNext = &scalarBlockFeatures,
             .bufferDeviceAddress = VK_TRUE
         };
+        VkPhysicalDeviceVulkanMemoryModelFeatures memModelFeatures{
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES,
+            .pNext = &addressFeatures,
+            //support is guaranteed by Vulkan 1.3
+            .vulkanMemoryModel            = VK_TRUE,
+            .vulkanMemoryModelDeviceScope = VK_TRUE
+        };
         VkPhysicalDeviceFeatures features{
             .shaderFloat64 = features2.features.shaderFloat64,
             .shaderInt64   = features2.features.shaderInt64,
@@ -431,7 +438,7 @@ ContextHandle createContext(
         };
         VkDeviceCreateInfo deviceInfo{
             .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-            .pNext                   = &addressFeatures,
+            .pNext                   = &memModelFeatures,
             .queueCreateInfoCount    = 1,
             .pQueueCreateInfos       = &queueInfo,
             .enabledExtensionCount   = static_cast<uint32_t>(allDeviceExtensions.size()),
